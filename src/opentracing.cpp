@@ -3,6 +3,7 @@
 namespace ot = opentracing;
 
 namespace datadog {
+namespace opentracing {
 
 class Tracer : public ot::Tracer {
  public:
@@ -47,4 +48,5 @@ std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options) {
   return std::shared_ptr<ot::Tracer>{new Tracer{}};
 }
 
+}  // namespace opentracing
 }  // namespace datadog

@@ -1,6 +1,9 @@
 #include <opentracing/tracer.h>
 
+namespace ot = opentracing;
+
 namespace datadog {
+namespace opentracing {
 
 struct TracerOptions {
   std::string agent_host = "localhost";
@@ -8,6 +11,7 @@ struct TracerOptions {
   std::string service_name = "nginx";
 };
 
-std::shared_ptr<opentracing::Tracer> makeTracer(const TracerOptions &options);
+std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
 
+}  // namespace opentracing
 }  // namespace datadog
