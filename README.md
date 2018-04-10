@@ -16,6 +16,16 @@
     make
     make install
 
+**Running the tests**
+
+Either just run `circleci build` or:
+
+    mkdir .build
+    cd .build
+    cmake ..
+    make
+    make test
+
 ## Usage
 
 ### Tracing C++ Code
