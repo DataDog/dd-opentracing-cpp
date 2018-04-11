@@ -7,7 +7,10 @@ project (dd-opentracing-cpp)
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
 
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB})
+
 # Includes
+include_directories(SYSTEM 3rd_party/include)
 include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR})
 include_directories(include)
 
@@ -18,13 +21,19 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 # Outputs
 ## Shared lib
 add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
-target_link_libraries(dd_opentracing ${OPENTRACING_LIB})
+target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
 
 ## Static lib
 add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
 set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
-target_link_libraries(dd_opentracing-static ${OPENTRACING_LIB} datadog)
+target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
 
 install(TARGETS dd_opentracing dd_opentracing-static
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
+
+# Tests
+include(CTest)
+if (BUILD_TESTING)
+  add_subdirectory(test)
+endif()
