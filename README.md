@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/DataDog/dd-opentracing-cpp/tree/master.svg?style=svg&circle-token=ad1c0acf298d39a594751ac9eb76ea92243e5fe3)](https://circleci.com/gh/DataDog/dd-opentracing-cpp/tree/master)
+
 # Datadog OpenTracing C++ Client
 
 ## Building
