@@ -16,7 +16,7 @@ jobs:
             changes=$(find ./ -iname *.h -o -iname *.cpp | xargs clang-format -output-replacements-xml | grep -c "<replacement " || true)
             if [ $changes != 0 ]
             then
-              echo "Did not pass clang-format"
+              echo "Did not pass clang-format, consider running: find ./ -iname *.h -o -iname *.cpp | xargs clang-format -i"
               exit 1
             fi
       - run:
@@ -38,5 +38,5 @@ jobs:
             pushd .build
             cmake ..
             make
-            make test
+            ctest --output-on-failure
             popd
