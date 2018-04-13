@@ -6,6 +6,7 @@
 
 - cmake >= 3.0
 - [OpenTracing C++](https://github.com/opentracing/)
+- [msgpack-c](ttps://github.com/msgpack/msgpack-c/)
 - Build tools (eg. build-essential, xcode)
 
 **Build steps**
