@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_TEST_MOCKS_H
 
 #include "../src/recorder.h"
+#include <sstream>
 
 namespace datadog {
 namespace opentracing {
@@ -18,6 +19,9 @@ struct SpanInfo {
   int32_t error;
   int64_t start;
   int64_t duration;
+
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, span_id, trace_id, parent_id,
+                     error);
 };
 
 // A Recorder implemenentation that allows access to the Spans recorded.
@@ -29,8 +33,17 @@ struct MockRecorder : public Recorder {
 
   // Returns a struct that describes the unique information of a span.
   static SpanInfo getSpanInfo(Span &span) {
-    return SpanInfo{span.name,     span.service,   span.resource, span.type,  span.span_id,
-                    span.trace_id, span.parent_id, span.error,    span.start, span.duration};
+    // Encode Span into msgpack and decode into SpanInfo.
+    std::stringstream buffer;
+    msgpack::pack(buffer, span);
+    // Decode.
+    buffer.seekg(0);
+    std::string str(buffer.str());
+    msgpack::object_handle oh = msgpack::unpack(str.data(), str.size());
+    msgpack::object deserialized = oh.get();
+    SpanInfo dst;
+    deserialized.convert(dst);
+    return dst;
   }
 
   std::vector<SpanInfo> spans;
