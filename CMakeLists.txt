@@ -7,12 +7,13 @@ project (dd-opentracing-cpp)
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
 find_library(MSGPACK_LIB msgpack)
+find_package(CURL)
 
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB})
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES})
 
 # Includes
 include_directories(SYSTEM 3rd_party/include)
-include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR})
+include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR} ${CURL_INCLUDE_DIRS})
 include_directories(include)
 
 # Code

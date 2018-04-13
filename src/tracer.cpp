@@ -15,7 +15,9 @@ uint64_t getId() {
 }
 
 Tracer::Tracer(TracerOptions options)
-    : Tracer(options, std::shared_ptr<Recorder>(new AgentRecorder{}), getRealTime, getId) {}
+    : Tracer(options,
+             std::shared_ptr<Recorder>(new AgentRecorder{options.agent_host, options.agent_port}),
+             getRealTime, getId) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Recorder> recorder, TimeProvider get_time,
                IdProvider get_id)
