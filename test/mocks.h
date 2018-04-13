@@ -1,8 +1,8 @@
 #ifndef DD_OPENTRACING_TEST_MOCKS_H
 #define DD_OPENTRACING_TEST_MOCKS_H
 
-#include "../src/recorder.h"
 #include <sstream>
+#include "../src/recorder.h"
 
 namespace datadog {
 namespace opentracing {
