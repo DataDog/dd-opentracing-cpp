@@ -5,7 +5,7 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer> writer,
+Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> writer,
            TimeProvider get_time, IdProvider next_id, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource,
            const ot::StartSpanOptions &options)
@@ -32,7 +32,7 @@ Span::~Span() noexcept {}
 void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept try {
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  writer_->Write(std::move(*this));
+  writer_->write(std::move(*this));
 } catch (const std::bad_alloc &) {
   // At least don't crash.
 }

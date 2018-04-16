@@ -28,11 +28,11 @@ struct SpanInfo {
 };
 
 // A Writer implemenentation that allows access to the Spans recorded.
-struct MockWriter : public Writer {
+struct MockWriter : public Writer<Span> {
   MockWriter() {}
   ~MockWriter() override {}
 
-  void Write(Span&& span) override { spans.push_back(MockWriter::getSpanInfo(span)); }
+  void write(Span&& span) override { spans.push_back(MockWriter::getSpanInfo(span)); }
 
   // Returns a struct that describes the unique information of a span.
   static SpanInfo getSpanInfo(Span& span) {
@@ -75,21 +75,27 @@ class MockHandle : public Handle {
   ~MockHandle() override{};
 
   CURLcode setopt(CURLoption key, const char* value) override {
-    if (rcode != CURLE_OK) {
-      options[key] = std::string(value);
+    if (rcode == CURLE_OK) {
+      // We might have null characters if it's the POST data, thanks msgpack!
+      if (key == CURLOPT_POSTFIELDS && options.find(CURLOPT_POSTFIELDSIZE) != options.end()) {
+        long len = std::stol(options.find(CURLOPT_POSTFIELDSIZE)->second);
+        options[key] = std::string(value, len);
+      } else {
+        options[key] = std::string(value);
+      }
     }
     return rcode;
   }
 
   CURLcode setopt(CURLoption key, long value) override {
-    if (rcode != CURLE_OK) {
+    if (rcode == CURLE_OK) {
       options[key] = std::to_string(value);
     }
     return rcode;
   }
 
   CURLcode appendHeaders(std::list<std::string> new_headers) override {
-    if (rcode != CURLE_OK) {
+    if (rcode == CURLE_OK) {
       headers.insert(headers.end(), new_headers.begin(), new_headers.end());
     }
     return rcode;
@@ -98,6 +104,16 @@ class MockHandle : public Handle {
   CURLcode perform() override { return rcode; }
 
   std::string getError() override { return error; }
+
+  std::unique_ptr<std::vector<std::vector<SpanInfo>>> getSpans() {
+    std::string packed_span = options[CURLOPT_POSTFIELDS];
+    msgpack::object_handle oh = msgpack::unpack(packed_span.data(), packed_span.size());
+    msgpack::object deserialized = oh.get();
+    std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
+        new std::vector<std::vector<SpanInfo>>{}};
+    deserialized.convert(*dst.get());
+    return std::move(dst);
+  }
 
   std::unordered_map<CURLoption, std::string, EnumClassHash> options;
   std::list<std::string> headers;

@@ -9,13 +9,18 @@ const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "https://";
 }  // namespace
 
-AgentWriter::AgentWriter(std::string host, uint32_t port) : handle_(std::move(new CurlHandle{})) {
+template <class Message>
+AgentWriter<Message>::AgentWriter(std::string host, uint32_t port)
+    : AgentWriter(std::shared_ptr<Handle>{new CurlHandle{}}, host, port){};
+
+template <class Message>
+AgentWriter<Message>::AgentWriter(std::shared_ptr<Handle> handle, std::string host, uint32_t port)
+    : handle_(std::move(handle)) {
   setUpHandle(host, port);
 }
 
-void AgentWriter::setUpHandle(std::string host, uint32_t port) {
-  // Initilaize the CURL handle.
-
+template <class Message>
+void AgentWriter<Message>::setUpHandle(std::string host, uint32_t port) {
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
@@ -33,21 +38,25 @@ void AgentWriter::setUpHandle(std::string host, uint32_t port) {
   }
 }
 
-AgentWriter::~AgentWriter() {}
+template <class Message>
+AgentWriter<Message>::~AgentWriter() {}
 
-void AgentWriter::Write(Span &&span) {
-  spans_.push_back(std::move(span));
-  sendSpans();  // To be done async in a near-future version.
+template <class Message>
+void AgentWriter<Message>::write(Message &&message) {
+  messages_.push_back(std::move(message));
+  flush();  // To be done async in a near-future version.
 };
 
-void AgentWriter::sendSpans() try {
+template <class Message>
+void AgentWriter<Message>::flush() try {
   // Clear the buffer but keep the allocated memory.
   buffer_.clear();
   buffer_.str(std::string{});
   // Why does the agent want extra nesting?
-  std::array<std::reference_wrapper<std::vector<Span>>, 1> spans{spans_};
-  msgpack::pack(buffer_, spans);
+  std::array<std::reference_wrapper<std::vector<Message>>, 1> messages{messages_};
+  msgpack::pack(buffer_, messages);
   std::string post_fields = buffer_.str();
+  messages_.clear();
 
   // We have to set the size manually, because msgpack uses null characters.
   auto rcode = handle_->setopt(CURLOPT_POSTFIELDSIZE, post_fields.size());
@@ -69,8 +78,12 @@ void AgentWriter::sendSpans() try {
     return;
   }
 } catch (const std::bad_alloc &) {
-  // Drop spans, but live to fight another day.
+  // Drop messages, but live to fight another day.
+  messages_.clear();
 }
+
+// Make sure we generate code for a Span-writing Writer.
+template class AgentWriter<Span>;
 
 }  // namespace opentracing
 }  // namespace datadog
