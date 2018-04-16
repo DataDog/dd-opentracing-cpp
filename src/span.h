@@ -10,16 +10,16 @@ namespace datadog {
 namespace opentracing {
 
 class Tracer;
-class Recorder;
+class Writer;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {
  public:
   // Creates a new Span, usually called by Tracer::CreateSpanFromOptions.
-  Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Recorder> recorder,
-       TimeProvider get_time, IdProvider next_id, std::string span_service, std::string span_type,
-       std::string span_name, ot::string_view resource, const ot::StartSpanOptions &options);
+  Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer> writer, TimeProvider get_time,
+       IdProvider next_id, std::string span_service, std::string span_type, std::string span_name,
+       ot::string_view resource, const ot::StartSpanOptions &options);
 
   Span() = delete;
 
@@ -45,7 +45,7 @@ class Span : public ot::Span {
  private:
   std::shared_ptr<const Tracer> tracer_;
   TimeProvider get_time_;
-  std::shared_ptr<Recorder> recorder_;
+  std::shared_ptr<Writer> writer_;
   TimePoint start_time_;
 
   // An exception to the naming convention is made here because the variable names themselves are
@@ -65,7 +65,7 @@ class Span : public ot::Span {
 
   // TODO[willgittoes-dd]: Remove this once we have msgpack serialisation. Since then we can test
   // against that.
-  friend class MockRecorder;
+  friend class MockWriter;
 };
 
 }  // namespace opentracing

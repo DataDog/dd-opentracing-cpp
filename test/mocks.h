@@ -1,7 +1,7 @@
 #ifndef DD_OPENTRACING_TEST_MOCKS_H
 #define DD_OPENTRACING_TEST_MOCKS_H
 
-#include "../src/recorder.h"
+#include "../src/writer.h"
 
 namespace datadog {
 namespace opentracing {
@@ -20,12 +20,12 @@ struct SpanInfo {
   int64_t duration;
 };
 
-// A Recorder implemenentation that allows access to the Spans recorded.
-struct MockRecorder : public Recorder {
-  MockRecorder() {}
-  ~MockRecorder() override {}
+// A Writer implemenentation that allows access to the Spans recorded.
+struct MockWriter : public Writer {
+  MockWriter() {}
+  ~MockWriter() override {}
 
-  void RecordSpan(Span &&span) override { spans.push_back(MockRecorder::getSpanInfo(span)); }
+  void Write(Span &&span) override { spans.push_back(MockWriter::getSpanInfo(span)); }
 
   // Returns a struct that describes the unique information of a span.
   static SpanInfo getSpanInfo(Span &span) {
