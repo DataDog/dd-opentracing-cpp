@@ -16,6 +16,7 @@ namespace opentracing {
 
 template <class MsgType>
 class Writer;
+class Span;
 
 // The interface for providing IDs to spans and traces.
 typedef std::function<uint64_t()> IdProvider;
