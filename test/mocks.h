@@ -1,10 +1,11 @@
 #ifndef DD_OPENTRACING_TEST_MOCKS_H
 #define DD_OPENTRACING_TEST_MOCKS_H
 
+#include <curl/curl.h>
 #include <list>
 #include <sstream>
 #include <unordered_map>
-#include "../src/recorder.h"
+#include "../src/writer.h"
 
 namespace datadog {
 namespace opentracing {
@@ -26,12 +27,12 @@ struct SpanInfo {
                      error);
 };
 
-// A Recorder implemenentation that allows access to the Spans recorded.
-struct MockRecorder : public Recorder {
-  MockRecorder() {}
-  ~MockRecorder() override {}
+// A Writer implemenentation that allows access to the Spans recorded.
+struct MockWriter : public Writer {
+  MockWriter() {}
+  ~MockWriter() override {}
 
-  void RecordSpan(Span&& span) override { spans.push_back(MockRecorder::getSpanInfo(span)); }
+  void Write(Span&& span) override { spans.push_back(MockWriter::getSpanInfo(span)); }
 
   // Returns a struct that describes the unique information of a span.
   static SpanInfo getSpanInfo(Span& span) {
@@ -57,6 +58,15 @@ void advanceSeconds(TimePoint& t, int s) {
   std::chrono::duration<int, std::ratio<1>> by(s);
   t.relative_time += by;
 }
+
+// Enums not hashable on some recent GCC versions:
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60970
+struct EnumClassHash {
+  template <typename T>
+  std::size_t operator()(T t) const {
+    return static_cast<std::size_t>(t);
+  }
+};
 
 // A Handle that doesn't actually make network requests.
 class MockHandle : public Handle {
@@ -89,7 +99,7 @@ class MockHandle : public Handle {
 
   std::string getError() override { return error; }
 
-  std::unordered_map<CURLoption, std::string> options;
+  std::unordered_map<CURLoption, std::string, EnumClassHash> options;
   std::list<std::string> headers;
   std::string error = "";
   CURLcode rcode = CURLE_OK;

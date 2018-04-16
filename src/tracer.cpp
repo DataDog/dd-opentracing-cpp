@@ -16,19 +16,19 @@ uint64_t getId() {
 
 Tracer::Tracer(TracerOptions options)
     : Tracer(options,
-             std::shared_ptr<Recorder>(new AgentRecorder{options.agent_host, options.agent_port}),
+             std::shared_ptr<Writer>(new AgentWriter{options.agent_host, options.agent_port}),
              getRealTime, getId) {}
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<Recorder> recorder, TimeProvider get_time,
+Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer, TimeProvider get_time,
                IdProvider get_id)
-    : opts_(options), recorder_(std::move(recorder)), get_time_(get_time), get_id_(get_id) {}
+    : opts_(options), writer_(std::move(writer)), get_time_(get_time), get_id_(get_id) {}
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), recorder_, get_time_,
-                                                  get_id_, opts_.service, opts_.type,
-                                                  opts_.span_name, operation_name, options}});
+  return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), writer_, get_time_, get_id_,
+                                                  opts_.service, opts_.type, opts_.span_name,
+                                                  operation_name, options}});
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;

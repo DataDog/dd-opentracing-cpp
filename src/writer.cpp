@@ -1,6 +1,5 @@
-#include "recorder.h"
+#include "writer.h"
 #include <iostream>
-#include <sstream>
 
 namespace datadog {
 namespace opentracing {
@@ -10,12 +9,11 @@ const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "https://";
 }  // namespace
 
-AgentRecorder::AgentRecorder(std::string host, uint32_t port)
-    : handle_(std::move(new CurlHandle{})) {
+AgentWriter::AgentWriter(std::string host, uint32_t port) : handle_(std::move(new CurlHandle{})) {
   setUpHandle(host, port);
 }
 
-void AgentRecorder::setUpHandle(std::string host, uint32_t port) {
+void AgentWriter::setUpHandle(std::string host, uint32_t port) {
   // Initilaize the CURL handle.
 
   // Some options are the same for all actions, set them here.
@@ -35,14 +33,14 @@ void AgentRecorder::setUpHandle(std::string host, uint32_t port) {
   }
 }
 
-AgentRecorder::~AgentRecorder() {}
+AgentWriter::~AgentWriter() {}
 
-void AgentRecorder::RecordSpan(Span &&span) {
+void AgentWriter::Write(Span &&span) {
   spans_.push_back(std::move(span));
   sendSpans();  // To be done async in a near-future version.
 };
 
-void AgentRecorder::sendSpans() try {
+void AgentWriter::sendSpans() try {
   // Clear the buffer but keep the allocated memory.
   buffer_.clear();
   buffer_.str(std::string{});

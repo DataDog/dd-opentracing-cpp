@@ -1,5 +1,6 @@
 #include "transport.h"
 
+#include <stdexcept>
 #include <string>
 
 namespace datadog {

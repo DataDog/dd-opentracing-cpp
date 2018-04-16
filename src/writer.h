@@ -1,5 +1,5 @@
-#ifndef DD_OPENTRACING_RECORDER_H
-#define DD_OPENTRACING_RECORDER_H
+#ifndef DD_OPENTRACING_WRITER_H
+#define DD_OPENTRACING_WRITER_H
 
 #include <curl/curl.h>
 #include <sstream>
@@ -12,26 +12,26 @@ namespace opentracing {
 class Span;
 
 // Takes Spans and records them (eg. sends them to Datadog).
-class Recorder {
+class Writer {
  public:
-  Recorder(){};
+  Writer() {}
 
-  virtual ~Recorder(){};
+  virtual ~Writer() {}
 
-  // Records the given span.
-  virtual void RecordSpan(Span &&span) = 0;
+  // Writes the given span.
+  virtual void Write(Span &&span) = 0;
 };
 
-// A Recorder that sends spans to a Datadog agent.
-class AgentRecorder : public Recorder {
+// A Writer that sends spans to a Datadog agent.
+class AgentWriter : public Writer {
  public:
-  // Creates an AgentRecorder that uses curl to send spans to a Datadog agent. May throw a
+  // Creates an AgentWriter that uses curl to send spans to a Datadog agent. May throw a
   // runtime_exception.
-  AgentRecorder(std::string host, uint32_t port);
+  AgentWriter(std::string host, uint32_t port);
 
-  ~AgentRecorder() override;
+  ~AgentWriter() override;
 
-  void RecordSpan(Span &&span) override;
+  void Write(Span &&span) override;
 
  private:
   // Initialises the curl handle. May throw a runtime_exception.
@@ -49,4 +49,4 @@ class AgentRecorder : public Recorder {
 }  // namespace opentracing
 }  // namespace datadog
 
-#endif  // DD_OPENTRACING_RECORDER_H
+#endif  // DD_OPENTRACING_WRITER_H

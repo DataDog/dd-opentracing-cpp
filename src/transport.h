@@ -3,6 +3,7 @@
 
 #include <curl/curl.h>
 #include <list>
+#include <string>
 
 namespace datadog {
 namespace opentracing {
