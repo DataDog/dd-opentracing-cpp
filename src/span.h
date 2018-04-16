@@ -1,6 +1,7 @@
 #ifndef DD_OPENTRACING_SPAN_H
 #define DD_OPENTRACING_SPAN_H
 
+#include <msgpack.hpp>
 #include "spancontext.h"
 #include "tracer.h"
 
@@ -63,9 +64,9 @@ class Span : public ot::Span {
 
   SpanContext context_;
 
-  // TODO[willgittoes-dd]: Remove this once we have msgpack serialisation. Since then we can test
-  // against that.
-  friend class MockWriter;
+ public:
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, span_id, trace_id, parent_id,
+                     error);
 };
 
 }  // namespace opentracing

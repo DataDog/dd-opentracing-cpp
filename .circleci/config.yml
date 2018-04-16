@@ -31,6 +31,17 @@ jobs:
             make install
             popd
       - run:
+          name: Compile Msgpack dependency
+          command: |
+            wget https://github.com/msgpack/msgpack-c/releases/download/cpp-2.1.5/msgpack-2.1.5.tar.gz
+            tar zxvf msgpack-2.1.5.tar.gz
+            mkdir msgpack-2.1.5/.build
+            pushd msgpack-2.1.5/.build
+            cmake ..
+            make
+            make install
+            popd
+      - run:
           name: Run Datadog C++ OpenTracing tests
           command: |
             rm -rf .build

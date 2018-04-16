@@ -6,6 +6,7 @@ project (dd-opentracing-cpp)
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
+find_library(MSGPACK_LIB msgpack)
 
 set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB})
 
