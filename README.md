@@ -24,7 +24,9 @@ Either just run `circleci build` or:
     cd .build
     cmake ..
     make
-    make test
+    ctest --output-on-failure
+
+`make test` also works instead of calling ctest, but [doesn't print](https://stackoverflow.com/questions/5709914/using-cmake-how-do-i-get-verbose-output-from-ctest) which tests are failing.
 
 ## Usage
 
