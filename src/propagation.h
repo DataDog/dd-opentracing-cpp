@@ -21,11 +21,12 @@ class SpanContext : public ot::SpanContext {
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
       const ot::TextMapReader &reader);
 
+  uint64_t id() const;
+  uint64_t trace_id() const;
+
  private:
   uint64_t id_;
   uint64_t trace_id_;
-
-  friend class Span;
 };
 
 }  // namespace opentracing

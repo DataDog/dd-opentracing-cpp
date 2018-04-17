@@ -27,6 +27,9 @@ SpanContext::SpanContext(uint64_t id, uint64_t trace_id,
 void SpanContext::ForeachBaggageItem(
     std::function<bool(const std::string &, const std::string &)> f) const {}
 
+uint64_t SpanContext::id() const { return id_; }
+uint64_t SpanContext::trace_id() const { return trace_id_; }
+
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const {
   auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
   if (!result) {
