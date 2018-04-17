@@ -1,5 +1,5 @@
-#ifndef DD_OPENTRACING_SPANCONTEXT_H
-#define DD_OPENTRACING_SPANCONTEXT_H
+#ifndef DD_OPENTRACING_PROPAGATION_H
+#define DD_OPENTRACING_PROPAGATION_H
 
 #include <opentracing/tracer.h>
 
@@ -15,9 +15,20 @@ class SpanContext : public ot::SpanContext {
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
+
+  ot::expected<void> serialize(const ot::TextMapWriter &writer) const;
+
+  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
+      const ot::TextMapReader &reader);
+
+ private:
+  uint64_t id_;
+  uint64_t trace_id_;
+
+  friend class Span;
 };
 
 }  // namespace opentracing
 }  // namespace datadog
 
-#endif  // DD_OPENTRACING_SPANCONTEXT_H
+#endif  // DD_OPENTRACING_PROPAGATION_H

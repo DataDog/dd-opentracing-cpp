@@ -2,7 +2,7 @@
 #define DD_OPENTRACING_SPAN_H
 
 #include <msgpack.hpp>
-#include "spancontext.h"
+#include "propagation.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
