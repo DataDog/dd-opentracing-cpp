@@ -1,0 +1,18 @@
+#ifndef DD_OPENTRACING_VERSION_NUMBER_H
+#define DD_OPENTRACING_VERSION_NUMBER_H
+
+#include <string>
+
+#define VERSION "@VERSION@"
+
+namespace datadog {
+namespace opentracing {
+namespace config {
+
+const std::string tracer_version = VERSION;
+
+}  // namespace config
+}  // namespace opentracing
+}  // namespace datadog
+
+#endif  // DD_OPENTRACING_VERSION_NUMBER_H

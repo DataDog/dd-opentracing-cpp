@@ -67,7 +67,7 @@ index 0000000..dfbdad9
 +static ngx_int_t datadog_init_worker(ngx_cycle_t *cycle) {
 +  auto main_conf = static_cast<datadog_main_conf_t *>(
 +      ngx_http_cycle_get_module_main_conf(cycle, ngx_http_datadog_module));
-+  datadog::TracerOptions options;
++  datadog::opentracing::TracerOptions options;
 +  if (main_conf->agent_host.data) {
 +    options.agent_host = to_string(main_conf->agent_host);
 +  }
@@ -87,10 +87,10 @@ index 0000000..dfbdad9
 +    }
 +  }
 +  if (main_conf->service_name.data) {
-+    options.service_name = to_string(main_conf->service_name);
++    options.service = to_string(main_conf->service_name);
 +  }
 +
-+  auto tracer = datadog::makeTracer(options);
++  auto tracer = datadog::opentracing::makeTracer(options);
 +  if (!tracer) {
 +    ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
 +                  "Failed to create Datadog tracer");

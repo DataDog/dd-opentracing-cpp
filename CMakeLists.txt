@@ -1,17 +1,42 @@
 cmake_minimum_required (VERSION 3.0)
 set(CMAKE_CXX_STANDARD 14)
 
-project (dd-opentracing-cpp)
+project(dd-opentracing-cpp)
+
+# If a git tag is set then use that as the version number,
+# otherwise use short commit hash. If git unavailable,
+# "unknown" is used.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+  find_package(Git)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} describe --tags --always
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE "VERSION"
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(STATUS "Git version: ${VERSION}")
+  else(GIT_FOUND)
+    set(VERSION "unknown")
+  endif(GIT_FOUND)
+endif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+
+configure_file (
+  "${PROJECT_SOURCE_DIR}/src/version_number.h.in"
+  "${PROJECT_BINARY_DIR}/version_number.h")
+include_directories("${PROJECT_BINARY_DIR}")
 
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
+find_library(MSGPACK_LIB msgpack)
+find_package(CURL)
 
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB})
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES})
 
 # Includes
 include_directories(SYSTEM 3rd_party/include)
-include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR})
+include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR} ${CURL_INCLUDE_DIRS})
 include_directories(include)
 
 # Code
