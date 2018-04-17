@@ -9,16 +9,19 @@ jobs:
           name: Install OS dependencies
           command: |
             apt-get update
-            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-format
+            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-format-5.0
       - run:
           name: Run clang-format
           command: |
-            changes=$(find ./ -iname *.h -o -iname *.cpp | xargs clang-format -output-replacements-xml | grep -c "<replacement " || true)
-            if [ $changes != 0 ]
-            then
-              echo "Did not pass clang-format, consider running: find ./ -iname *.h -o -iname *.cpp | xargs clang-format -i"
-              exit 1
-            fi
+            find ./ -iname *.h -o -iname *.cpp | while read fname; do 
+              changes=$(clang-format-5.0 -output-replacements-xml $fname | grep -c "<replacement " || true)
+              if [ $changes != 0 ]
+              then
+                clang-format-5.0 -output-replacements-xml $fname
+                echo "$fname did not pass clang-format, consider running: find ./ -iname *.h -o -iname *.cpp | xargs clang-format -i"
+                exit 1
+              fi
+            done
       - run:
           name: Compile OpenTracing dependency
           command: |

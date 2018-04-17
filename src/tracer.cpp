@@ -15,9 +15,12 @@ uint64_t getId() {
 }
 
 Tracer::Tracer(TracerOptions options)
-    : Tracer(options, std::shared_ptr<Writer>(new AgentWriter{}), getRealTime, getId) {}
+    : Tracer(options,
+             std::shared_ptr<Writer<Span>>(
+                 new AgentWriter<Span>{options.agent_host, options.agent_port}),
+             getRealTime, getId) {}
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer, TimeProvider get_time,
+Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer<Span>> writer, TimeProvider get_time,
                IdProvider get_id)
     : opts_(options), writer_(std::move(writer)), get_time_(get_time), get_id_(get_id) {}
 

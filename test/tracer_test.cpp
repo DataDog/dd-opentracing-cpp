@@ -17,7 +17,7 @@ TEST_CASE("tracer") {
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   TracerOptions tracer_options{"", 0, "service_name", "service_name.span_name", "web"};
   std::shared_ptr<Tracer> tracer{
-      new Tracer{tracer_options, std::shared_ptr<Writer>{writer}, get_time, get_id}};
+      new Tracer{tracer_options, std::shared_ptr<Writer<Span>>{writer}, get_time, get_id}};
   const ot::StartSpanOptions span_options;
 
   SECTION("names spans correctly") {

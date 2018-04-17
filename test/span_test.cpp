@@ -18,7 +18,7 @@ TEST_CASE("span") {
   const ot::StartSpanOptions span_options;
 
   SECTION("receives id") {
-    Span span{nullptr,     std::shared_ptr<Writer>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
               span_options};
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
@@ -30,7 +30,7 @@ TEST_CASE("span") {
   }
 
   SECTION("timed correctly") {
-    Span span{nullptr,     std::shared_ptr<Writer>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
               span_options};
     advanceSeconds(time, 10);
     const ot::FinishSpanOptions finish_options;
