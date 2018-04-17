@@ -10,13 +10,14 @@ using namespace datadog::opentracing;
 
 TEST_CASE("writer") {
   std::shared_ptr<MockHandle> handle{new MockHandle{}};
-  AgentWriter<SpanInfo> writer{handle, "hostname", 6319};
+  AgentWriter<SpanInfo> writer{handle, "v0.1.0", "hostname", 6319};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
                                    {CURLOPT_URL, "https://hostname:6319/v0.3/traces"}});
-    REQUIRE(handle->headers == std::list<std::string>{"X-Datadog-Trace-Count: 1",
-                                                      "Content-Type: application/msgpack"});
+    REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
+                                                      "Datadog-Meta-Lang: cpp",
+                                                      "Datadog-Meta-Tracer-Version: v0.1.0"});
   }
 
   SECTION("spans can be sent") {
@@ -43,13 +44,15 @@ TEST_CASE("writer") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
                                    {CURLOPT_URL, "https://hostname:6319/v0.3/traces"},
                                    {CURLOPT_POSTFIELDSIZE, "120"}});
-    REQUIRE(handle->headers == std::list<std::string>{"X-Datadog-Trace-Count: 1",
-                                                      "Content-Type: application/msgpack"});
+    REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
+                                                      "Datadog-Meta-Lang: cpp",
+                                                      "Datadog-Meta-Tracer-Version: v0.1.0",
+                                                      "X-Datadog-Trace-Count: 1"});
   }
 
   SECTION("bad handle causes constructor to fail") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    REQUIRE_THROWS(AgentWriter<SpanInfo>{handle, "hostname", 6319});
+    REQUIRE_THROWS(AgentWriter<SpanInfo>{handle, "v0.1.0", "hostname", 6319});
   }
 
   SECTION("handle failure during perform/sending") {

@@ -1,7 +1,18 @@
 cmake_minimum_required (VERSION 3.0)
 set(CMAKE_CXX_STANDARD 14)
 
-project (dd-opentracing-cpp)
+project(dd-opentracing-cpp)
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
+set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+
+
+configure_file (
+  "${PROJECT_SOURCE_DIR}/src/version_number.h.in"
+  "${PROJECT_BINARY_DIR}/version_number.h"
+  )
+include_directories("${PROJECT_BINARY_DIR}")
 
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)

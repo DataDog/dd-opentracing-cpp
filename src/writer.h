@@ -31,7 +31,8 @@ class AgentWriter : public Writer<Message> {
   // runtime_exception.
   AgentWriter(std::string host, uint32_t port);
 
-  AgentWriter(std::shared_ptr<Handle> handle, std::string host, uint32_t port);
+  AgentWriter(std::shared_ptr<Handle> handle, std::string tracer_version, std::string host,
+              uint32_t port);
 
   ~AgentWriter() override;
 
@@ -46,6 +47,7 @@ class AgentWriter : public Writer<Message> {
   void setUpHandle(std::string host, uint32_t port);
 
   std::shared_ptr<Handle> handle_;
+  const std::string tracer_version_;
 
   // TODO[willgittoes-dd]: Replace this with SPSC sync queue when making this concurrent.
   std::vector<Message> messages_;
