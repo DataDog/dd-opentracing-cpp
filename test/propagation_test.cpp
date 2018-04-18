@@ -9,6 +9,7 @@ using namespace datadog::opentracing;
 namespace ot = opentracing;
 
 // A Mock TextMapReader and TextMapWriter.
+// Not in mocks.h since we only need it here for now.
 struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
   MockTextMapCarrier() {}
 
@@ -67,14 +68,14 @@ TEST_CASE("SpanContext") {
   }
 
   SECTION("serialise fails") {
-    SECTION("on setting trace id") {
+    SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
       auto err = context.serialize(carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
 
-    SECTION("on setting parent id") {
+    SECTION("when setting parent id fails") {
       carrier.set_fails_after = 1;
       auto err = context.serialize(carrier);
       REQUIRE(!err);
@@ -83,7 +84,7 @@ TEST_CASE("SpanContext") {
   }
 
   SECTION("deserialise fails") {
-    SECTION("because of missing keys") {
+    SECTION("when there are missing keys") {
       carrier.Set("x-datadog-trace-id", "123");
       carrier.Set("but where is parent-id??", "420");
       auto err = SpanContext::deserialize(carrier);
@@ -91,7 +92,7 @@ TEST_CASE("SpanContext") {
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
-    SECTION("because of badly formatted keys") {
+    SECTION("when there are formatted keys") {
       carrier.Set("x-datadog-trace-id", "The madman! This isn't even a number!");
       carrier.Set("x-datadog-parent-id", "420");
       auto err = SpanContext::deserialize(carrier);

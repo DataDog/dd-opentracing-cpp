@@ -9,10 +9,13 @@ namespace opentracing {
 
 namespace {
 
+// Header names for trace data.
 const std::string trace_id_header = "x-datadog-trace-id";
 const std::string parent_id_header = "x-datadog-parent-id";
 
-// Because I don't want to import all of libboost for one function!
+// Does what it says on the tin. Just looks at each char, so don't try and use this on
+// unicode strings, only used for comparing HTTP header names.
+// Rolled my own because I don't want to import all of libboost for one function!
 bool equals_ignore_case(const std::string &a, const std::string &b) {
   return std::equal(a.begin(), a.end(), b.begin(), b.end(),
                     [](char a, char b) { return tolower(a) == tolower(b); });
@@ -35,7 +38,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
   if (!result) {
     return result;
   }
-  // Yes, "id" does go to "parent id". Since this is the point where subsequent Spans getting this
+  // Yes, "id" does go to "parent id" since this is the point where subsequent Spans getting this
   // context become children.
   result = writer.Set(parent_id_header, std::to_string(id_));
   return result;
@@ -44,16 +47,17 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     const ot::TextMapReader &reader) try {
   uint64_t trace_id, parent_id;
-  int missing_required_keys = 2;  // We want both trace_id and parent_id.
+  bool trace_id_set = false;
+  bool parent_id_set = false;
   auto result =
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
           if (equals_ignore_case(key, trace_id_header)) {
             trace_id = std::stoull(value);
-            missing_required_keys--;
+            trace_id_set = true;
           } else if (equals_ignore_case(key, parent_id_header)) {
             parent_id = std::stoull(value);
-            missing_required_keys--;
+            parent_id_set = true;
           }
         } catch (const std::invalid_argument &ia) {
           return ot::make_unexpected(ot::span_context_corrupted_error);
@@ -62,10 +66,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
         }
         return {};
       });
-  if (!result) {
+  if (!result) {  // "if unexpected", hence "{}" from above is fine.
     return ot::make_unexpected(result.error());
   }
-  if (missing_required_keys) {
+  if (!trace_id_set || !parent_id_set) {
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
   return std::move(std::unique_ptr<ot::SpanContext>{new SpanContext{parent_id, trace_id, {}}});

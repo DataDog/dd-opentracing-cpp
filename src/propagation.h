@@ -16,8 +16,10 @@ class SpanContext : public ot::SpanContext {
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
 
+  // Serializes the context into the given writer.
   ot::expected<void> serialize(const ot::TextMapWriter &writer) const;
 
+  // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
       const ot::TextMapReader &reader);
 
