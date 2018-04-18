@@ -12,7 +12,8 @@ namespace {
 // Header names for trace data.
 const std::string trace_id_header = "x-datadog-trace-id";
 const std::string parent_id_header = "x-datadog-parent-id";
-// Header name prefix for OpenTracing baggage.
+// Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
+// interop.
 const ot::string_view baggage_prefix = "ot-baggage-";
 
 // Does what it says on the tin. Just looks at each char, so don't try and use this on

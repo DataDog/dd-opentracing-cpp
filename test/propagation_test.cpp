@@ -8,6 +8,8 @@
 using namespace datadog::opentracing;
 namespace ot = opentracing;
 
+using dict = std::unordered_map<std::string, std::string>;
+
 // A Mock TextMapReader and TextMapWriter.
 // Not in mocks.h since we only need it here for now.
 struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
@@ -37,14 +39,23 @@ struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
     return {};
   }
 
-  mutable std::unordered_map<std::string, std::string> text_map;
+  mutable dict text_map;
   // Count-down to method failing. Negative means no failures.
   mutable int set_fails_after = -1;
 };
 
+dict getBaggage(SpanContext* ctx) {
+  dict baggage;
+  ctx->ForeachBaggageItem([&baggage](const std::string& key, const std::string& value) -> bool {
+    baggage[key] = value;
+    return true;
+  });
+  return baggage;
+}
+
 TEST_CASE("SpanContext") {
   MockTextMapCarrier carrier{};
-  SpanContext context{420, 123, {}};
+  SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier));
@@ -55,6 +66,7 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->trace_id() == 123);
+      REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
         carrier.Set("some junk thingy", "ayy lmao");
@@ -63,6 +75,7 @@ TEST_CASE("SpanContext") {
         REQUIRE(received_context);
         REQUIRE(received_context->id() == 420);
         REQUIRE(received_context->trace_id() == 123);
+        REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
       }
     }
   }
