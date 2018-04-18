@@ -27,13 +27,18 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> w
       duration(0),
       context_(span_id, span_id, {}) {
   // Extract context (if present) from options.
+  const SpanContext *parent_span_context = nullptr;
   for (auto &reference : options.references) {
     if (auto span_context = dynamic_cast<const SpanContext *>(reference.second)) {
-      trace_id = span_context->trace_id();
-      parent_id = span_context->id();
+      parent_span_context = span_context;
+      break;
     }
   }
-  context_ = {span_id, trace_id, {}};
+  if (parent_span_context != nullptr) {
+    trace_id = parent_span_context->trace_id();
+    parent_id = parent_span_context->id();
+    context_ = parent_span_context->withId(span_id);
+  }
 }
 
 Span::~Span() noexcept {}
@@ -50,9 +55,13 @@ void Span::SetOperationName(ot::string_view name) noexcept {}
 
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {}
 
-void Span::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {}
+void Span::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {
+  context_.setBaggageItem(restricted_key, value);
+}
 
-std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept { return ""; }
+std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
+  return context_.baggageItem(restricted_key);
+}
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
