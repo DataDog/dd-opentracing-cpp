@@ -32,6 +32,7 @@ WORKDIR dd-opentracing-cpp/.build
 RUN cmake ..
 RUN make
 RUN make install
+RUN ctest --output-on-failure
 WORKDIR ../..
 
 # Fetch and patch the nginx-opentracing module

@@ -25,7 +25,16 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> w
                 start_time_.absolute_time.time_since_epoch())
                 .count()),
       duration(0),
-      context_(span_id, span_id, {}) {}
+      context_(span_id, span_id, {}) {
+  // Extract context (if present) from options.
+  for (auto &reference : options.references) {
+    if (auto span_context = dynamic_cast<const SpanContext *>(reference.second)) {
+      trace_id = span_context->trace_id();
+      parent_id = span_context->id();
+    }
+  }
+  context_ = {span_id, trace_id, {}};
+}
 
 Span::~Span() noexcept {}
 
