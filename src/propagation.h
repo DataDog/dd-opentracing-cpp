@@ -3,6 +3,8 @@
 
 #include <opentracing/tracer.h>
 
+#include <unordered_map>
+
 namespace ot = opentracing;
 
 namespace datadog {
@@ -16,8 +18,14 @@ class SpanContext : public ot::SpanContext {
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
 
+  void setBaggageItem(ot::string_view key, ot::string_view value) noexcept;
+
+  std::string baggageItem(ot::string_view key) const;
+
   // Serializes the context into the given writer.
   ot::expected<void> serialize(const ot::TextMapWriter &writer) const;
+
+  SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -29,6 +37,7 @@ class SpanContext : public ot::SpanContext {
  private:
   uint64_t id_;
   uint64_t trace_id_;
+  std::unordered_map<std::string, std::string> baggage_;
 };
 
 }  // namespace opentracing
