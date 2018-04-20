@@ -9,8 +9,13 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("writer") {
-  std::shared_ptr<MockHandle> handle{new MockHandle{}};
-  AgentWriter<SpanInfo> writer{handle, "v0.1.0", "hostname", 6319};
+  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+  MockHandle* handle = handle_ptr.get();
+  // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
+  // problems.
+  auto only_send_spans_when_we_flush = std::chrono::seconds(3600);
+  AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0", only_send_spans_when_we_flush,
+                               "hostname", 6319};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
@@ -23,6 +28,7 @@ TEST_CASE("writer") {
   SECTION("spans can be sent") {
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.flush();
 
     // Check span body.
     auto spans = handle->getSpans();
@@ -51,18 +57,20 @@ TEST_CASE("writer") {
   }
 
   SECTION("bad handle causes constructor to fail") {
-    handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    REQUIRE_THROWS(AgentWriter<SpanInfo>{handle, "v0.1.0", "hostname", 6319});
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+    handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
+    REQUIRE_THROWS(AgentWriter<SpanInfo>{std::move(handle_ptr), "v0.1.0",
+                                         only_send_spans_when_we_flush, "hostname", 6319});
   }
 
   SECTION("handle failure during perform/sending") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    // Doesn't throw an error.
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    // Doesn't throw an error.
+    writer.flush();
     // Dropped all spans.
     handle->rcode = CURLE_OK;
-    writer.flush();
     REQUIRE((*handle->getSpans())[0].size() == 0);
   }
 }
