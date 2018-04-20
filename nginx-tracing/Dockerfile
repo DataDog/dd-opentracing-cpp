@@ -2,7 +2,7 @@
 FROM ubuntu
 
 RUN apt-get update
-RUN apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake folly
+RUN apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake
 
 # Install opentracing dependency
 RUN wget -O opentracing-cpp.tar.gz https://github.com/opentracing/opentracing-cpp/archive/v1.3.0.tar.gz
