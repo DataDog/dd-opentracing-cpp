@@ -41,12 +41,23 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc, std::ostream &write
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
                                   const ot::TextMapWriter &writer) const {
-  return ot::make_unexpected(ot::invalid_carrier_error);
+  return inject(sc, writer);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
                                   const ot::HTTPHeadersWriter &writer) const {
-  return ot::make_unexpected(ot::invalid_carrier_error);
+  return inject(sc, writer);
+}
+
+ot::expected<void> Tracer::inject(const ot::SpanContext &sc, const ot::TextMapWriter &writer) const
+    try {
+  auto span_context = dynamic_cast<const SpanContext *>(&sc);
+  if (span_context == nullptr) {
+    return ot::make_unexpected(ot::invalid_span_context_error);
+  }
+  return span_context->serialize(writer);
+} catch (const std::bad_alloc &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &reader) const {
@@ -55,12 +66,12 @@ ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &rea
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::TextMapReader &reader) const {
-  return ot::make_unexpected(ot::invalid_carrier_error);
+  return SpanContext::deserialize(reader);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::HTTPHeadersReader &reader) const {
-  return ot::make_unexpected(ot::invalid_carrier_error);
+  return SpanContext::deserialize(reader);
 }
 
 void Tracer::Close() noexcept {}

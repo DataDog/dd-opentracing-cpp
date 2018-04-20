@@ -58,6 +58,8 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   void Close() noexcept override;
 
  private:
+  ot::expected<void> inject(const ot::SpanContext &sc, const ot::TextMapWriter &writer) const;
+
   const TracerOptions opts_;
   std::shared_ptr<Writer<Span>> writer_;  // Records spans (eg sends to the agent).
   TimeProvider get_time_;
