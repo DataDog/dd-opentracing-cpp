@@ -43,9 +43,11 @@ class AgentWriter : public Writer<Message> {
 
   void write(Message &&message) override;
 
-  // Sends Messages to the agent using a POST request. Doesn't throw exceptions, but may drop
-  // messages.
+  // Send all buffered Messages to the destination now. Will block until sending is complete.
   void flush();
+
+  // Permanently stops writing Messages. Calls to write() and flush() will do nothing.
+  void stop();
 
  private:
   // Initialises the curl handle. May throw a runtime_exception.

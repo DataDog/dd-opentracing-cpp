@@ -9,7 +9,8 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("writer") {
-  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+  std::atomic<bool> handle_destructed{false};
+  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
   MockHandle* handle = handle_ptr.get();
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
@@ -72,5 +73,16 @@ TEST_CASE("writer") {
     // Dropped all spans.
     handle->rcode = CURLE_OK;
     REQUIRE(handle->getSpans()->size() == 0);
+  }
+
+  SECTION("destructed/stopped writer does nothing when written to") {
+    writer.stop();  // Normally called by destructor.
+    // We know the worker thread has stopped because it is the unique owner of handle (the pointer
+    // we keep for testing is leaked) and has destructed it.
+    REQUIRE(handle_destructed);
+    // Check that these don't crash (but niether will they do anything).
+    writer.write(
+        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.flush();
   }
 }

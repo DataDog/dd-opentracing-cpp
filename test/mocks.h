@@ -69,10 +69,14 @@ struct EnumClassHash {
 };
 
 // A Handle that doesn't actually make network requests.
-class MockHandle : public Handle {
- public:
-  MockHandle() {}
-  ~MockHandle() override{};
+struct MockHandle : public Handle {
+  MockHandle() : MockHandle(nullptr) {}
+  MockHandle(std::atomic<bool>* is_destructed_) : is_destructed(is_destructed_) {}
+  ~MockHandle() override {
+    if (is_destructed != nullptr) {
+      *is_destructed = true;
+    }
+  };
 
   CURLcode setopt(CURLoption key, const char* value) override {
     if (rcode == CURLE_OK) {
@@ -122,6 +126,7 @@ class MockHandle : public Handle {
   std::list<std::string> headers;
   std::string error = "";
   CURLcode rcode = CURLE_OK;
+  std::atomic<bool>* is_destructed = nullptr;
 };
 
 }  // namespace opentracing
