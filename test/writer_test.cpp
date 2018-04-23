@@ -85,4 +85,7 @@ TEST_CASE("writer") {
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
     writer.flush();
   }
+
+  // FIXME: Test multi-threaded write, test automatic write_period (ie block on a method in
+  // MockHandler).
 }
