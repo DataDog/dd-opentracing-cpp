@@ -59,8 +59,11 @@ AgentWriter<Message>::~AgentWriter() {
 
 template <class Message>
 void AgentWriter<Message>::write(Message &&message) {
+  std::cout << "WRITE \n";
   std::unique_lock<std::mutex> lock(mutex_);
+  std::cout << "WRITE locked\n";
   messages_.push_back(std::move(message));
+  std::cout << "WRITE done\n";
 };
 
 template <class Message>
@@ -75,10 +78,11 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
           // Encode messages when there are new ones.
           {
             // Wait to be told about new messages (or to stop).
+            std::cout << "writing wait \n";
             std::unique_lock<std::mutex> lock(mutex_);
             condition_.wait_for(lock, write_period_,
                                 [&]() -> bool { return flush_worker_ || stop_writing_; });
-            flush_worker_ = false;
+            std::cout << "finished waiting " << flush_worker_ << stop_writing_ << " \n";
             if (stop_writing_) {
               return;  // Stop the thread.
             }
@@ -93,9 +97,21 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
             std::array<std::reference_wrapper<std::deque<Message>>, 1> wrapped_messages{messages_};
             msgpack::pack(buffer, wrapped_messages);
             messages_.clear();
+            std::cout << "writing finished packing \n";
           }  // lock on mutex_ ends.
+          std::cout << "writing starting post \n";
           // Send messages, not in critical period.
           AgentWriter<Message>::postMessages(handle, buffer, num_messages);
+          std::cout << "writing finished post \n";
+          // Let thread calling 'flush' that we're done flushing.
+          {
+            std::unique_lock<std::mutex> lock(mutex_);
+            std::cout << "writing setting flush false\n";
+            flush_worker_ = false;
+          }
+          std::cout << "writing notifying flush \n";
+          condition_.notify_all();
+          std::cout << "writing DONE writing! \n";
         }
       },
       std::move(handle));
@@ -103,10 +119,14 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
 
 template <class Message>
 void AgentWriter<Message>::flush() try {
+  std::cout << "Flush start \n";
   std::unique_lock<std::mutex> lock(mutex_);
   flush_worker_ = true;
+  std::cout << "Flush lock accquired \n";
   condition_.notify_all();
-  // FIXME: Needs to block until flush complete!
+  // Wait until flush is complete.
+  std::cout << "Flush waiting \n";
+  condition_.wait(lock, [&]() -> bool { return !flush_worker_ || stop_writing_; });
 } catch (const std::bad_alloc &) {
 }
 

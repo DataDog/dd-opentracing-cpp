@@ -71,6 +71,6 @@ TEST_CASE("writer") {
     writer.flush();
     // Dropped all spans.
     handle->rcode = CURLE_OK;
-    REQUIRE((*handle->getSpans())[0].size() == 0);
+    REQUIRE(handle->getSpans()->size() == 0);
   }
 }

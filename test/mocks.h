@@ -106,12 +106,15 @@ class MockHandle : public Handle {
   std::string getError() override { return error; }
 
   std::unique_ptr<std::vector<std::vector<SpanInfo>>> getSpans() {
-    std::string packed_span = options[CURLOPT_POSTFIELDS];
-    msgpack::object_handle oh = msgpack::unpack(packed_span.data(), packed_span.size());
-    msgpack::object deserialized = oh.get();
     std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
         new std::vector<std::vector<SpanInfo>>{}};
-    deserialized.convert(*dst.get());
+    if (options.find(CURLOPT_POSTFIELDS) != options.end()) {
+      std::string packed_span = options[CURLOPT_POSTFIELDS];
+      msgpack::object_handle oh = msgpack::unpack(packed_span.data(), packed_span.size());
+      msgpack::object deserialized = oh.get();
+      deserialized.convert(*dst.get());
+      options.erase(CURLOPT_POSTFIELDS);
+    }
     return std::move(dst);
   }
 
