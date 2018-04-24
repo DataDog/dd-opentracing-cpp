@@ -43,7 +43,8 @@ class AgentWriter : public Writer<Message> {
 
   void write(Message &&message) override;
 
-  // Send all buffered Messages to the destination now. Will block until sending is complete.
+  // Send all buffered Messages to the destination now. Will block until sending is complete. This
+  // isn't on the main Writer API because real code should not need to call this.
   void flush();
 
   // Permanently stops writing Messages. Calls to write() and flush() will do nothing.

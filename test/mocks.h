@@ -79,6 +79,7 @@ struct MockHandle : public Handle {
   };
 
   CURLcode setopt(CURLoption key, const char* value) override {
+    std::unique_lock<std::mutex> lock(mutex);
     if (rcode == CURLE_OK) {
       // We might have null characters if it's the POST data, thanks msgpack!
       if (key == CURLOPT_POSTFIELDS && options.find(CURLOPT_POSTFIELDSIZE) != options.end()) {
@@ -92,6 +93,7 @@ struct MockHandle : public Handle {
   }
 
   CURLcode setopt(CURLoption key, long value) override {
+    std::unique_lock<std::mutex> lock(mutex);
     if (rcode == CURLE_OK) {
       options[key] = std::to_string(value);
     }
@@ -99,17 +101,32 @@ struct MockHandle : public Handle {
   }
 
   CURLcode appendHeaders(std::list<std::string> new_headers) override {
+    std::unique_lock<std::mutex> lock(mutex);
     if (rcode == CURLE_OK) {
       headers.insert(headers.end(), new_headers.begin(), new_headers.end());
     }
     return rcode;
   }
 
-  CURLcode perform() override { return rcode; }
+  CURLcode perform() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    data_written.notify_all();
+    return rcode;
+  }
 
-  std::string getError() override { return error; }
+  // Could be spurious.
+  void waitUntilDataWritten() {
+    std::unique_lock<std::mutex> lock(mutex);
+    data_written.wait(lock);
+  }
+
+  std::string getError() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    return error;
+  }
 
   std::unique_ptr<std::vector<std::vector<SpanInfo>>> getSpans() {
+    std::unique_lock<std::mutex> lock(mutex);
     std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
         new std::vector<std::vector<SpanInfo>>{}};
     if (options.find(CURLOPT_POSTFIELDS) != options.end()) {
@@ -127,6 +144,8 @@ struct MockHandle : public Handle {
   std::string error = "";
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
+  std::mutex mutex;
+  std::condition_variable data_written;
 };
 
 }  // namespace opentracing

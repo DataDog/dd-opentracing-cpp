@@ -68,8 +68,13 @@ TEST_CASE("writer") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
-    // Doesn't throw an error.
-    writer.flush();
+    // Redirect stderr so the test logs don't look like a failure.
+    std::stringstream error_message;
+    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+    writer.flush();  // Doesn't throw an error. That's the test!
+    REQUIRE(error_message.str() ==
+            "Error setting agent communication headers: Timeout was reached\n");
+    std::cerr.rdbuf(stderr);  // Restore stderr.
     // Dropped all spans.
     handle->rcode = CURLE_OK;
     REQUIRE(handle->getSpans()->size() == 0);
@@ -80,12 +85,74 @@ TEST_CASE("writer") {
     // We know the worker thread has stopped because it is the unique owner of handle (the pointer
     // we keep for testing is leaked) and has destructed it.
     REQUIRE(handle_destructed);
-    // Check that these don't crash (but niether will they do anything).
+    // Check that these don't crash (but neither will they do anything).
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
     writer.flush();
   }
 
-  // FIXME: Test multi-threaded write, test automatic write_period (ie block on a method in
-  // MockHandler).
+  SECTION("there can be multiple threads sending Spans") {
+    // Write concurrently.
+    std::vector<std::thread> senders;
+    for (uint64_t i = 1; i <= 20; i++) {
+      senders.emplace_back(
+          [&](uint64_t id) {
+            writer.write(std::move(
+                SpanInfo{"service.name", "service", "resource", "web", id, id, 0, 0, 69, 420}));
+          },
+          i);
+    }
+    for (std::thread& sender : senders) {
+      sender.join();
+    }
+    writer.flush();
+    // Now check.
+    auto spans = handle->getSpans();
+    REQUIRE(spans->size() == 1);
+    std::unordered_set<uint64_t> seen_ids;  // Make sure all senders sent their Span.
+    for (auto span : (*spans)[0]) {
+      seen_ids.insert(span.trace_id);
+      REQUIRE(span.name == "service.name");
+      REQUIRE(span.service == "service");
+      REQUIRE(span.resource == "resource");
+      REQUIRE(span.type == "web");
+      REQUIRE(span.parent_id == 0);
+      REQUIRE(span.error == 0);
+      REQUIRE(span.start == 69);
+      REQUIRE(span.duration == 420);
+    }
+    REQUIRE(seen_ids == std::unordered_set<uint64_t>{1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                                                     11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
+  }
+
+  SECTION("writes happen periodically") {
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+    MockHandle* handle = handle_ptr.get();
+    auto write_interval = std::chrono::seconds(2);
+    AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0", write_interval, "hostname",
+                                 6319};
+    // Send 7 spans at 1 Span per second. Since the write period is 2s, there should be 4 different
+    // writes. We don't count the number of writes because that could flake, but we do check that
+    // all 7 Spans are written, implicitly testing that multiple writes happen.
+    std::thread sender([&]() {
+      for (uint64_t i = 1; i <= 7; i++) {
+        writer.write(std::move(
+            SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+    });
+    // Wait until data is written.
+    std::unordered_set<uint64_t> span_ids;
+    while (span_ids.size() < 7) {
+      handle->waitUntilDataWritten();
+      auto data = handle->getSpans();
+      REQUIRE(data->size() == 1);
+      std::transform((*data)[0].begin(), (*data)[0].end(),
+                     std::inserter(span_ids, span_ids.begin()),
+                     [](SpanInfo& span) -> uint64_t { return span.span_id; });
+    }
+    // We got all 7 spans without calling flush ourselves.
+    REQUIRE(span_ids == std::unordered_set<uint64_t>{1, 2, 3, 4, 5, 6, 7});
+    sender.join();
+  }
 }

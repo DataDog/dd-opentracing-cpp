@@ -4,8 +4,7 @@ project(dd-opentracing-cpp)
 
 # Configure the compiler.
 set(CMAKE_CXX_STANDARD 14)
-# This not needed on Mac, but is needed on GNU/Linux.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+find_package(Threads REQUIRED)
 
 # If a git tag is set then use that as the version number,
 # otherwise use short commit hash. If git unavailable,
