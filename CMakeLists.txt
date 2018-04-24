@@ -1,10 +1,9 @@
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required (VERSION 3.1)
 
 project(dd-opentracing-cpp)
 
 # Configure the compiler.
 set(CMAKE_CXX_STANDARD 14)
-find_package(Threads REQUIRED)
 
 # If a git tag is set then use that as the version number,
 # otherwise use short commit hash. If git unavailable,
@@ -34,8 +33,9 @@ find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
 find_library(MSGPACK_LIB msgpack)
 find_package(CURL)
+find_package(Threads REQUIRED)
 
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES})
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads)
 
 # Includes
 include_directories(SYSTEM 3rd_party/include)
