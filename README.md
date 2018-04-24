@@ -9,6 +9,7 @@
 - cmake >= 3.0
 - [OpenTracing C++](https://github.com/opentracing/)
 - [msgpack-c](ttps://github.com/msgpack/msgpack-c/)
+- [libCURL](https://curl.haxx.se/libcurl/)
 - Build tools (eg. build-essential, xcode)
 
 **Build steps**
@@ -25,11 +26,11 @@ Either just run `circleci build` or:
 
     mkdir .build
     cd .build
-    cmake ..
+    cmake -DCMAKE_BUILD_TYPE=Debug ..
     make
     ctest --output-on-failure
 
-`make test` also works instead of calling ctest, but [doesn't print](https://stackoverflow.com/questions/5709914/using-cmake-how-do-i-get-verbose-output-from-ctest) which tests are failing.
+`make test` also works instead of calling ctest, but [doesn't print](https://stackoverflow.com/questions/5709914/using-cmake-how-do-i-get-verbose-output-from-ctest) which tests are failing. Make sure to build with `-DCMAKE_BUILD_TYPE=Debug` to ensure that [santiziers](https://github.com/google/sanitizers) are run.
 
 ## Usage
 

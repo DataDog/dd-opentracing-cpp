@@ -32,6 +32,8 @@ WORKDIR dd-opentracing-cpp/.build
 RUN cmake ..
 RUN make
 RUN make install
+# Warning: Sanitizers (tsan, usan, msan, asan) are not run on these tests, see the CircleCI
+# config.yml for an example of running tests with those checks.
 RUN ctest --output-on-failure
 WORKDIR ../..
 

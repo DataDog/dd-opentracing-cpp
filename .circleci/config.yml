@@ -9,7 +9,8 @@ jobs:
           name: Install OS dependencies
           command: |
             apt-get update
-            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-format-5.0
+            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-5.0 clang-format-5.0
+            echo $(which clang)
       - run:
           name: Run clang-format
           command: |
@@ -44,13 +45,44 @@ jobs:
             make
             make install
             popd
+      # - run:
+      #     name: Run Datadog C++ OpenTracing tests
+      #     command: |
+      #       rm -rf .build
+      #       mkdir .build
+      #       pushd .build
+      #       cmake ..
+      #       make
+      #       ctest --output-on-failure
+      #       popd
+      # - run:
+      #     name: Run Datadog C++ OpenTracing tests (with tsan and usan)
+      #     command: |
+      #       rm -rf .build
+      #       mkdir .build
+      #       pushd .build
+      #       cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..
+      #       make
+      #       ctest --output-on-failure
+      #       popd
       - run:
-          name: Run Datadog C++ OpenTracing tests
+          name: Run Datadog C++ OpenTracing tests (with msan)
           command: |
             rm -rf .build
             mkdir .build
             pushd .build
-            cmake ..
+            # clang required for Memory Sanitizer.
+            cmake -DSANITIZE_MEMORY=On -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+            make
+            ctest --output-on-failure
+            popd
+      - run:
+          name: Run Datadog C++ OpenTracing tests (with asan)
+          command: |
+            rm -rf .build
+            mkdir .build
+            pushd .build
+            cmake -DSANITIZE_ADDRESS=On ..
             make
             ctest --output-on-failure
             popd

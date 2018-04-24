@@ -34,6 +34,9 @@ find_library(OPENTRACING_LIB opentracing)
 find_library(MSGPACK_LIB msgpack)
 find_package(CURL)
 find_package(Threads REQUIRED)
+# Code Sanitizers, for testing.
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/3rd_party/sanitizers-cmake" ${CMAKE_MODULE_PATH})
+find_package(Sanitizers)
 
 set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads)
 
@@ -49,10 +52,12 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 # Outputs
 ## Shared lib
 add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
+add_sanitizers(dd_opentracing)
 target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
 
 ## Static lib
 add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
+add_sanitizers(dd_opentracing-static)
 set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
 target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
 
