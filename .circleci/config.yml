@@ -45,34 +45,23 @@ jobs:
             make
             make install
             popd
-      # - run:
-      #     name: Run Datadog C++ OpenTracing tests
-      #     command: |
-      #       rm -rf .build
-      #       mkdir .build
-      #       pushd .build
-      #       cmake ..
-      #       make
-      #       ctest --output-on-failure
-      #       popd
-      # - run:
-      #     name: Run Datadog C++ OpenTracing tests (with tsan and usan)
-      #     command: |
-      #       rm -rf .build
-      #       mkdir .build
-      #       pushd .build
-      #       cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..
-      #       make
-      #       ctest --output-on-failure
-      #       popd
       - run:
-          name: Run Datadog C++ OpenTracing tests (with msan)
+          name: Run Datadog C++ OpenTracing tests
           command: |
             rm -rf .build
             mkdir .build
             pushd .build
-            # clang required for Memory Sanitizer.
-            cmake -DSANITIZE_MEMORY=On -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+            cmake ..
+            make
+            ctest --output-on-failure
+            popd
+      - run:
+          name: Run Datadog C++ OpenTracing tests (with tsan and usan)
+          command: |
+            rm -rf .build
+            mkdir .build
+            pushd .build
+            cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..
             make
             ctest --output-on-failure
             popd
