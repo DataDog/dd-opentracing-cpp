@@ -9,8 +9,7 @@ jobs:
           name: Install OS dependencies
           command: |
             apt-get update
-            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-5.0 clang-format-5.0
-            echo $(which clang)
+            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-format-5.0
       - run:
           name: Run clang-format
           command: |
