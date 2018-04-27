@@ -39,6 +39,17 @@ SpanContext::SpanContext(uint64_t id, uint64_t trace_id,
                          std::unordered_map<std::string, std::string> &&baggage)
     : id_(id), trace_id_(trace_id), baggage_(std::move(baggage)) {}
 
+SpanContext::SpanContext(SpanContext &&other)
+    : id_(other.id_), trace_id_(other.trace_id_), baggage_(std::move(other.baggage_)) {}
+
+SpanContext &SpanContext::operator=(SpanContext &&other) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  id_ = other.id_;
+  trace_id_ = other.trace_id_;
+  baggage_ = std::move(other.baggage_);
+  return *this;
+}
+
 void SpanContext::ForeachBaggageItem(
     std::function<bool(const std::string &, const std::string &)> f) const {
   for (const auto &baggage_item : baggage_) {
@@ -48,15 +59,24 @@ void SpanContext::ForeachBaggageItem(
   }
 }
 
-uint64_t SpanContext::id() const { return id_; }
-uint64_t SpanContext::trace_id() const { return trace_id_; }
+uint64_t SpanContext::id() const {
+  // Not locked, since id_ never modified.
+  return id_;
+}
+
+uint64_t SpanContext::trace_id() const {
+  // Not locked, since trace_id_ never modified.
+  return trace_id_;
+}
 
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
+  std::lock_guard<std::mutex> lock{mutex_};
   baggage_.emplace(key, value);
 } catch (const std::bad_alloc &) {
 }
 
 std::string SpanContext::baggageItem(ot::string_view key) const {
+  std::lock_guard<std::mutex> lock{mutex_};
   auto lookup = baggage_.find(key);
   if (lookup != baggage_.end()) {
     return lookup->second;
@@ -65,11 +85,13 @@ std::string SpanContext::baggageItem(ot::string_view key) const {
 }
 
 SpanContext SpanContext::withId(uint64_t id) const {
-  auto baggage = baggage_;
-  return SpanContext{id, trace_id_, std::move(baggage)};
+  std::lock_guard<std::mutex> lock{mutex_};
+  auto baggage = baggage_;  // (Shallow) copy baggage.
+  return std::move(SpanContext{id, trace_id_, std::move(baggage)});
 }
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const {
+  std::lock_guard<std::mutex> lock{mutex_};
   auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
   if (!result) {
     return result;

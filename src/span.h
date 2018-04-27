@@ -24,8 +24,8 @@ class Span : public ot::Span {
        std::string span_name, ot::string_view resource, const ot::StartSpanOptions &options);
 
   Span() = delete;
-
-  ~Span() noexcept override;
+  Span(Span &&other);
+  ~Span() override;
 
   // Finishes and records the span.
   void FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept override;
@@ -49,6 +49,8 @@ class Span : public ot::Span {
   TimeProvider get_time_;
   std::shared_ptr<Writer<Span>> writer_;
   TimePoint start_time_;
+  std::atomic<bool> is_finished_{false};
+  std::mutex mutex_;
 
   // An exception to the naming convention is made here because the variable names themselves are
   // used by msgpack as dictionary keys.

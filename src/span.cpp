@@ -41,9 +41,36 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> w
   }
 }
 
-Span::~Span() noexcept {}
+Span::Span(Span &&other)
+    : tracer_(other.tracer_),
+      get_time_(other.get_time_),
+      writer_(other.writer_),
+      start_time_(other.start_time_),
+      name(other.name),
+      service(other.service),
+      resource(other.resource),
+      type(other.type),
+      span_id(other.span_id),
+      trace_id(other.trace_id),
+      parent_id(other.parent_id),
+      error(other.error),
+      start(other.start),
+      duration(other.duration),
+      context_(std::move(other.context_)) {
+  is_finished_ = (bool)other.is_finished_;  // Copy the value.
+}
+
+Span::~Span() {
+  if (!is_finished_) {
+    this->Finish();
+  }
+}
 
 void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept try {
+  if (is_finished_.exchange(true)) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock{mutex_};
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
   writer_->write(std::move(*this));
@@ -51,7 +78,10 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // At least don't crash.
 }
 
-void Span::SetOperationName(ot::string_view name) noexcept {}
+void Span::SetOperationName(ot::string_view name) noexcept {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  name = name;
+}
 
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {}
 
