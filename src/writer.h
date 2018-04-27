@@ -36,7 +36,8 @@ class AgentWriter : public Writer<Message> {
   AgentWriter(std::string host, uint32_t port);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-              std::chrono::milliseconds write_period, size_t max_queued_messages, std::string host, uint32_t port);
+              std::chrono::milliseconds write_period, size_t max_queued_messages, std::string host,
+              uint32_t port);
 
   // Does not flush on destruction, buffered spans may be lost. Stops all threads.
   ~AgentWriter() override;
