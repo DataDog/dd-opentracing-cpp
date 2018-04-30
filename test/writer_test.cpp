@@ -61,7 +61,7 @@ TEST_CASE("writer") {
   SECTION("queue does not grow indefinitely") {
     for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
       writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+          std::move(SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
     }
     writer.flush();
     auto spans = handle->getSpans();
