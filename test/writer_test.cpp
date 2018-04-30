@@ -15,12 +15,14 @@ TEST_CASE("writer") {
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
   auto only_send_spans_when_we_flush = std::chrono::seconds(3600);
-  AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0", only_send_spans_when_we_flush,
-                               "hostname", 6319};
+  std::vector<std::chrono::milliseconds> disable_retry;
+  AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   only_send_spans_when_we_flush,
+                               disable_retry,         "hostname", 6319};
 
   SECTION("initilises handle correctly") {
-    REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                                   {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}});
+    REQUIRE(handle->options ==
+            std::unordered_map<CURLoption, std::string, EnumClassHash>{
+                {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
     REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
                                                       "Datadog-Meta-Lang: cpp",
                                                       "Datadog-Meta-Tracer-Version: v0.1.0"});
@@ -50,6 +52,7 @@ TEST_CASE("writer") {
     handle->options.erase(CURLOPT_POSTFIELDS);
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
                                    {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
+                                   {CURLOPT_TIMEOUT_MS, "2000"},
                                    {CURLOPT_POSTFIELDSIZE, "120"}});
     REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
                                                       "Datadog-Meta-Lang: cpp",
@@ -61,7 +64,8 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter<SpanInfo>{std::move(handle_ptr), "v0.1.0",
-                                         only_send_spans_when_we_flush, "hostname", 6319});
+                                         only_send_spans_when_we_flush, disable_retry, "hostname",
+                                         6319});
   }
 
   SECTION("handle failure during perform/sending") {
@@ -136,8 +140,8 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
     auto write_interval = std::chrono::seconds(2);
-    AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0", write_interval, "hostname",
-                                 6319};
+    AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   write_interval,
+                                 disable_retry,         "hostname", 6319};
     // Send 7 spans at 1 Span per second. Since the write period is 2s, there should be 4 different
     // writes. We don't count the number of writes because that could flake, but we do check that
     // all 7 Spans are written, implicitly testing that multiple writes happen.
@@ -162,4 +166,6 @@ TEST_CASE("writer") {
     REQUIRE(span_ids == std::unordered_set<uint64_t>{1, 2, 3, 4, 5, 6, 7});
     sender.join();
   }
+
+  // FIXME: Tests for: timeout, retry.
 }

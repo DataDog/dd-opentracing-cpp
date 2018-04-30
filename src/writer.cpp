@@ -10,19 +10,27 @@ const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "http://";
 // Max amount of time to wait between sending spans to agent. Agent discards spans older than 10s,
 // so that is the upper bound.
-const std::chrono::milliseconds default_write_period = std::chrono::seconds(6);
+const std::chrono::milliseconds default_write_period = std::chrono::seconds(1);
+// Retry sending spans to agent a couple of times. Any more than that and the agent won't accept
+// them.
+// write_period 1s + timeout 2s + (retry & timeout) 2.5s + (retry and timeout) 4.5s = 10s.
+const std::vector<std::chrono::milliseconds> default_retry_periods{
+    std::chrono::milliseconds(500), std::chrono::milliseconds(2500)};
+// Agent communication timeout.
+const long default_timeout_ms = 2000L;
 }  // namespace
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
-                  default_write_period, host, port){};
+                  default_write_period, default_retry_periods, host, port){};
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                               std::chrono::milliseconds write_period, std::string host,
-                               uint32_t port)
-    : write_period_(write_period), tracer_version_(tracer_version) {
+                               std::chrono::milliseconds write_period,
+                               std::vector<std::chrono::milliseconds> retry_periods,
+                               std::string host, uint32_t port)
+    : write_period_(write_period), retry_periods_(retry_periods), tracer_version_(tracer_version) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
 }
@@ -37,6 +45,11 @@ void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string
   auto rcode = handle->setopt(CURLOPT_URL, agent_uri.str().c_str());
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent URL: ") + curl_easy_strerror(rcode));
+  }
+  rcode = handle->setopt(CURLOPT_TIMEOUT_MS, default_timeout_ms);
+  if (rcode != CURLE_OK) {
+    throw std::runtime_error(std::string("Unable to set agent timeout: ") +
+                             curl_easy_strerror(rcode));
   }
   // Set the common HTTP headers.
   rcode = handle->appendHeaders({"Content-Type: application/msgpack", "Datadog-Meta-Lang: cpp",
@@ -115,7 +128,8 @@ void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
             spans_.clear();
           }  // lock on mutex_ ends.
           // Send spans, not in critical period.
-          AgentWriter<Span>::postSpans(handle, buffer, num_spans);
+          retryFiniteOnFail(
+              [&]() { return AgentWriter<Span>::postSpans(handle, buffer, num_spans); });
           // Let thread calling 'flush' that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -138,13 +152,32 @@ void AgentWriter<Span>::flush() try {
 }
 
 template <class Span>
-void AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
+void AgentWriter<Span>::retryFiniteOnFail(std::function<bool()> f) const {
+  for (std::chrono::milliseconds backoff : retry_periods_) {
+    if (f()) {
+      return;
+    }
+    {
+      // Just check for stop_writing_ between attempts. No need to allow wake-from-sleep
+      // stop_writing signal during retry period since that should always be short.
+      std::unique_lock<std::mutex> lock(mutex_);
+      if (stop_writing_) {
+        return;
+      }
+    }
+    std::this_thread::sleep_for(backoff);
+  }
+  f();  // Final try after final sleep.
+}
+
+template <class Span>
+bool AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
                                   size_t num_spans) try {
   auto rcode = handle->appendHeaders({"X-Datadog-Trace-Count: " + std::to_string(num_spans)});
   if (rcode != CURLE_OK) {
     std::cerr << "Error setting agent communication headers: " << curl_easy_strerror(rcode)
               << std::endl;
-    return;
+    return false;
   }
 
   // We have to set the size manually, because msgpack uses null characters.
@@ -152,23 +185,25 @@ void AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringst
   rcode = handle->setopt(CURLOPT_POSTFIELDSIZE, post_fields.size());
   if (rcode != CURLE_OK) {
     std::cerr << "Error setting agent request size: " << curl_easy_strerror(rcode) << std::endl;
-    return;
+    return false;
   }
 
   rcode = handle->setopt(CURLOPT_POSTFIELDS, post_fields.data());
   if (rcode != CURLE_OK) {
     std::cerr << "Error setting agent request body: " << curl_easy_strerror(rcode) << std::endl;
-    return;
+    return false;
   }
 
   rcode = handle->perform();
   if (rcode != CURLE_OK) {
     std::cerr << "Error sending traces to agent: " << curl_easy_strerror(rcode) << std::endl
               << handle->getError() << std::endl;
-    return;
+    return false;
   }
+  return true;
 } catch (const std::bad_alloc &) {
   // Drop spans, but live to fight another day.
+  return true;  // Don't attempt to retry.
 }
 
 // Make sure we generate code for a Span-writing Writer.
