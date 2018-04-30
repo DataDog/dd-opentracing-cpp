@@ -27,6 +27,8 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> w
       duration(0),
       context_(span_id, span_id, {}) {
   // Extract context (if present) from options.
+  // TODO[willgittoes-dd]: Consider making all this logic happen in the initializer list, so we can
+  // make the ID members const.
   const SpanContext *parent_span_context = nullptr;
   for (auto &reference : options.references) {
     if (auto span_context = dynamic_cast<const SpanContext *>(reference.second)) {
@@ -98,6 +100,10 @@ void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fiel
 const ot::SpanContext &Span::context() const noexcept { return context_; }
 
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
+
+uint64_t Span::traceId() const {
+  return trace_id;  // Never modified, hence un-locked access.
+}
 
 }  // namespace opentracing
 }  // namespace datadog

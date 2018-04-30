@@ -44,6 +44,8 @@ class Span : public ot::Span {
 
   const ot::Tracer &tracer() const noexcept override;
 
+  uint64_t traceId() const;
+
  private:
   std::shared_ptr<const Tracer> tracer_;
   TimeProvider get_time_;

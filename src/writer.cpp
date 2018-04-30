@@ -7,7 +7,7 @@ namespace opentracing {
 
 namespace {
 const std::string agent_api_path = "/v0.3/traces";
-const std::string agent_protocol = "https://";
+const std::string agent_protocol = "http://";
 // Max amount of time to wait between sending spans to agent. Agent discards spans older than 10s,
 // so that is the upper bound.
 const std::chrono::milliseconds default_write_period = std::chrono::seconds(6);
@@ -99,9 +99,21 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
             // Clear the buffer but keep the allocated memory.
             buffer.clear();
             buffer.str(std::string{});
-            // Why does the agent want extra nesting?
-            std::array<std::reference_wrapper<std::deque<Message>>, 1> wrapped_messages{messages_};
-            msgpack::pack(buffer, wrapped_messages);
+            // Group Spans by trace_id.
+            // TODO[willgittoes-dd]: Investigate whether it's faster to have grouping done on
+            // write().
+            std::unordered_map<int, std::vector<std::reference_wrapper<Message>>>
+                messages_by_trace;
+            for (Message &message : messages_) {
+              messages_by_trace[message.traceId()].push_back(message);
+            }
+            // Change outer collection type to sequential from associative.
+            std::vector<std::reference_wrapper<std::vector<std::reference_wrapper<Message>>>>
+                traces;
+            for (auto &trace : messages_by_trace) {
+              traces.push_back(trace.second);
+            }
+            msgpack::pack(buffer, traces);
             messages_.clear();
           }  // lock on mutex_ ends.
           // Send messages, not in critical period.
