@@ -3,6 +3,7 @@
 
 #include <opentracing/tracer.h>
 
+#include <mutex>
 #include <unordered_map>
 
 namespace ot = opentracing;
@@ -14,6 +15,9 @@ class SpanContext : public ot::SpanContext {
  public:
   SpanContext(uint64_t id, uint64_t trace_id,
               std::unordered_map<std::string, std::string> &&baggage);
+
+  SpanContext(SpanContext &&other);
+  SpanContext &operator=(SpanContext &&other);
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
@@ -38,6 +42,7 @@ class SpanContext : public ot::SpanContext {
   uint64_t id_;
   uint64_t trace_id_;
   std::unordered_map<std::string, std::string> baggage_;
+  mutable std::mutex mutex_;
 };
 
 }  // namespace opentracing

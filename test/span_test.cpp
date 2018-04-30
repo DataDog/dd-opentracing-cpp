@@ -2,6 +2,7 @@
 #include "mocks.h"
 
 #include <ctime>
+#include <thread>
 
 #define CATCH_CONFIG_MAIN
 #include <datadog/catch2/catch.hpp>
@@ -38,5 +39,17 @@ TEST_CASE("span") {
 
     REQUIRE(writer->spans.size() == 1);
     REQUIRE(writer->spans[0].duration == 10000000000);
+  }
+
+  SECTION("finishes once") {
+    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
+              span_options};
+    const ot::FinishSpanOptions finish_options;
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 10; i++) {
+      threads.emplace_back([&]() { span.FinishWithOptions(finish_options); });
+    }
+    std::for_each(threads.begin(), threads.end(), std::mem_fn(&std::thread::join));
+    REQUIRE(writer->spans.size() == 1);
   }
 }
