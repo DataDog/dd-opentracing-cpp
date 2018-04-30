@@ -9,8 +9,15 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("writer") {
-  std::shared_ptr<MockHandle> handle{new MockHandle{}};
-  AgentWriter<SpanInfo> writer{handle, "v0.1.0", "hostname", 6319};
+  std::atomic<bool> handle_destructed{false};
+  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
+  MockHandle* handle = handle_ptr.get();
+  // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
+  // problems.
+  auto only_send_spans_when_we_flush = std::chrono::seconds(3600);
+  size_t max_queued_spans = 25;
+  AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   only_send_spans_when_we_flush,
+                               max_queued_spans,      "hostname", 6319};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
@@ -23,6 +30,7 @@ TEST_CASE("writer") {
   SECTION("spans can be sent") {
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.flush();
 
     // Check span body.
     auto spans = handle->getSpans();
@@ -50,19 +58,114 @@ TEST_CASE("writer") {
                                                       "X-Datadog-Trace-Count: 1"});
   }
 
+  SECTION("queue does not grow indefinitely") {
+    for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
+      writer.write(
+          std::move(SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+    }
+    writer.flush();
+    auto spans = handle->getSpans();
+    REQUIRE(spans->size() == 1);
+    REQUIRE((*spans)[0].size() == 25);
+  }
+
   SECTION("bad handle causes constructor to fail") {
-    handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    REQUIRE_THROWS(AgentWriter<SpanInfo>{handle, "v0.1.0", "hostname", 6319});
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+    handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
+    REQUIRE_THROWS(AgentWriter<SpanInfo>{std::move(handle_ptr), "v0.1.0",
+                                         only_send_spans_when_we_flush, max_queued_spans,
+                                         "hostname", 6319});
   }
 
   SECTION("handle failure during perform/sending") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    // Doesn't throw an error.
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    // Redirect stderr so the test logs don't look like a failure.
+    std::stringstream error_message;
+    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+    writer.flush();  // Doesn't throw an error. That's the test!
+    REQUIRE(error_message.str() ==
+            "Error setting agent communication headers: Timeout was reached\n");
+    std::cerr.rdbuf(stderr);  // Restore stderr.
     // Dropped all spans.
     handle->rcode = CURLE_OK;
+    REQUIRE(handle->getSpans()->size() == 0);
+  }
+
+  SECTION("destructed/stopped writer does nothing when written to") {
+    writer.stop();  // Normally called by destructor.
+    // We know the worker thread has stopped because it is the unique owner of handle (the pointer
+    // we keep for testing is leaked) and has destructed it.
+    REQUIRE(handle_destructed);
+    // Check that these don't crash (but neither will they do anything).
+    writer.write(
+        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
     writer.flush();
-    REQUIRE((*handle->getSpans())[0].size() == 0);
+  }
+
+  SECTION("there can be multiple threads sending Spans") {
+    // Write concurrently.
+    std::vector<std::thread> senders;
+    for (uint64_t i = 1; i <= 20; i++) {
+      senders.emplace_back(
+          [&](uint64_t id) {
+            writer.write(std::move(
+                SpanInfo{"service.name", "service", "resource", "web", id, id, 0, 0, 69, 420}));
+          },
+          i);
+    }
+    for (std::thread& sender : senders) {
+      sender.join();
+    }
+    writer.flush();
+    // Now check.
+    auto spans = handle->getSpans();
+    REQUIRE(spans->size() == 1);
+    std::unordered_set<uint64_t> seen_ids;  // Make sure all senders sent their Span.
+    for (auto span : (*spans)[0]) {
+      seen_ids.insert(span.trace_id);
+      REQUIRE(span.name == "service.name");
+      REQUIRE(span.service == "service");
+      REQUIRE(span.resource == "resource");
+      REQUIRE(span.type == "web");
+      REQUIRE(span.parent_id == 0);
+      REQUIRE(span.error == 0);
+      REQUIRE(span.start == 69);
+      REQUIRE(span.duration == 420);
+    }
+    REQUIRE(seen_ids == std::unordered_set<uint64_t>{1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                                                     11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
+  }
+
+  SECTION("writes happen periodically") {
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+    MockHandle* handle = handle_ptr.get();
+    auto write_interval = std::chrono::seconds(2);
+    AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   write_interval,
+                                 max_queued_spans,      "hostname", 6319};
+    // Send 7 spans at 1 Span per second. Since the write period is 2s, there should be 4 different
+    // writes. We don't count the number of writes because that could flake, but we do check that
+    // all 7 Spans are written, implicitly testing that multiple writes happen.
+    std::thread sender([&]() {
+      for (uint64_t i = 1; i <= 7; i++) {
+        writer.write(std::move(
+            SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+    });
+    // Wait until data is written.
+    std::unordered_set<uint64_t> span_ids;
+    while (span_ids.size() < 7) {
+      handle->waitUntilDataWritten();
+      auto data = handle->getSpans();
+      REQUIRE(data->size() == 1);
+      std::transform((*data)[0].begin(), (*data)[0].end(),
+                     std::inserter(span_ids, span_ids.begin()),
+                     [](SpanInfo& span) -> uint64_t { return span.span_id; });
+    }
+    // We got all 7 spans without calling flush ourselves.
+    REQUIRE(span_ids == std::unordered_set<uint64_t>{1, 2, 3, 4, 5, 6, 7});
+    sender.join();
   }
 }
