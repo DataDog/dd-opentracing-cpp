@@ -111,10 +111,10 @@ TEST_CASE("writer") {
     auto spans = handle->getSpans();
     REQUIRE(spans->size() == 4);
     // Make sure all senders sent their Span.
-    std::unordered_map<uint64_t, std::vector<uint64_t>> seen_ids;
+    std::unordered_map<uint64_t, std::unordered_set<uint64_t>> seen_ids;
     for (auto trace : (*spans)) {
       for (auto span : trace) {
-        seen_ids[span.trace_id].push_back(span.span_id);
+        seen_ids[span.trace_id].insert(span.span_id);
         REQUIRE(span.name == "service.name");
         REQUIRE(span.service == "service");
         REQUIRE(span.resource == "resource");
@@ -126,10 +126,10 @@ TEST_CASE("writer") {
       }
     }
     REQUIRE(seen_ids ==
-            std::unordered_map<uint64_t, std::vector<uint64_t>>{{1, {1, 2, 3, 4, 5}},
-                                                                {2, {6, 7, 8, 9, 10}},
-                                                                {3, {11, 12, 13, 14, 15}},
-                                                                {4, {16, 17, 18, 19, 20}}});
+            std::unordered_map<uint64_t, std::unordered_set<uint64_t>>{{1, {1, 2, 3, 4, 5}},
+                                                                       {2, {6, 7, 8, 9, 10}},
+                                                                       {3, {11, 12, 13, 14, 15}},
+                                                                       {4, {16, 17, 18, 19, 20}}});
   }
 
   SECTION("writes happen periodically") {

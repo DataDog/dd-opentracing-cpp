@@ -13,23 +13,23 @@ const std::string agent_protocol = "http://";
 const std::chrono::milliseconds default_write_period = std::chrono::seconds(6);
 }  // namespace
 
-template <class Message>
-AgentWriter<Message>::AgentWriter(std::string host, uint32_t port)
+template <class Span>
+AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
                   default_write_period, host, port){};
 
-template <class Message>
-AgentWriter<Message>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                                  std::chrono::milliseconds write_period, std::string host,
-                                  uint32_t port)
+template <class Span>
+AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
+                               std::chrono::milliseconds write_period, std::string host,
+                               uint32_t port)
     : write_period_(write_period), tracer_version_(tracer_version) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
 }
 
-template <class Message>
-void AgentWriter<Message>::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
-                                       uint32_t port) {
+template <class Span>
+void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
+                                    uint32_t port) {
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
@@ -47,13 +47,13 @@ void AgentWriter<Message>::setUpHandle(std::unique_ptr<Handle> &handle, std::str
   }
 }
 
-template <class Message>
-AgentWriter<Message>::~AgentWriter() {
+template <class Span>
+AgentWriter<Span>::~AgentWriter() {
   stop();
 }
 
-template <class Message>
-void AgentWriter<Message>::stop() {
+template <class Span>
+void AgentWriter<Span>::stop() {
   {
     std::unique_lock<std::mutex> lock(mutex_);
     if (stop_writing_) {
@@ -65,35 +65,35 @@ void AgentWriter<Message>::stop() {
   worker_->join();
 }
 
-template <class Message>
-void AgentWriter<Message>::write(Message &&message) {
+template <class Span>
+void AgentWriter<Span>::write(Span &&span) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;
   }
-  messages_.push_back(std::move(message));
+  spans_.push_back(std::move(span));
 };
 
-template <class Message>
-void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
-  // Start worker that sends Messages to agent.
+template <class Span>
+void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
+  // Start worker that sends Spans to agent.
   // We can capture 'this' because destruction of this stops the thread and the lambda.
   worker_ = std::make_unique<std::thread>(
       [this](std::unique_ptr<Handle> handle) {
         std::stringstream buffer;
-        size_t num_messages = 0;
+        size_t num_spans = 0;
         while (true) {
-          // Encode messages when there are new ones.
+          // Encode spans when there are new ones.
           {
-            // Wait to be told about new messages (or to stop).
+            // Wait to be told about new spans (or to stop).
             std::unique_lock<std::mutex> lock(mutex_);
             condition_.wait_for(lock, write_period_,
                                 [&]() -> bool { return flush_worker_ || stop_writing_; });
             if (stop_writing_) {
               return;  // Stop the thread.
             }
-            num_messages = messages_.size();
-            if (num_messages == 0) {
+            num_spans = spans_.size();
+            if (num_spans == 0) {
               continue;
             }
             // Clear the buffer but keep the allocated memory.
@@ -102,22 +102,20 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
             // Group Spans by trace_id.
             // TODO[willgittoes-dd]: Investigate whether it's faster to have grouping done on
             // write().
-            std::unordered_map<int, std::vector<std::reference_wrapper<Message>>>
-                messages_by_trace;
-            for (Message &message : messages_) {
-              messages_by_trace[message.traceId()].push_back(message);
+            std::unordered_map<int, std::vector<std::reference_wrapper<Span>>> spans_by_trace;
+            for (Span &span : spans_) {
+              spans_by_trace[span.traceId()].push_back(span);
             }
             // Change outer collection type to sequential from associative.
-            std::vector<std::reference_wrapper<std::vector<std::reference_wrapper<Message>>>>
-                traces;
-            for (auto &trace : messages_by_trace) {
+            std::vector<std::reference_wrapper<std::vector<std::reference_wrapper<Span>>>> traces;
+            for (auto &trace : spans_by_trace) {
               traces.push_back(trace.second);
             }
             msgpack::pack(buffer, traces);
-            messages_.clear();
+            spans_.clear();
           }  // lock on mutex_ ends.
-          // Send messages, not in critical period.
-          AgentWriter<Message>::postMessages(handle, buffer, num_messages);
+          // Send spans, not in critical period.
+          AgentWriter<Span>::postSpans(handle, buffer, num_spans);
           // Let thread calling 'flush' that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -129,8 +127,8 @@ void AgentWriter<Message>::startWriting(std::unique_ptr<Handle> handle) {
       std::move(handle));
 }  // namespace opentracing
 
-template <class Message>
-void AgentWriter<Message>::flush() try {
+template <class Span>
+void AgentWriter<Span>::flush() try {
   std::unique_lock<std::mutex> lock(mutex_);
   flush_worker_ = true;
   condition_.notify_all();
@@ -139,10 +137,10 @@ void AgentWriter<Message>::flush() try {
 } catch (const std::bad_alloc &) {
 }
 
-template <class Message>
-void AgentWriter<Message>::postMessages(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
-                                        size_t num_messages) try {
-  auto rcode = handle->appendHeaders({"X-Datadog-Trace-Count: " + std::to_string(num_messages)});
+template <class Span>
+void AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
+                                  size_t num_spans) try {
+  auto rcode = handle->appendHeaders({"X-Datadog-Trace-Count: " + std::to_string(num_spans)});
   if (rcode != CURLE_OK) {
     std::cerr << "Error setting agent communication headers: " << curl_easy_strerror(rcode)
               << std::endl;
@@ -170,7 +168,7 @@ void AgentWriter<Message>::postMessages(std::unique_ptr<Handle> &handle, std::st
     return;
   }
 } catch (const std::bad_alloc &) {
-  // Drop messages, but live to fight another day.
+  // Drop spans, but live to fight another day.
 }
 
 // Make sure we generate code for a Span-writing Writer.
