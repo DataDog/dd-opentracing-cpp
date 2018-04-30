@@ -10,19 +10,22 @@ const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "http://";
 // Max amount of time to wait between sending spans to agent. Agent discards spans older than 10s,
 // so that is the upper bound.
-const std::chrono::milliseconds default_write_period = std::chrono::seconds(6);
+const std::chrono::milliseconds default_write_period = std::chrono::seconds(1);
+const size_t max_queued_spans = 7000;
 }  // namespace
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
-                  default_write_period, host, port){};
+                  default_write_period, max_queued_spans, host, port){};
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                               std::chrono::milliseconds write_period, std::string host,
-                               uint32_t port)
-    : write_period_(write_period), tracer_version_(tracer_version) {
+                               std::chrono::milliseconds write_period, size_t max_queued_spans,
+                               std::string host, uint32_t port)
+    : tracer_version_(tracer_version),
+      write_period_(write_period),
+      max_queued_spans_(max_queued_spans) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
 }
@@ -69,6 +72,9 @@ template <class Span>
 void AgentWriter<Span>::write(Span &&span) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
+    return;
+  }
+  if (spans_.size() >= max_queued_spans_) {
     return;
   }
   spans_.push_back(std::move(span));
