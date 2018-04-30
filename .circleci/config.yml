@@ -53,6 +53,7 @@ jobs:
             cmake ..
             make
             ctest --output-on-failure
+            make install
             popd
       - run:
           name: Run Datadog C++ OpenTracing tests (with tsan and usan)
@@ -73,4 +74,21 @@ jobs:
             cmake -DSANITIZE_ADDRESS=On ..
             make
             ctest --output-on-failure
+            popd
+      - run:
+          name: Nginx module builds
+          command: |
+            wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v0.2.1.tar.gz
+            tar zxvf nginx-opentracing.tar.gz
+            pushd nginx-opentracing-0.2.1
+            patch -p1 < ../nginx-opentracing-datadog.patch
+            popd
+            wget http://nginx.org/download/nginx-1.13.10.tar.gz
+            tar zxvf nginx-1.13.10.tar.gz
+            pushd nginx-1.13.10
+            ./configure \
+              --add-dynamic-module=../nginx-opentracing-0.2.1/opentracing \
+              --add-dynamic-module=../nginx-opentracing-0.2.1/datadog
+            make
+            make install
             popd
