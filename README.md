@@ -9,6 +9,7 @@
 - cmake >= 3.0
 - [OpenTracing C++](https://github.com/opentracing/)
 - [msgpack-c](ttps://github.com/msgpack/msgpack-c/)
+- [libCURL](https://curl.haxx.se/libcurl/)
 - Build tools (eg. build-essential, xcode)
 
 **Build steps**
@@ -30,6 +31,8 @@ Either just run `circleci build` or:
     ctest --output-on-failure
 
 `make test` also works instead of calling ctest, but [doesn't print](https://stackoverflow.com/questions/5709914/using-cmake-how-do-i-get-verbose-output-from-ctest) which tests are failing.
+
+If you want [santiziers](https://github.com/google/sanitizers) to be enabled, then instead of `cmake ..`, use either `cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..` or `cmake -DSANITIZE_ADDRESS=On ..`, running the tests will now also check with the sanitizers.
 
 ## Usage
 

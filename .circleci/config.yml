@@ -54,3 +54,23 @@ jobs:
             make
             ctest --output-on-failure
             popd
+      - run:
+          name: Run Datadog C++ OpenTracing tests (with tsan and usan)
+          command: |
+            rm -rf .build
+            mkdir .build
+            pushd .build
+            cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..
+            make
+            ctest --output-on-failure
+            popd
+      - run:
+          name: Run Datadog C++ OpenTracing tests (with asan)
+          command: |
+            rm -rf .build
+            mkdir .build
+            pushd .build
+            cmake -DSANITIZE_ADDRESS=On ..
+            make
+            ctest --output-on-failure
+            popd
