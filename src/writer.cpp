@@ -11,6 +11,7 @@ const std::string agent_protocol = "http://";
 // Max amount of time to wait between sending spans to agent. Agent discards spans older than 10s,
 // so that is the upper bound.
 const std::chrono::milliseconds default_write_period = std::chrono::seconds(1);
+const size_t max_queued_spans = 7000;
 // Retry sending spans to agent a couple of times. Any more than that and the agent won't accept
 // them.
 // write_period 1s + timeout 2s + (retry & timeout) 2.5s + (retry and timeout) 4.5s = 10s.
@@ -23,14 +24,17 @@ const long default_timeout_ms = 2000L;
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
-                  default_write_period, default_retry_periods, host, port){};
+                  default_write_period, max_queued_spans, default_retry_periods, host, port){};
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                               std::chrono::milliseconds write_period,
+                               std::chrono::milliseconds write_period, size_t max_queued_spans,
                                std::vector<std::chrono::milliseconds> retry_periods,
                                std::string host, uint32_t port)
-    : write_period_(write_period), retry_periods_(retry_periods), tracer_version_(tracer_version) {
+    : write_period_(write_period),
+      max_queued_spans_(max_queued_spans),
+      retry_periods_(retry_periods),
+      tracer_version_(tracer_version) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
 }
@@ -82,6 +86,9 @@ template <class Span>
 void AgentWriter<Span>::write(Span &&span) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
+    return;
+  }
+  if (spans_.size() >= max_queued_spans_) {
     return;
   }
   spans_.push_back(std::move(span));

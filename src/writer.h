@@ -36,7 +36,7 @@ class AgentWriter : public Writer<Span> {
   AgentWriter(std::string host, uint32_t port);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-              std::chrono::milliseconds write_period,
+              std::chrono::milliseconds write_period, size_t max_queued_spans,
               std::vector<std::chrono::milliseconds> retry_periods, std::string host,
               uint32_t port);
 
@@ -69,6 +69,7 @@ class AgentWriter : public Writer<Span> {
   const std::string tracer_version_;
   // How often to send Spans.
   const std::chrono::milliseconds write_period_;
+  const size_t max_queued_spans_;
   // How long to wait before retrying each time. If empty, only try once.
   const std::vector<std::chrono::milliseconds> retry_periods_;
 
@@ -76,16 +77,16 @@ class AgentWriter : public Writer<Span> {
   // spans_ queue as notified by condition_. Encodes spans to buffer_ and sends to the
   // agent.
   std::unique_ptr<std::thread> worker_ = nullptr;
+  // Locks access to the spans_ queue and the stop_writing_ and flush_worker_ signals.
+  mutable std::mutex mutex_;
+  // Notifies worker thread when there are new spans in the queue or it should stop.
+  std::condition_variable condition_;
   // These two bools, stop_writing_ and flush_worker_, act as signals. They are the predicates on
   // which the condition_ variable acts.
   // If set to true, stops worker. Locked by mutex_;
   bool stop_writing_ = false;
   // If set to true, flushes worker (which sets it false again). Locked by mutex_;
   bool flush_worker_ = false;
-  // Locks access to the spans_ queue and the stop_writing_ and flush_worker_ signals.
-  mutable std::mutex mutex_;
-  // Notifies worker thread when there are new spans in the queue or it should stop.
-  std::condition_variable condition_;
   // Multiple producer (potentially), single consumer. Locked by mutex_.
   std::deque<Span> spans_;
 };

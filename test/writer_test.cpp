@@ -15,9 +15,15 @@ TEST_CASE("writer") {
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
   auto only_send_spans_when_we_flush = std::chrono::seconds(3600);
+  size_t max_queued_spans = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
-  AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   only_send_spans_when_we_flush,
-                               disable_retry,         "hostname", 6319};
+  AgentWriter<SpanInfo> writer{std::move(handle_ptr),
+                               "v0.1.0",
+                               only_send_spans_when_we_flush,
+                               max_queued_spans,
+                               disable_retry,
+                               "hostname",
+                               6319};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options ==
@@ -60,12 +66,23 @@ TEST_CASE("writer") {
                                                       "X-Datadog-Trace-Count: 1"});
   }
 
+  SECTION("queue does not grow indefinitely") {
+    for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
+      writer.write(
+          std::move(SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
+    }
+    writer.flush();
+    auto spans = handle->getSpans();
+    REQUIRE(spans->size() == 1);
+    REQUIRE((*spans)[0].size() == 25);
+  }
+
   SECTION("bad handle causes constructor to fail") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter<SpanInfo>{std::move(handle_ptr), "v0.1.0",
-                                         only_send_spans_when_we_flush, disable_retry, "hostname",
-                                         6319});
+                                         only_send_spans_when_we_flush, max_queued_spans,
+                                         disable_retry, "hostname", 6319});
   }
 
   SECTION("handle failure during perform/sending") {
@@ -140,8 +157,13 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
     auto write_interval = std::chrono::seconds(2);
-    AgentWriter<SpanInfo> writer{std::move(handle_ptr), "v0.1.0",   write_interval,
-                                 disable_retry,         "hostname", 6319};
+    AgentWriter<SpanInfo> writer{std::move(handle_ptr),
+                                 "v0.1.0",
+                                 write_interval,
+                                 max_queued_spans,
+                                 disable_retry,
+                                 "hostname",
+                                 6319};
     // Send 7 spans at 1 Span per second. Since the write period is 2s, there should be 4 different
     // writes. We don't count the number of writes because that could flake, but we do check that
     // all 7 Spans are written, implicitly testing that multiple writes happen.
@@ -155,7 +177,7 @@ TEST_CASE("writer") {
     // Wait until data is written.
     std::unordered_set<uint64_t> span_ids;
     while (span_ids.size() < 7) {
-      handle->waitUntilDataWritten();
+      handle->waitUntilPerformIsCalled();
       auto data = handle->getSpans();
       REQUIRE(data->size() == 1);
       std::transform((*data)[0].begin(), (*data)[0].end(),
@@ -167,5 +189,31 @@ TEST_CASE("writer") {
     sender.join();
   }
 
-  // FIXME: Tests for: timeout, retry.
+  SECTION("failed agent comms") {
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+    MockHandle* handle = handle_ptr.get();
+    std::vector<std::chrono::milliseconds> retry_periods{std::chrono::milliseconds(500),
+                                                         std::chrono::milliseconds(2500)};
+    AgentWriter<SpanInfo> writer{std::move(handle_ptr),
+                                 "v0.1.0",
+                                 only_send_spans_when_we_flush,
+                                 max_queued_spans,
+                                 retry_periods,
+                                 "hostname",
+                                 6319};
+    writer.write(
+        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+
+    SECTION("will retry") {
+      handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT, CURLE_OK};
+      writer.flush();
+      REQUIRE(handle->perform_call_count == 2);
+    }
+
+    SECTION("will eventually give up") {
+      handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT};
+      writer.flush();
+      REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
+    }
+  }
 }
