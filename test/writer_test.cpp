@@ -21,7 +21,7 @@ TEST_CASE("writer") {
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                                   {CURLOPT_URL, "https://hostname:6319/v0.3/traces"}});
+                                   {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}});
     REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
                                                       "Datadog-Meta-Lang: cpp",
                                                       "Datadog-Meta-Tracer-Version: v0.1.0"});
@@ -50,7 +50,7 @@ TEST_CASE("writer") {
     // Remove postdata first, since it's ugly to print and we just tested it above.
     handle->options.erase(CURLOPT_POSTFIELDS);
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                                   {CURLOPT_URL, "https://hostname:6319/v0.3/traces"},
+                                   {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
                                    {CURLOPT_POSTFIELDSIZE, "120"}});
     REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
                                                       "Datadog-Meta-Lang: cpp",
@@ -61,7 +61,7 @@ TEST_CASE("writer") {
   SECTION("queue does not grow indefinitely") {
     for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
       writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+          std::move(SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
     }
     writer.flush();
     auto spans = handle->getSpans();
@@ -110,8 +110,9 @@ TEST_CASE("writer") {
     for (uint64_t i = 1; i <= 20; i++) {
       senders.emplace_back(
           [&](uint64_t id) {
-            writer.write(std::move(
-                SpanInfo{"service.name", "service", "resource", "web", id, id, 0, 0, 69, 420}));
+            uint64_t trace_id = (id - 1) / 5 + 1;  // 1, 2, 3, 4
+            writer.write(std::move(SpanInfo{"service.name", "service", "resource", "web", id,
+                                            trace_id, 0, 0, 69, 420}));
           },
           i);
     }
@@ -121,21 +122,27 @@ TEST_CASE("writer") {
     writer.flush();
     // Now check.
     auto spans = handle->getSpans();
-    REQUIRE(spans->size() == 1);
-    std::unordered_set<uint64_t> seen_ids;  // Make sure all senders sent their Span.
-    for (auto span : (*spans)[0]) {
-      seen_ids.insert(span.trace_id);
-      REQUIRE(span.name == "service.name");
-      REQUIRE(span.service == "service");
-      REQUIRE(span.resource == "resource");
-      REQUIRE(span.type == "web");
-      REQUIRE(span.parent_id == 0);
-      REQUIRE(span.error == 0);
-      REQUIRE(span.start == 69);
-      REQUIRE(span.duration == 420);
+    REQUIRE(spans->size() == 4);
+    // Make sure all senders sent their Span.
+    std::unordered_map<uint64_t, std::unordered_set<uint64_t>> seen_ids;
+    for (auto trace : (*spans)) {
+      for (auto span : trace) {
+        seen_ids[span.trace_id].insert(span.span_id);
+        REQUIRE(span.name == "service.name");
+        REQUIRE(span.service == "service");
+        REQUIRE(span.resource == "resource");
+        REQUIRE(span.type == "web");
+        REQUIRE(span.parent_id == 0);
+        REQUIRE(span.error == 0);
+        REQUIRE(span.start == 69);
+        REQUIRE(span.duration == 420);
+      }
     }
-    REQUIRE(seen_ids == std::unordered_set<uint64_t>{1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-                                                     11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
+    REQUIRE(seen_ids ==
+            std::unordered_map<uint64_t, std::unordered_set<uint64_t>>{{1, {1, 2, 3, 4, 5}},
+                                                                       {2, {6, 7, 8, 9, 10}},
+                                                                       {3, {11, 12, 13, 14, 15}},
+                                                                       {4, {16, 17, 18, 19, 20}}});
   }
 
   SECTION("writes happen periodically") {
@@ -150,7 +157,7 @@ TEST_CASE("writer") {
     std::thread sender([&]() {
       for (uint64_t i = 1; i <= 7; i++) {
         writer.write(std::move(
-            SpanInfo{"service.name", "service", "resource", "web", i, i, 0, 0, 69, 420}));
+            SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
     });

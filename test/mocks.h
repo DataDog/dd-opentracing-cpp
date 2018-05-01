@@ -23,11 +23,13 @@ struct SpanInfo {
   int64_t start;
   int64_t duration;
 
+  uint64_t traceId() const { return trace_id; }
+
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, span_id, trace_id, parent_id,
                      error);
 };
 
-// A Writer implemenentation that allows access to the Spans recorded.
+// A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer<Span> {
   MockWriter() {}
   ~MockWriter() override {}
