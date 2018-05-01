@@ -31,10 +31,10 @@ AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string trace
                                std::chrono::milliseconds write_period, size_t max_queued_spans,
                                std::vector<std::chrono::milliseconds> retry_periods,
                                std::string host, uint32_t port)
-    : write_period_(write_period),
+    : tracer_version_(tracer_version),
+      write_period_(write_period),
       max_queued_spans_(max_queued_spans),
-      retry_periods_(retry_periods),
-      tracer_version_(tracer_version) {
+      retry_periods_(retry_periods) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
 }
