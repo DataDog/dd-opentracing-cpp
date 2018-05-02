@@ -4,7 +4,7 @@
 #include <string>
 
 #define CATCH_CONFIG_MAIN
-#include <datadog/catch2/catch.hpp>
+#include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 namespace ot = opentracing;
 
