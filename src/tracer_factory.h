@@ -8,6 +8,7 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+template <class TracerImpl>
 class TracerFactory : public ot::TracerFactory {
  public:
   ot::expected<std::shared_ptr<ot::Tracer>> MakeTracer(const char *configuration,
