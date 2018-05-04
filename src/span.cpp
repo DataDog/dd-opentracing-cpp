@@ -61,6 +61,7 @@ Span::Span(Span &&other)
       error(other.error),
       start(other.start),
       duration(other.duration),
+      meta(other.meta),
       context_(std::move(other.context_)) {
   is_finished_ = (bool)other.is_finished_;  // Copy the value.
 }
