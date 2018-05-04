@@ -59,7 +59,7 @@ TEST_CASE("writer") {
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
                                    {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
                                    {CURLOPT_TIMEOUT_MS, "2000"},
-                                   {CURLOPT_POSTFIELDSIZE, "120"}});
+                                   {CURLOPT_POSTFIELDSIZE, "126"}});
     REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
                                                       "Datadog-Meta-Lang: cpp",
                                                       "Datadog-Meta-Tracer-Version: v0.1.0",

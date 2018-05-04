@@ -66,12 +66,13 @@ class Span : public ot::Span {
   int32_t error;
   int64_t start;
   int64_t duration;
+  std::unordered_map<std::string, std::string> meta;  // Aka, tags.
 
   SpanContext context_;
 
  public:
-  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, span_id, trace_id, parent_id,
-                     error);
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
+                     parent_id, error);
 };
 
 }  // namespace opentracing
