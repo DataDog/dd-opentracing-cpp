@@ -15,7 +15,7 @@ TEST_CASE("tracer") {
   auto writer = new MockWriter();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  TracerOptions tracer_options{"", 0, "service_name", "service_name.span_name", "web"};
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{
       new Tracer{tracer_options, std::shared_ptr<Writer<Span>>{writer}, get_time, get_id}};
   const ot::StartSpanOptions span_options;
@@ -28,7 +28,7 @@ TEST_CASE("tracer") {
     REQUIRE(writer->spans.size() == 1);
     REQUIRE(writer->spans[0].type == "web");
     REQUIRE(writer->spans[0].service == "service_name");
-    REQUIRE(writer->spans[0].name == "service_name.span_name");
+    REQUIRE(writer->spans[0].name == "/what_up");
     REQUIRE(writer->spans[0].resource == "/what_up");
   }
 

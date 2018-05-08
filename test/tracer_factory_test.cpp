@@ -58,7 +58,6 @@ TEST_CASE("tracer") {
     std::string input{R"(
       {
         "service": "my-service",
-        "span_name": "my-span",
         "agent_host": "www.omfgdogs.com",
         "agent_port": 80,
         "type": "db"
@@ -72,15 +71,13 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.agent_host == "www.omfgdogs.com");
     REQUIRE(tracer->opts.agent_port == 80);
     REQUIRE(tracer->opts.service == "my-service");
-    REQUIRE(tracer->opts.span_name == "my-span");
     REQUIRE(tracer->opts.type == "db");
   }
 
   SECTION("can be created without optional fields") {
     std::string input{R"(
       {
-        "service": "my-service",
-        "span_name": "my-span"
+        "service": "my-service"
       }
     )"};
     std::string error = "";
@@ -91,7 +88,6 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.agent_host == "localhost");
     REQUIRE(tracer->opts.agent_port == 8126);
     REQUIRE(tracer->opts.service == "my-service");
-    REQUIRE(tracer->opts.span_name == "my-span");
     REQUIRE(tracer->opts.type == "web");
   }
 
@@ -99,7 +95,6 @@ TEST_CASE("tracer") {
     std::string input{R"(
       {
         "service": "my-service",
-        "span_name": "my-span",
         "HERP": "DERP"
       }
     )"};
@@ -111,19 +106,18 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.agent_host == "localhost");
     REQUIRE(tracer->opts.agent_port == 8126);
     REQUIRE(tracer->opts.service == "my-service");
-    REQUIRE(tracer->opts.span_name == "my-span");
     REQUIRE(tracer->opts.type == "web");
   }
 
   SECTION("has required fields") {
     std::string input{R"(
       {
-        "service": "my-service"
+        "agent_host": "localhost"
       }
-    )"};  // Missing span_name
+    )"};  // Missing service
     std::string error = "";
     auto result = factory.MakeTracer(input.c_str(), error);
-    REQUIRE(error == "configuration argument 'span_name' is missing");
+    REQUIRE(error == "configuration argument 'service' is missing");
     REQUIRE(!result);
     REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
   }
@@ -144,7 +138,6 @@ TEST_CASE("tracer") {
     std::string input{R"(
       {
         "service": "my-service",
-        "span_name": "my-span",
         "agent_port": "25 year aged tawny"
       }
     )"};
