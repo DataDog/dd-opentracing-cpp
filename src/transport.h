@@ -2,7 +2,7 @@
 #define DD_OPENTRACING_TRANSPORT_H
 
 #include <curl/curl.h>
-#include <list>
+#include <map>
 #include <string>
 
 namespace datadog {
@@ -15,7 +15,7 @@ class Handle {
   virtual ~Handle(){};
   virtual CURLcode setopt(CURLoption key, const char* value) = 0;
   virtual CURLcode setopt(CURLoption key, long value) = 0;
-  virtual CURLcode appendHeaders(std::list<std::string> headers) = 0;
+  virtual void setHeaders(std::map<std::string, std::string> headers) = 0;
   virtual CURLcode perform() = 0;
   virtual std::string getError() = 0;
 };
@@ -28,7 +28,7 @@ class CurlHandle : public Handle {
   ~CurlHandle() override;
   CURLcode setopt(CURLoption key, const char* value) override;
   CURLcode setopt(CURLoption key, long value) override;
-  CURLcode appendHeaders(std::list<std::string> headers) override;
+  void setHeaders(std::map<std::string, std::string> headers) override;
   CURLcode perform() override;
   std::string getError() override;
 
@@ -37,7 +37,9 @@ class CurlHandle : public Handle {
   void tearDownHandle();
 
   CURL* handle_;
-  struct curl_slist* http_headers_ = nullptr;
+  // Not unordered, just so that the headers are always in the same order. Makes testing just a bit
+  // easier, and the number of headers is so low that the log(n) insert doesn't matter.
+  std::map<std::string, std::string> headers_;
   char curl_error_buffer_[CURL_ERROR_SIZE];
 };
 

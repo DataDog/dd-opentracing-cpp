@@ -56,13 +56,10 @@ void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string
                              curl_easy_strerror(rcode));
   }
   // Set the common HTTP headers.
-  rcode = handle->appendHeaders({"Content-Type: application/msgpack", "Datadog-Meta-Lang: cpp",
-                                 "Datadog-Meta-Tracer-Version: " + tracer_version_});
-  if (rcode != CURLE_OK) {
-    throw std::runtime_error(std::string("Unable to set agent connection headers: ") +
-                             curl_easy_strerror(rcode));
-  }
-}
+  handle->setHeaders({{"Content-Type", "application/msgpack"},
+                      {"Datadog-Meta-Lang", "cpp"},
+                      {"Datadog-Meta-Tracer-Version", tracer_version_}});
+}  // namespace opentracing
 
 template <class Span>
 AgentWriter<Span>::~AgentWriter() {
@@ -146,7 +143,7 @@ void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
         }
       },
       std::move(handle));
-}  // namespace opentracing
+}
 
 template <class Span>
 void AgentWriter<Span>::flush() try {
@@ -180,16 +177,11 @@ void AgentWriter<Span>::retryFiniteOnFail(std::function<bool()> f) const {
 template <class Span>
 bool AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
                                   size_t num_spans) try {
-  auto rcode = handle->appendHeaders({"X-Datadog-Trace-Count: " + std::to_string(num_spans)});
-  if (rcode != CURLE_OK) {
-    std::cerr << "Error setting agent communication headers: " << curl_easy_strerror(rcode)
-              << std::endl;
-    return false;
-  }
+  handle->setHeaders({{"X-Datadog-Trace-Count", std::to_string(num_spans)}});
 
   // We have to set the size manually, because msgpack uses null characters.
   std::string post_fields = buffer.str();
-  rcode = handle->setopt(CURLOPT_POSTFIELDSIZE, post_fields.size());
+  CURLcode rcode = handle->setopt(CURLOPT_POSTFIELDSIZE, post_fields.size());
   if (rcode != CURLE_OK) {
     std::cerr << "Error setting agent request size: " << curl_easy_strerror(rcode) << std::endl;
     return false;

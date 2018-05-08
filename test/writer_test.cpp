@@ -29,9 +29,10 @@ TEST_CASE("writer") {
     REQUIRE(handle->options ==
             std::unordered_map<CURLoption, std::string, EnumClassHash>{
                 {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
-    REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
-                                                      "Datadog-Meta-Lang: cpp",
-                                                      "Datadog-Meta-Tracer-Version: v0.1.0"});
+    REQUIRE(handle->headers ==
+            std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
+                                               {"Datadog-Meta-Lang", "cpp"},
+                                               {"Datadog-Meta-Tracer-Version", "v0.1.0"}});
   }
 
   SECTION("spans can be sent") {
@@ -60,10 +61,11 @@ TEST_CASE("writer") {
                                    {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
                                    {CURLOPT_TIMEOUT_MS, "2000"},
                                    {CURLOPT_POSTFIELDSIZE, "126"}});
-    REQUIRE(handle->headers == std::list<std::string>{"Content-Type: application/msgpack",
-                                                      "Datadog-Meta-Lang: cpp",
-                                                      "Datadog-Meta-Tracer-Version: v0.1.0",
-                                                      "X-Datadog-Trace-Count: 1"});
+    REQUIRE(handle->headers ==
+            std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
+                                               {"Datadog-Meta-Lang", "cpp"},
+                                               {"Datadog-Meta-Tracer-Version", "v0.1.0"},
+                                               {"X-Datadog-Trace-Count", "1"}});
   }
 
   SECTION("queue does not grow indefinitely") {
@@ -85,7 +87,7 @@ TEST_CASE("writer") {
                                          disable_retry, "hostname", 6319});
   }
 
-  SECTION("handle failure during perform/sending") {
+  SECTION("handle failure during post") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
     writer.write(
         std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
@@ -93,12 +95,24 @@ TEST_CASE("writer") {
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush();  // Doesn't throw an error. That's the test!
-    REQUIRE(error_message.str() ==
-            "Error setting agent communication headers: Timeout was reached\n");
+    REQUIRE(error_message.str() == "Error setting agent request size: Timeout was reached\n");
     std::cerr.rdbuf(stderr);  // Restore stderr.
     // Dropped all spans.
     handle->rcode = CURLE_OK;
     REQUIRE(handle->getSpans()->size() == 0);
+  }
+
+  SECTION("handle failure during perform") {
+    handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT};
+    handle->error = "error from libcurl";
+    writer.write(
+        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    std::stringstream error_message;
+    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+    writer.flush();
+    REQUIRE(error_message.str() ==
+            "Error sending traces to agent: Timeout was reached\nerror from libcurl\n");
+    std::cerr.rdbuf(stderr);  // Restore stderr.
   }
 
   SECTION("destructed/stopped writer does nothing when written to") {

@@ -3,6 +3,7 @@
 
 #include <curl/curl.h>
 #include <list>
+#include <map>
 #include <sstream>
 #include <unordered_map>
 #include "../src/writer.h"
@@ -103,12 +104,10 @@ struct MockHandle : public Handle {
     return rcode;
   }
 
-  CURLcode appendHeaders(std::list<std::string> new_headers) override {
-    std::unique_lock<std::mutex> lock(mutex);
-    if (rcode == CURLE_OK) {
-      headers.insert(headers.end(), new_headers.begin(), new_headers.end());
+  void setHeaders(std::map<std::string, std::string> headers_) override {
+    for (auto& header : headers_) {
+      headers[header.first] = header.second;  // Overwrite.
     }
-    return rcode;
   }
 
   CURLcode perform() override {
@@ -128,6 +127,8 @@ struct MockHandle : public Handle {
     return error;
   }
 
+  // Note, this returns any spans that have been added to the request - NOT spans that have been
+  // successfully posted.
   std::unique_ptr<std::vector<std::vector<SpanInfo>>> getSpans() {
     std::unique_lock<std::mutex> lock(mutex);
     std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
@@ -143,7 +144,7 @@ struct MockHandle : public Handle {
   }
 
   std::unordered_map<CURLoption, std::string, EnumClassHash> options;
-  std::list<std::string> headers;
+  std::map<std::string, std::string> headers;
   std::string error = "";
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
