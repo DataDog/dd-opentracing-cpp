@@ -112,14 +112,14 @@ struct MockHandle : public Handle {
 
   CURLcode perform() override {
     std::unique_lock<std::mutex> lock(mutex);
-    data_written.notify_all();
-    return rcode;
+    perform_called.notify_all();
+    return nextPerformResult();
   }
 
   // Could be spurious.
-  void waitUntilDataWritten() {
+  void waitUntilPerformIsCalled() {
     std::unique_lock<std::mutex> lock(mutex);
-    data_written.wait(lock);
+    perform_called.wait(lock);
   }
 
   std::string getError() override {
@@ -146,8 +146,22 @@ struct MockHandle : public Handle {
   std::string error = "";
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
+  // Each time an perform is called, the next perform_result is used to determine if it
+  // succeeds or fails. Loops. Default is for all operations to succeed.
+  std::vector<CURLcode> perform_result{CURLE_OK};
+  int perform_call_count = 0;
+
+ private:
+  // Returns next result code. Expects mutex to be locked already.
+  CURLcode nextPerformResult() {
+    if (perform_result.size() == 0) {
+      return CURLE_OK;
+    }
+    return perform_result[perform_call_count++ % perform_result.size()];
+  }
+
   std::mutex mutex;
-  std::condition_variable data_written;
+  std::condition_variable perform_called;
 };
 
 }  // namespace opentracing

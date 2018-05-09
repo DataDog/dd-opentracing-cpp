@@ -36,7 +36,8 @@ class AgentWriter : public Writer<Span> {
   AgentWriter(std::string host, uint32_t port);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-              std::chrono::milliseconds write_period, size_t max_queued_spans, std::string host,
+              std::chrono::milliseconds write_period, size_t max_queued_spans,
+              std::vector<std::chrono::milliseconds> retry_periods, std::string host,
               uint32_t port);
 
   // Does not flush on destruction, buffered spans may be lost. Stops all threads.
@@ -58,20 +59,26 @@ class AgentWriter : public Writer<Span> {
   // Starts asynchronously writing spans. They will be written periodically (set by write_period_)
   // or when flush() is called manually.
   void startWriting(std::unique_ptr<Handle> handle);
-  static void postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
+  // Posts the given Spans to the Agent. Returns true if it succeeds, otherwise false.
+  static bool postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
                         size_t num_spans);
+  // Retries the given function a finite number of times according to retry_periods_. Retries when
+  // f() returns false.
+  void retryFiniteOnFail(std::function<bool()> f) const;
 
   const std::string tracer_version_;
   // How often to send Spans.
   const std::chrono::milliseconds write_period_;
   const size_t max_queued_spans_;
+  // How long to wait before retrying each time. If empty, only try once.
+  const std::vector<std::chrono::milliseconds> retry_periods_;
 
   // The thread on which spans are encoded and send to the agent. Receives spans on the
   // spans_ queue as notified by condition_. Encodes spans to buffer_ and sends to the
   // agent.
   std::unique_ptr<std::thread> worker_ = nullptr;
   // Locks access to the spans_ queue and the stop_writing_ and flush_worker_ signals.
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   // Notifies worker thread when there are new spans in the queue or it should stop.
   std::condition_variable condition_;
   // These two bools, stop_writing_ and flush_worker_, act as signals. They are the predicates on
