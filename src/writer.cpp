@@ -45,7 +45,7 @@ void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
-  agent_uri << agent_protocol << host << ":" << port << agent_api_path;
+  agent_uri << agent_protocol << host << ":" << std::to_string(port) << agent_api_path;
   auto rcode = handle->setopt(CURLOPT_URL, agent_uri.str().c_str());
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent URL: ") + curl_easy_strerror(rcode));
