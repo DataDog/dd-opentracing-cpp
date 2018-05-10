@@ -1,6 +1,9 @@
 #include "span.h"
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace ot = opentracing;
+using json = nlohmann::json;
 
 namespace datadog {
 namespace opentracing {
@@ -58,6 +61,7 @@ Span::Span(Span &&other)
       error(other.error),
       start(other.start),
       duration(other.duration),
+      meta(other.meta),
       context_(std::move(other.context_)) {
   is_finished_ = (bool)other.is_finished_;  // Copy the value.
 }
@@ -85,7 +89,124 @@ void Span::SetOperationName(ot::string_view name) noexcept {
   name = name;
 }
 
-void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {}
+namespace {
+// Visits and serializes an arbitrarily-nested variant type. Serialisation of value types is to
+// string while any composite types are expressed in JSON. eg. string("fred") -> "fred"
+// vector<string>{"felicity"} -> "[\"felicity\"]"
+struct VariantVisitor {
+  // Populated with the final result.
+  std::string &result;
+  VariantVisitor(std::string &result_) : result(result_) {}
+
+ private:
+  // Only set if VariantVisitor is recursing. Unfortunately we only really need an explicit
+  // distinction (and all the conditionals below) to avoid the case of a simple string being
+  // serialized to "\"string\"" - which is valid JSON but very silly never-the-less.
+  json *json_result = nullptr;
+  VariantVisitor(std::string &result_, json *json_result_)
+      : result(result_), json_result(json_result_) {}
+
+ public:
+  void operator()(bool value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = value ? "true" : "false";
+    }
+  }
+
+  void operator()(double value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = std::to_string(value);
+    }
+  }
+
+  void operator()(int64_t value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = std::to_string(value);
+    }
+  }
+
+  void operator()(uint64_t value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = std::to_string(value);
+    }
+  }
+
+  void operator()(const std::string &value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = value;
+    }
+  }
+
+  void operator()(std::nullptr_t) const {
+    if (json_result != nullptr) {
+      *json_result = "nullptr";
+    } else {
+      result = "nullptr";
+    }
+  }
+
+  void operator()(const char *value) const {
+    if (json_result != nullptr) {
+      *json_result = value;
+    } else {
+      result = std::string(value);
+    }
+  }
+
+  void operator()(const std::vector<ot::Value> &values) const {
+    json list;
+    for (auto value : values) {
+      json inner;
+      std::string r;
+      apply_visitor(VariantVisitor{r, &inner}, value);
+      list.push_back(inner);
+    }
+    if (json_result != nullptr) {
+      // We're a list in a dict/list.
+      *json_result = list;
+    } else {
+      // We're a root object, so dump the string.
+      result = list.dump();
+    }
+  }
+
+  void operator()(const std::unordered_map<std::string, ot::Value> &value) const {
+    json dict;
+    for (auto pair : value) {
+      json inner;
+      std::string r;
+      apply_visitor(VariantVisitor{r, &inner}, pair.second);
+      dict[pair.first] = inner;
+    }
+    if (json_result != nullptr) {
+      // We're a dict in a dict/list.
+      *json_result = dict;
+    } else {
+      // We're a root object, so dump the string.
+      result = dict.dump();
+    }
+  }
+};
+}  // namespace
+
+void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
+  std::string result;
+  apply_visitor(VariantVisitor{result}, value);
+  {
+    std::lock_guard<std::mutex> lock_guard{mutex_};
+    meta[key] = result;
+  }
+}
 
 void Span::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {
   context_.setBaggageItem(restricted_key, value);
