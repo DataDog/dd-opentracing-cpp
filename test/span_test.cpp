@@ -55,7 +55,7 @@ TEST_CASE("span") {
     REQUIRE(writer->spans.size() == 1);
   }
 
-  SECTION("parses tags") {
+  SECTION("handles tags") {
     Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
               span_options};
 
@@ -92,5 +92,70 @@ TEST_CASE("span") {
                                          {"char*", "hi there"},
                                          {"list", "[\"hi\",420,true]"},
                                      });
+  }
+
+  SECTION("maps datadog tags to span data") {
+    Span span{nullptr,
+              std::shared_ptr<Writer<Span>>{writer},
+              get_time,
+              get_id,
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              span_options};
+    span.SetTag("span.type", "new type");
+    span.SetTag("resource.name", "new resource");
+    span.SetTag("service.name", "new service");
+
+    // Clashes with service.name, check that the Datadog tag has priority though.
+    span.SetTag("component", "service that is set by the component tag");
+
+    const ot::FinishSpanOptions finish_options;
+    span.FinishWithOptions(finish_options);
+
+    REQUIRE(writer->spans.size() == 1);
+    REQUIRE(writer->spans[0].meta == std::unordered_map<std::string, std::string>{
+                                         {"component", "new service"},
+                                         {"service.name", "new service"},
+                                         {"resource.name", "new resource"},
+                                         {"span.type", "new type"},
+                                     });
+    REQUIRE(writer->spans[0].name == "original span name");
+    REQUIRE(writer->spans[0].resource == "new resource");
+    REQUIRE(writer->spans[0].service == "new service");
+    REQUIRE(writer->spans[0].type == "new type");
+  }
+
+  SECTION("OpenTracing operation name works") {
+    Span span{nullptr,
+              std::shared_ptr<Writer<Span>>{writer},
+              get_time,
+              get_id,
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              span_options};
+    span.SetOperationName("operation name");
+
+    SECTION("sets resource and span name") {
+      const ot::FinishSpanOptions finish_options;
+      span.FinishWithOptions(finish_options);
+
+      REQUIRE(writer->spans.size() == 1);
+      REQUIRE(writer->spans[0].name == "operation name");
+      REQUIRE(writer->spans[0].resource == "operation name");
+    }
+
+    SECTION("sets resource, but can be overridden by Datadog tag") {
+      span.SetTag("resource.name", "resource tag override");
+      const ot::FinishSpanOptions finish_options;
+      span.FinishWithOptions(finish_options);
+
+      REQUIRE(writer->spans.size() == 1);
+      REQUIRE(writer->spans[0].name == "operation name");
+      REQUIRE(writer->spans[0].resource == "resource tag override");
+    }
   }
 }
