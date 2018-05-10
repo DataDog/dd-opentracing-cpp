@@ -1,5 +1,6 @@
 #include "transport.h"
 
+#include <cstring>
 #include <stdexcept>
 #include <string>
 
@@ -49,7 +50,7 @@ CURLcode CurlHandle::perform() {
   }
   CURLcode rcode = curl_easy_setopt(handle_, CURLOPT_HTTPHEADER, http_headers);
   if (rcode != CURLE_OK) {
-    strncpy(curl_error_buffer_, "Unable to write headers", CURL_ERROR_SIZE - 1);
+    std::strncpy(curl_error_buffer_, "Unable to write headers", CURL_ERROR_SIZE - 1);
     curl_slist_free_all(http_headers);
     return rcode;
   }
