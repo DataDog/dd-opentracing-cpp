@@ -87,8 +87,8 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // Set end time.
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  // Apply any special datadog tags. Apply them now rather than when the tag was set, so we don't
-  // get a race between SetOperationName and setting span.name or span.resource.
+  // Apply any tags with special meaning. Apply them now rather than when the tag was set, so we
+  // don't get a race between SetOperationName and setting span.name or span.resource.
   if (meta.find(datadog_span_type_tag) != meta.end()) {
     type = meta[datadog_span_type_tag];
   }
@@ -100,7 +100,9 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   } else if (meta.find(opentracing_component_tag) != meta.end()) {
     service = meta[opentracing_component_tag];
   }
-  meta[opentracing_component_tag] = service;
+  if (service != "") {
+    meta[opentracing_component_tag] = service;
+  }
   writer_->write(std::move(*this));
 } catch (const std::bad_alloc &) {
   // At least don't crash.
