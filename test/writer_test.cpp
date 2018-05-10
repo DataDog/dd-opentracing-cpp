@@ -230,4 +230,23 @@ TEST_CASE("writer") {
       REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
     }
   }
+
+  SECTION("multiple requests don't append headers") {
+    // Regression test for an issue where CURL only allows appending headers, not changing them,
+    // therefore leading to extraneous headers.
+    for (int i = 0; i < 5; i++) {
+      writer.write(
+          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+      writer.write(
+          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 2, 1, 0, 69, 420}));
+      writer.write(
+          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 3, 1, 0, 69, 420}));
+      writer.flush();
+      REQUIRE(handle->headers ==
+              std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
+                                                 {"Datadog-Meta-Lang", "cpp"},
+                                                 {"Datadog-Meta-Tracer-Version", "v0.1.0"},
+                                                 {"X-Datadog-Trace-Count", "3"}});
+    }
+  }
 }
