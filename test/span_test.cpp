@@ -107,20 +107,15 @@ TEST_CASE("span") {
     span.SetTag("span.type", "new type");
     span.SetTag("resource.name", "new resource");
     span.SetTag("service.name", "new service");
-
-    // Clashes with service.name, check that the Datadog tag has priority though.
-    span.SetTag("component", "service that is set by the component tag");
+    span.SetTag("tag with no special meaning", "ayy lmao");
 
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
     REQUIRE(writer->spans.size() == 1);
+    // Datadog special tags aren't kept, they just set the Span values.
     REQUIRE(writer->spans[0].meta == std::unordered_map<std::string, std::string>{
-                                         {"component", "new service"},
-                                         {"service.name", "new service"},
-                                         {"resource.name", "new resource"},
-                                         {"span.type", "new type"},
-                                     });
+                                         {"tag with no special meaning", "ayy lmao"}});
     REQUIRE(writer->spans[0].name == "original span name");
     REQUIRE(writer->spans[0].resource == "new resource");
     REQUIRE(writer->spans[0].service == "new service");
