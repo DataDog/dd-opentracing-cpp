@@ -12,7 +12,6 @@ namespace {
 const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
-const std::string opentracing_component_tag = "component";
 }  // namespace
 
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> writer,
@@ -87,31 +86,15 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // Set end time.
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  // Apply any tags with special meaning. Apply them now rather than when the tag was set, so we
-  // don't get a race between SetOperationName and setting span.name or span.resource.
-  if (meta.find(datadog_span_type_tag) != meta.end()) {
-    type = meta[datadog_span_type_tag];
-  }
-  if (meta.find(datadog_resource_name_tag) != meta.end()) {
-    resource = meta[datadog_resource_name_tag];
-  }
-  if (meta.find(datadog_service_name_tag) != meta.end()) {
-    service = meta[datadog_service_name_tag];
-  } else if (meta.find(opentracing_component_tag) != meta.end()) {
-    service = meta[opentracing_component_tag];
-  }
-  if (service != "") {
-    meta[opentracing_component_tag] = service;
-  }
   writer_->write(std::move(*this));
 } catch (const std::bad_alloc &) {
   // At least don't crash.
 }
 
-void Span::SetOperationName(ot::string_view name_) noexcept {
+void Span::SetOperationName(ot::string_view operation_name) noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  name = name_;
-  resource = name_;
+  name = operation_name;
+  resource = operation_name;
 }
 
 namespace {
@@ -229,7 +212,15 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   apply_visitor(VariantVisitor{result}, value);
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
-    meta[key] = result;
+    if (key == datadog_span_type_tag) {
+      type = result;
+    } else if (key == datadog_resource_name_tag) {
+      resource = result;
+    } else if (key == datadog_service_name_tag) {
+      service = result;
+    } else {
+      meta[key] = result;
+    }
   }
 }
 
