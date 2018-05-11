@@ -28,7 +28,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
   return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), writer_, get_time_, get_id_,
-                                                  opts_.service, opts_.type, opts_.span_name,
+                                                  opts_.service, opts_.type, operation_name,
                                                   operation_name, options}});
 } catch (const std::bad_alloc &) {
   // At least don't crash.

@@ -12,7 +12,6 @@ struct TracerOptions {
   std::string agent_host = "localhost";
   uint32_t agent_port = 8126;
   std::string service;
-  std::string span_name;
   std::string type = "web";
 };
 

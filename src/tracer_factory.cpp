@@ -19,7 +19,7 @@ namespace opentracing {
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     const char *configuration, std::string &error_message) const noexcept try {
-  TracerOptions options{"localhost", 8126, "", "", "web"};
+  TracerOptions options{"localhost", 8126, "", "web"};
   json config;
   try {
     config = json::parse(configuration);
@@ -34,11 +34,6 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
       return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
     }
     options.service = config["service"];
-    if (config.find("span_name") == config.end()) {
-      error_message = "configuration argument 'span_name' is missing";
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-    }
-    options.span_name = config["span_name"];
     // Optional.
     if (config.find("agent_host") != config.end()) {
       options.agent_host = config["agent_host"];

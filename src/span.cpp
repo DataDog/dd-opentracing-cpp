@@ -8,6 +8,12 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
+namespace {
+const std::string datadog_span_type_tag = "span.type";
+const std::string datadog_resource_name_tag = "resource.name";
+const std::string datadog_service_name_tag = "service.name";
+}  // namespace
+
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> writer,
            TimeProvider get_time, IdProvider next_id, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource,
@@ -77,6 +83,7 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
     return;
   }
   std::lock_guard<std::mutex> lock{mutex_};
+  // Set end time.
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
   writer_->write(std::move(*this));
@@ -84,9 +91,10 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // At least don't crash.
 }
 
-void Span::SetOperationName(ot::string_view name) noexcept {
+void Span::SetOperationName(ot::string_view operation_name) noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  name = name;
+  name = operation_name;
+  resource = operation_name;
 }
 
 namespace {
@@ -204,7 +212,15 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   apply_visitor(VariantVisitor{result}, value);
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
-    meta[key] = result;
+    if (key == datadog_span_type_tag) {
+      type = result;
+    } else if (key == datadog_resource_name_tag) {
+      resource = result;
+    } else if (key == datadog_service_name_tag) {
+      service = result;
+    } else {
+      meta[key] = result;
+    }
   }
 }
 
