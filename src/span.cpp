@@ -91,10 +91,10 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // At least don't crash.
 }
 
-void Span::SetOperationName(ot::string_view name_) noexcept {
+void Span::SetOperationName(ot::string_view name) noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  name = name_;
-  resource = name_;
+  name = name;
+  resource = name;
 }
 
 namespace {
