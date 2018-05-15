@@ -8,11 +8,11 @@ namespace opentracing {
 namespace {
 const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "http://";
-// Max amount of time to wait between sending spans to agent. Agent discards spans older than 10s,
-// so that is the upper bound.
+// Max amount of time to wait between sending traces to agent. Agent discards traces older than
+// 10s, so that is the upper bound.
 const std::chrono::milliseconds default_write_period = std::chrono::seconds(1);
-const size_t max_queued_spans = 7000;
-// Retry sending spans to agent a couple of times. Any more than that and the agent won't accept
+const size_t max_queued_traces = 7000;
+// Retry sending traces to agent a couple of times. Any more than that and the agent won't accept
 // them.
 // write_period 1s + timeout 2s + (retry & timeout) 2.5s + (retry and timeout) 4.5s = 10s.
 const std::vector<std::chrono::milliseconds> default_retry_periods{
@@ -24,16 +24,16 @@ const long default_timeout_ms = 2000L;
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
-                  default_write_period, max_queued_spans, default_retry_periods, host, port){};
+                  default_write_period, max_queued_traces, default_retry_periods, host, port){};
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                               std::chrono::milliseconds write_period, size_t max_queued_spans,
+                               std::chrono::milliseconds write_period, size_t max_queued_traces,
                                std::vector<std::chrono::milliseconds> retry_periods,
                                std::string host, uint32_t port)
     : tracer_version_(tracer_version),
       write_period_(write_period),
-      max_queued_spans_(max_queued_spans),
+      max_queued_traces_(max_queued_traces),
       retry_periods_(retry_periods) {
   setUpHandle(handle, host, port);
   startWriting(std::move(handle));
@@ -80,60 +80,48 @@ void AgentWriter<Span>::stop() {
 }
 
 template <class Span>
-void AgentWriter<Span>::write(Span &&span) {
+void AgentWriter<Span>::write(std::unique_ptr<std::vector<Span>> trace) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;
   }
-  if (spans_.size() >= max_queued_spans_) {
+  if (traces_.size() >= max_queued_traces_) {
     return;
   }
-  spans_.push_back(std::move(span));
+  traces_.push_back(std::move(trace));
 };
 
 template <class Span>
 void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
-  // Start worker that sends Spans to agent.
+  // Start worker that sends Traces to agent.
   // We can capture 'this' because destruction of this stops the thread and the lambda.
   worker_ = std::make_unique<std::thread>(
       [this](std::unique_ptr<Handle> handle) {
         std::stringstream buffer;
-        size_t num_spans = 0;
+        size_t num_traces = 0;
         while (true) {
-          // Encode spans when there are new ones.
+          // Encode traces when there are new ones.
           {
-            // Wait to be told about new spans (or to stop).
+            // Wait to be told about new traces (or to stop).
             std::unique_lock<std::mutex> lock(mutex_);
             condition_.wait_for(lock, write_period_,
                                 [&]() -> bool { return flush_worker_ || stop_writing_; });
             if (stop_writing_) {
               return;  // Stop the thread.
             }
-            num_spans = spans_.size();
-            if (num_spans == 0) {
+            num_traces = traces_.size();
+            if (num_traces == 0) {
               continue;
             }
             // Clear the buffer but keep the allocated memory.
             buffer.clear();
             buffer.str(std::string{});
-            // Group Spans by trace_id.
-            // TODO[willgittoes-dd]: Investigate whether it's faster to have grouping done on
-            // write().
-            std::unordered_map<int, std::vector<std::reference_wrapper<Span>>> spans_by_trace;
-            for (Span &span : spans_) {
-              spans_by_trace[span.traceId()].push_back(span);
-            }
-            // Change outer collection type to sequential from associative.
-            std::vector<std::reference_wrapper<std::vector<std::reference_wrapper<Span>>>> traces;
-            for (auto &trace : spans_by_trace) {
-              traces.push_back(trace.second);
-            }
-            msgpack::pack(buffer, traces);
-            spans_.clear();
+            msgpack::pack(buffer, traces_);
+            traces_.clear();
           }  // lock on mutex_ ends.
           // Send spans, not in critical period.
           retryFiniteOnFail(
-              [&]() { return AgentWriter<Span>::postSpans(handle, buffer, num_spans); });
+              [&]() { return AgentWriter<Span>::postTraces(handle, buffer, num_traces); });
           // Let thread calling 'flush' that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -175,9 +163,9 @@ void AgentWriter<Span>::retryFiniteOnFail(std::function<bool()> f) const {
 }
 
 template <class Span>
-bool AgentWriter<Span>::postSpans(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
-                                  size_t num_spans) try {
-  handle->setHeaders({{"X-Datadog-Trace-Count", std::to_string(num_spans)}});
+bool AgentWriter<Span>::postTraces(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
+                                   size_t num_traces) try {
+  handle->setHeaders({{"X-Datadog-Trace-Count", std::to_string(num_traces)}});
 
   // We have to set the size manually, because msgpack uses null characters.
   std::string post_fields = buffer.str();

@@ -11,15 +11,14 @@ namespace datadog {
 namespace opentracing {
 
 class Tracer;
-template <class MsgType>
-class Writer;
+class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {
  public:
   // Creates a new Span, usually called by Tracer::CreateSpanFromOptions.
-  Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> writer,
+  Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
        TimeProvider get_time, IdProvider next_id, std::string span_service, std::string span_type,
        std::string span_name, ot::string_view resource, const ot::StartSpanOptions &options);
 
@@ -49,7 +48,7 @@ class Span : public ot::Span {
  private:
   std::shared_ptr<const Tracer> tracer_;
   TimeProvider get_time_;
-  std::shared_ptr<Writer<Span>> writer_;
+  std::shared_ptr<SpanBuffer> buffer_;
   TimePoint start_time_;
   std::atomic<bool> is_finished_{false};
   std::mutex mutex_;

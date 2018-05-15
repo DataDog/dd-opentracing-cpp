@@ -12,12 +12,12 @@ TEST_CASE("tracer") {
   std::tm start{0, 0, 0, 12, 2, 107};  // Starting calendar time 2007-03-12 00:00:00
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
-  auto writer = new MockWriter();
+  auto buffer = new MockBuffer();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{
-      new Tracer{tracer_options, std::shared_ptr<Writer<Span>>{writer}, get_time, get_id}};
+      new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id}};
   const ot::StartSpanOptions span_options;
 
   SECTION("names spans correctly") {
@@ -25,11 +25,11 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
-    REQUIRE(writer->spans[0].type == "web");
-    REQUIRE(writer->spans[0].service == "service_name");
-    REQUIRE(writer->spans[0].name == "/what_up");
-    REQUIRE(writer->spans[0].resource == "/what_up");
+    auto result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result.type == "web");
+    REQUIRE(result.service == "service_name");
+    REQUIRE(result.name == "/what_up");
+    REQUIRE(result.resource == "/what_up");
   }
 
   SECTION("spans receive id") {
@@ -37,9 +37,9 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
-    REQUIRE(writer->spans[0].span_id == 100);
-    REQUIRE(writer->spans[0].trace_id == 100);
-    REQUIRE(writer->spans[0].parent_id == 0);
+    auto result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result.span_id == 100);
+    REQUIRE(result.trace_id == 100);
+    REQUIRE(result.parent_id == 0);
   }
 }

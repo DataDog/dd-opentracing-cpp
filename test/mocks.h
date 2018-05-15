@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_TEST_MOCKS_H
 
 #include <curl/curl.h>
+#include <iostream>
 #include <list>
 #include <map>
 #include <sstream>
@@ -29,17 +30,9 @@ struct SpanInfo {
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
                      parent_id, error);
-};
-
-// A Writer implementation that allows access to the Spans recorded.
-struct MockWriter : public Writer<Span> {
-  MockWriter() {}
-  ~MockWriter() override {}
-
-  void write(Span&& span) override { spans.push_back(MockWriter::getSpanInfo(span)); }
 
   // Returns a struct that describes the unique information of a span.
-  static SpanInfo getSpanInfo(Span& span) {
+  static SpanInfo fromSpan(Span& span) {
     // Encode Span into msgpack and decode into SpanInfo.
     std::stringstream buffer;
     msgpack::pack(buffer, span);
@@ -52,9 +45,51 @@ struct MockWriter : public Writer<Span> {
     deserialized.convert(dst);
     return dst;
   }
-
-  std::vector<SpanInfo> spans;
 };
+
+struct MockBuffer : public SpanBuffer {
+  struct Trace {
+    std::unique_ptr<std::vector<SpanInfo>> finished_spans;
+    size_t all_spans;
+  };
+
+  MockBuffer(){};
+
+  void startSpan(uint64_t trace_id) override {
+    auto trace = traces.find(trace_id);
+    if (trace == traces.end()) {
+      traces.emplace(
+          std::make_pair(trace_id, Trace{std::make_unique<std::vector<SpanInfo>>(), 0}));
+      trace = traces.find(trace_id);
+    }
+    trace->second.all_spans++;
+  }
+
+  void finishSpan(Span&& span) override {
+    auto trace = traces.find(span.traceId());
+    if (trace == traces.end()) {
+      std::cerr << "Missing trace for finished span" << std::endl;
+    }
+    trace->second.finished_spans->emplace_back(SpanInfo::fromSpan(span));
+  }
+
+  std::unordered_map<uint64_t, Trace> traces;
+};
+
+// // A Writer implementation that allows access to the Spans recorded.
+// struct MockWriter : public Writer<Span> {
+//   MockWriter() {}
+//   ~MockWriter() override {}
+
+//   void write(std::unique_ptr<std::vector<Span>> trace) override {
+//     traces.emplace_back();
+//     for (auto& span : *trace) {
+//       traces.back().push_back(MockWriter::getSpanInfo(span));
+//     }
+//   }
+
+//   std::vector<std::vector<SpanInfo>> traces;
+// };
 
 // Advances the relative (steady_clock) time in the given TimePoint by the given number of seconds.
 // Ignores the absolute/system time.
@@ -127,9 +162,9 @@ struct MockHandle : public Handle {
     return error;
   }
 
-  // Note, this returns any spans that have been added to the request - NOT spans that have been
+  // Note, this returns any traces that have been added to the request - NOT traces that have been
   // successfully posted.
-  std::unique_ptr<std::vector<std::vector<SpanInfo>>> getSpans() {
+  std::unique_ptr<std::vector<std::vector<SpanInfo>>> getTraces() {
     std::unique_lock<std::mutex> lock(mutex);
     std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
         new std::vector<std::vector<SpanInfo>>{}};

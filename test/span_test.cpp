@@ -15,36 +15,45 @@ TEST_CASE("span") {
   std::tm start{0, 0, 0, 12, 2, 107};  // Starting calendar time 2007-03-12 00:00:00
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
-  auto writer = new MockWriter();
+  auto buffer = new MockBuffer();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   const ot::StartSpanOptions span_options;
 
   SECTION("receives id") {
-    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, "", "", "", "",
               span_options};
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
-    REQUIRE(writer->spans[0].span_id == 100);
-    REQUIRE(writer->spans[0].trace_id == 100);
-    REQUIRE(writer->spans[0].parent_id == 0);
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result.span_id == 100);
+    REQUIRE(result.trace_id == 100);
+    REQUIRE(result.parent_id == 0);
+  }
+
+  SECTION("registers with SpanBuffer") {
+    Span span{nullptr,     std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, "", "", "", "",
+              span_options};
+    REQUIRE(buffer->traces.size() == 1);
+    REQUIRE(buffer->traces.find(100) != buffer->traces.end());
+    REQUIRE(buffer->traces[100].finished_spans->size() == 0);
+    REQUIRE(buffer->traces[100].all_spans == 1);
   }
 
   SECTION("timed correctly") {
-    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, "", "", "", "",
               span_options};
     advanceSeconds(time, 10);
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
-    REQUIRE(writer->spans[0].duration == 10000000000);
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result.duration == 10000000000);
   }
 
   SECTION("finishes once") {
-    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, "", "", "", "",
               span_options};
     const ot::FinishSpanOptions finish_options;
     std::vector<std::thread> threads;
@@ -52,11 +61,13 @@ TEST_CASE("span") {
       threads.emplace_back([&]() { span.FinishWithOptions(finish_options); });
     }
     std::for_each(threads.begin(), threads.end(), std::mem_fn(&std::thread::join));
-    REQUIRE(writer->spans.size() == 1);
+    REQUIRE(buffer->traces.size() == 1);
+    REQUIRE(buffer->traces.find(100) != buffer->traces.end());
+    REQUIRE(buffer->traces[100].finished_spans->size() == 1);
   }
 
   SECTION("handles tags") {
-    Span span{nullptr,     std::shared_ptr<Writer<Span>>{writer}, get_time, get_id, "", "", "", "",
+    Span span{nullptr,     std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, "", "", "", "",
               span_options};
 
     span.SetTag("bool", true);
@@ -75,28 +86,28 @@ TEST_CASE("span") {
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
+    auto& result = buffer->traces[100].finished_spans->at(0);
     // Check "map" seperately, because JSON key order is non-deterministic therefore we can't do
     // simple string matching.
-    REQUIRE(json::parse(writer->spans[0].meta["map"]) ==
+    REQUIRE(json::parse(result.meta["map"]) ==
             json::parse(R"({"a":"1","b":2,"c":{"nesting":true}})"));
-    writer->spans[0].meta.erase("map");
+    result.meta.erase("map");
     // Check the rest.
-    REQUIRE(writer->spans[0].meta == std::unordered_map<std::string, std::string>{
-                                         {"bool", "true"},
-                                         {"double", "6.283185"},
-                                         {"int64_t", "-69"},
-                                         {"uint64_t", "420"},
-                                         {"std::string", "hi there"},
-                                         {"nullptr", "nullptr"},
-                                         {"char*", "hi there"},
-                                         {"list", "[\"hi\",420,true]"},
-                                     });
+    REQUIRE(result.meta == std::unordered_map<std::string, std::string>{
+                               {"bool", "true"},
+                               {"double", "6.283185"},
+                               {"int64_t", "-69"},
+                               {"uint64_t", "420"},
+                               {"std::string", "hi there"},
+                               {"nullptr", "nullptr"},
+                               {"char*", "hi there"},
+                               {"list", "[\"hi\",420,true]"},
+                           });
   }
 
   SECTION("maps datadog tags to span data") {
     Span span{nullptr,
-              std::shared_ptr<Writer<Span>>{writer},
+              std::shared_ptr<SpanBuffer>{buffer},
               get_time,
               get_id,
               "original service",
@@ -112,19 +123,19 @@ TEST_CASE("span") {
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
-    REQUIRE(writer->spans.size() == 1);
+    auto& result = buffer->traces[100].finished_spans->at(0);
     // Datadog special tags aren't kept, they just set the Span values.
-    REQUIRE(writer->spans[0].meta == std::unordered_map<std::string, std::string>{
-                                         {"tag with no special meaning", "ayy lmao"}});
-    REQUIRE(writer->spans[0].name == "original span name");
-    REQUIRE(writer->spans[0].resource == "new resource");
-    REQUIRE(writer->spans[0].service == "new service");
-    REQUIRE(writer->spans[0].type == "new type");
+    REQUIRE(result.meta == std::unordered_map<std::string, std::string>{
+                               {"tag with no special meaning", "ayy lmao"}});
+    REQUIRE(result.name == "original span name");
+    REQUIRE(result.resource == "new resource");
+    REQUIRE(result.service == "new service");
+    REQUIRE(result.type == "new type");
   }
 
   SECTION("OpenTracing operation name works") {
     Span span{nullptr,
-              std::shared_ptr<Writer<Span>>{writer},
+              std::shared_ptr<SpanBuffer>{buffer},
               get_time,
               get_id,
               "original service",
@@ -138,9 +149,9 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      REQUIRE(writer->spans.size() == 1);
-      REQUIRE(writer->spans[0].name == "operation name");
-      REQUIRE(writer->spans[0].resource == "operation name");
+      auto& result = buffer->traces[100].finished_spans->at(0);
+      REQUIRE(result.name == "operation name");
+      REQUIRE(result.resource == "operation name");
     }
 
     SECTION("sets resource, but can be overridden by Datadog tag") {
@@ -148,9 +159,9 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      REQUIRE(writer->spans.size() == 1);
-      REQUIRE(writer->spans[0].name == "operation name");
-      REQUIRE(writer->spans[0].resource == "resource tag override");
+      auto& result = buffer->traces[100].finished_spans->at(0);
+      REQUIRE(result.name == "operation name");
+      REQUIRE(result.resource == "resource tag override");
     }
   }
 }
