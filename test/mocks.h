@@ -27,6 +27,7 @@ struct SpanInfo {
   std::unordered_map<std::string, std::string> meta;  // Aka, tags.
 
   uint64_t traceId() const { return trace_id; }
+  uint64_t spanId() const { return span_id; }
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
                      parent_id, error);
@@ -47,7 +48,7 @@ struct SpanInfo {
   }
 };
 
-struct MockBuffer : public SpanBuffer {
+struct MockBuffer : public SpanBuffer<Span> {
   struct Trace {
     std::unique_ptr<std::vector<SpanInfo>> finished_spans;
     size_t all_spans;
@@ -55,7 +56,8 @@ struct MockBuffer : public SpanBuffer {
 
   MockBuffer(){};
 
-  void startSpan(uint64_t trace_id) override {
+  void registerSpan(const Span& span) override {
+    uint64_t trace_id = span.traceId();
     auto trace = traces.find(trace_id);
     if (trace == traces.end()) {
       traces.emplace(
@@ -76,20 +78,25 @@ struct MockBuffer : public SpanBuffer {
   std::unordered_map<uint64_t, Trace> traces;
 };
 
-// // A Writer implementation that allows access to the Spans recorded.
-// struct MockWriter : public Writer<Span> {
-//   MockWriter() {}
-//   ~MockWriter() override {}
+// A Writer implementation that allows access to the Spans recorded.
+template <class Span>
+struct MockWriter : public Writer<Span> {
+  MockWriter() {}
+  ~MockWriter() override {}
 
-//   void write(std::unique_ptr<std::vector<Span>> trace) override {
-//     traces.emplace_back();
-//     for (auto& span : *trace) {
-//       traces.back().push_back(MockWriter::getSpanInfo(span));
-//     }
-//   }
+  void write(std::unique_ptr<std::vector<Span>> trace) override {
+    std::lock_guard<std::mutex> lock_guard{mutex_};
+    traces.emplace_back();
+    for (auto& span : *trace) {
+      traces.back().push_back(span);
+    }
+  }
 
-//   std::vector<std::vector<SpanInfo>> traces;
-// };
+  std::vector<std::vector<Span>> traces;
+
+ private:
+  mutable std::mutex mutex_;
+};
 
 // Advances the relative (steady_clock) time in the given TimePoint by the given number of seconds.
 // Ignores the absolute/system time.

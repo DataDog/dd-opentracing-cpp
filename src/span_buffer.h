@@ -14,31 +14,35 @@ class Span;
 template <class Span>
 class Writer;
 
+template <class Span>
 struct Trace {
   std::unique_ptr<std::vector<Span>> finished_spans;
-  size_t all_spans;
+  std::unordered_set<uint64_t> all_spans;
 };
 
 // Keeps track of Spans until there is a complete trace.
+template <class Span>
 class SpanBuffer {
  public:
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
-  virtual void startSpan(uint64_t trace_id) = 0;
+  virtual void registerSpan(const Span& span) = 0;
   virtual void finishSpan(Span&& span) = 0;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.
-class WritingSpanBuffer : public SpanBuffer {
+template <class Span>
+class WritingSpanBuffer : public SpanBuffer<Span> {
  public:
   WritingSpanBuffer(std::shared_ptr<Writer<Span>> writer);
 
-  void startSpan(uint64_t trace_id) override;
+  void registerSpan(const Span& span) override;
   void finishSpan(Span&& span) override;
 
  private:
   std::shared_ptr<Writer<Span>> writer_;
-  std::unordered_map<uint64_t, Trace> traces_;
+  std::unordered_map<uint64_t, Trace<Span>> traces_;
+  mutable std::mutex mutex_;
 };
 
 }  // namespace opentracing

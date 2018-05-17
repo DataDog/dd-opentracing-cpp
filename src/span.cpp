@@ -14,7 +14,7 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 }  // namespace
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
+Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span>> buffer,
            TimeProvider get_time, IdProvider next_id, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource,
            const ot::StartSpanOptions &options)
@@ -50,7 +50,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
     parent_id = parent_span_context->id();
     context_ = parent_span_context->withId(span_id);
   }
-  buffer_->startSpan(trace_id);
+  buffer_->registerSpan(*this);
 }
 
 Span::Span(Span &&other)
@@ -241,6 +241,10 @@ const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 
 uint64_t Span::traceId() const {
   return trace_id;  // Never modified, hence un-locked access.
+}
+
+uint64_t Span::spanId() const {
+  return span_id;  // Never modified, hence un-locked access.
 }
 
 }  // namespace opentracing
