@@ -49,10 +49,10 @@ struct SpanInfo {
 };
 
 struct MockBuffer : public SpanBuffer<Span> {
-  struct Trace {
-    std::unique_ptr<std::vector<SpanInfo>> finished_spans;
-    size_t all_spans;
-  };
+  // struct Trace {
+  //   std::unique_ptr<std::vector<SpanInfo>> finished_spans;
+  //   size_t all_spans;
+  // };
 
   MockBuffer(){};
 
@@ -60,11 +60,10 @@ struct MockBuffer : public SpanBuffer<Span> {
     uint64_t trace_id = span.traceId();
     auto trace = traces.find(trace_id);
     if (trace == traces.end()) {
-      traces.emplace(
-          std::make_pair(trace_id, Trace{std::make_unique<std::vector<SpanInfo>>(), 0}));
+      traces.emplace(std::make_pair(trace_id, PendingTrace<SpanInfo>{}));
       trace = traces.find(trace_id);
     }
-    trace->second.all_spans++;
+    trace->second.all_spans.insert(span.spanId());
   }
 
   void finishSpan(Span&& span) override {
@@ -75,7 +74,7 @@ struct MockBuffer : public SpanBuffer<Span> {
     trace->second.finished_spans->emplace_back(SpanInfo::fromSpan(span));
   }
 
-  std::unordered_map<uint64_t, Trace> traces;
+  std::unordered_map<uint64_t, PendingTrace<SpanInfo>> traces;
 };
 
 // A Writer implementation that allows access to the Spans recorded.
@@ -84,7 +83,7 @@ struct MockWriter : public Writer<Span> {
   MockWriter() {}
   ~MockWriter() override {}
 
-  void write(std::unique_ptr<std::vector<Span>> trace) override {
+  void write(Trace<Span> trace) override {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     traces.emplace_back();
     for (auto& span : *trace) {

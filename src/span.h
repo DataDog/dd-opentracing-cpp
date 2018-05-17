@@ -15,6 +15,9 @@ template <class Span>
 class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
+template <class Span>
+using Trace = std::unique_ptr<std::vector<Span>>;
+
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {
  public:

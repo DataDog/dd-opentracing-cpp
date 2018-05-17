@@ -15,8 +15,7 @@ void WritingSpanBuffer<Span>::registerSpan(const Span& span) {
   uint64_t trace_id = span.traceId();
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
-    traces_.emplace(std::make_pair(trace_id, Trace<Span>{std::make_unique<std::vector<Span>>(),
-                                                         std::unordered_set<uint64_t>{}}));
+    traces_.emplace(std::make_pair(trace_id, PendingTrace<Span>{}));
     trace = traces_.find(trace_id);
   }
   trace->second.all_spans.insert(span.spanId());

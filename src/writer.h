@@ -14,6 +14,8 @@ namespace datadog {
 namespace opentracing {
 
 class Span;
+template <class Span>
+using Trace = std::unique_ptr<std::vector<Span>>;
 
 // Takes Traces and writes them (eg. sends them to Datadog).
 template <class Span>
@@ -24,7 +26,7 @@ class Writer {
   virtual ~Writer() {}
 
   // Writes the given Trace.
-  virtual void write(std::unique_ptr<std::vector<Span>> trace) = 0;
+  virtual void write(Trace<Span> trace) = 0;
 };
 
 // A Writer that sends Traces (collections of Spans) to a Datadog agent.
@@ -43,7 +45,7 @@ class AgentWriter : public Writer<Span> {
   // Does not flush on destruction, buffered traces may be lost. Stops all threads.
   ~AgentWriter() override;
 
-  void write(std::unique_ptr<std::vector<Span>> trace) override;
+  void write(Trace<Span> trace) override;
 
   // Send all buffered Traces to the destination now. Will block until sending is complete. This
   // isn't on the main Writer API because real code should not need to call this.
@@ -88,7 +90,7 @@ class AgentWriter : public Writer<Span> {
   // If set to true, flushes worker (which sets it false again). Locked by mutex_;
   bool flush_worker_ = false;
   // Multiple producer (potentially), single consumer. Locked by mutex_.
-  std::deque<std::unique_ptr<std::vector<Span>>> traces_;
+  std::deque<Trace<Span>> traces_;
 };
 
 }  // namespace opentracing

@@ -80,7 +80,7 @@ void AgentWriter<Span>::stop() {
 }
 
 template <class Span>
-void AgentWriter<Span>::write(std::unique_ptr<std::vector<Span>> trace) {
+void AgentWriter<Span>::write(Trace<Span> trace) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;

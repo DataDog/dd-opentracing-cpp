@@ -40,7 +40,7 @@ TEST_CASE("span") {
     REQUIRE(buffer->traces.size() == 1);
     REQUIRE(buffer->traces.find(100) != buffer->traces.end());
     REQUIRE(buffer->traces[100].finished_spans->size() == 0);
-    REQUIRE(buffer->traces[100].all_spans == 1);
+    REQUIRE(buffer->traces[100].all_spans.size() == 1);
   }
 
   SECTION("timed correctly") {

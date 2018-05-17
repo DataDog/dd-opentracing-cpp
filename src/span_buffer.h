@@ -13,10 +13,14 @@ namespace opentracing {
 class Span;
 template <class Span>
 class Writer;
+template <class Span>
+using Trace = std::unique_ptr<std::vector<Span>>;
 
 template <class Span>
-struct Trace {
-  std::unique_ptr<std::vector<Span>> finished_spans;
+struct PendingTrace {
+  PendingTrace() : finished_spans(std::make_unique<std::vector<Span>>()), all_spans() {}
+
+  Trace<Span> finished_spans;
   std::unordered_set<uint64_t> all_spans;
 };
 
@@ -41,7 +45,7 @@ class WritingSpanBuffer : public SpanBuffer<Span> {
 
  private:
   std::shared_ptr<Writer<Span>> writer_;
-  std::unordered_map<uint64_t, Trace<Span>> traces_;
+  std::unordered_map<uint64_t, PendingTrace<Span>> traces_;
   mutable std::mutex mutex_;
 };
 
