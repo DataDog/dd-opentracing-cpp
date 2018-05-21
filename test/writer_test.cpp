@@ -14,13 +14,13 @@ TEST_CASE("writer") {
   MockHandle* handle = handle_ptr.get();
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
-  auto only_send_spans_when_we_flush = std::chrono::seconds(3600);
-  size_t max_queued_spans = 25;
+  auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
+  size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
   AgentWriter<SpanInfo> writer{std::move(handle_ptr),
                                "v0.1.0",
-                               only_send_spans_when_we_flush,
-                               max_queued_spans,
+                               only_send_traces_when_we_flush,
+                               max_queued_traces,
                                disable_retry,
                                "hostname",
                                6319};
@@ -35,25 +35,25 @@ TEST_CASE("writer") {
                                                {"Datadog-Meta-Tracer-Version", "v0.1.0"}});
   }
 
-  SECTION("spans can be sent") {
-    writer.write(
-        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+  SECTION("traces can be sent") {
+    writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+        SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
     writer.flush();
 
     // Check span body.
-    auto spans = handle->getSpans();
-    REQUIRE(spans->size() == 1);
-    REQUIRE((*spans)[0].size() == 1);
-    REQUIRE((*spans)[0][0].name == "service.name");
-    REQUIRE((*spans)[0][0].service == "service");
-    REQUIRE((*spans)[0][0].resource == "resource");
-    REQUIRE((*spans)[0][0].type == "web");
-    REQUIRE((*spans)[0][0].span_id == 1);
-    REQUIRE((*spans)[0][0].trace_id == 1);
-    REQUIRE((*spans)[0][0].parent_id == 0);
-    REQUIRE((*spans)[0][0].error == 0);
-    REQUIRE((*spans)[0][0].start == 69);
-    REQUIRE((*spans)[0][0].duration == 420);
+    auto traces = handle->getTraces();
+    REQUIRE(traces->size() == 1);
+    REQUIRE((*traces)[0].size() == 1);
+    REQUIRE((*traces)[0][0].name == "service.name");
+    REQUIRE((*traces)[0][0].service == "service");
+    REQUIRE((*traces)[0][0].resource == "resource");
+    REQUIRE((*traces)[0][0].type == "web");
+    REQUIRE((*traces)[0][0].span_id == 1);
+    REQUIRE((*traces)[0][0].trace_id == 1);
+    REQUIRE((*traces)[0][0].parent_id == 0);
+    REQUIRE((*traces)[0][0].error == 0);
+    REQUIRE((*traces)[0][0].start == 69);
+    REQUIRE((*traces)[0][0].duration == 420);
     // Check general Curl connection config.
     // Remove postdata first, since it's ugly to print and we just tested it above.
     handle->options.erase(CURLOPT_POSTFIELDS);
@@ -70,27 +70,26 @@ TEST_CASE("writer") {
 
   SECTION("queue does not grow indefinitely") {
     for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
-      writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
+      writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+          SpanInfo{"service.name", "service", "resource", "web", 1, i, 0, 0, 69, 420}}});
     }
     writer.flush();
-    auto spans = handle->getSpans();
-    REQUIRE(spans->size() == 1);
-    REQUIRE((*spans)[0].size() == 25);
+    auto traces = handle->getTraces();
+    REQUIRE(traces->size() == 25);
   }
 
   SECTION("bad handle causes constructor to fail") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter<SpanInfo>{std::move(handle_ptr), "v0.1.0",
-                                         only_send_spans_when_we_flush, max_queued_spans,
+                                         only_send_traces_when_we_flush, max_queued_traces,
                                          disable_retry, "hostname", 6319});
   }
 
   SECTION("handle failure during post") {
     handle->rcode = CURLE_OPERATION_TIMEDOUT;
-    writer.write(
-        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+        SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
     // Redirect stderr so the test logs don't look like a failure.
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
@@ -99,14 +98,14 @@ TEST_CASE("writer") {
     std::cerr.rdbuf(stderr);  // Restore stderr.
     // Dropped all spans.
     handle->rcode = CURLE_OK;
-    REQUIRE(handle->getSpans()->size() == 0);
+    REQUIRE(handle->getTraces()->size() == 0);
   }
 
   SECTION("handle failure during perform") {
     handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT};
     handle->error = "error from libcurl";
-    writer.write(
-        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+        SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush();
@@ -117,24 +116,29 @@ TEST_CASE("writer") {
 
   SECTION("destructed/stopped writer does nothing when written to") {
     writer.stop();  // Normally called by destructor.
-    // We know the worker thread has stopped because it is the unique owner of handle (the pointer
-    // we keep for testing is leaked) and has destructed it.
+    // We know the worker thread has stopped because it is the unique owner of handle (the
+    // pointer we keep for testing is leaked) and has destructed it.
     REQUIRE(handle_destructed);
     // Check that these don't crash (but neither will they do anything).
-    writer.write(
-        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+        SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
     writer.flush();
   }
 
   SECTION("there can be multiple threads sending Spans") {
     // Write concurrently.
     std::vector<std::thread> senders;
-    for (uint64_t i = 1; i <= 20; i++) {
+    for (uint64_t i = 1; i <= 4; i++) {
       senders.emplace_back(
-          [&](uint64_t id) {
-            uint64_t trace_id = (id - 1) / 5 + 1;  // 1, 2, 3, 4
-            writer.write(std::move(SpanInfo{"service.name", "service", "resource", "web", id,
-                                            trace_id, 0, 0, 69, 420}));
+          [&](uint64_t trace_id) {
+            std::unique_ptr<std::vector<SpanInfo>> trace{new std::vector<SpanInfo>{
+                SpanInfo{"service.name", "service", "resource", "web", 1, trace_id, 0, 0, 69, 420},
+                SpanInfo{"service.name", "service", "resource", "web", 2, trace_id, 0, 0, 69, 420},
+                SpanInfo{"service.name", "service", "resource", "web", 3, trace_id, 0, 0, 69, 420},
+                SpanInfo{"service.name", "service", "resource", "web", 4, trace_id, 0, 0, 69, 420},
+                SpanInfo{"service.name", "service", "resource", "web", 5, trace_id, 0, 0, 69, 420},
+            }};
+            writer.write(std::move(trace));
           },
           i);
     }
@@ -143,11 +147,11 @@ TEST_CASE("writer") {
     }
     writer.flush();
     // Now check.
-    auto spans = handle->getSpans();
-    REQUIRE(spans->size() == 4);
+    auto traces = handle->getTraces();
+    REQUIRE(traces->size() == 4);
     // Make sure all senders sent their Span.
     std::unordered_map<uint64_t, std::unordered_set<uint64_t>> seen_ids;
-    for (auto trace : (*spans)) {
+    for (auto trace : (*traces)) {
       for (auto span : trace) {
         seen_ids[span.trace_id].insert(span.span_id);
         REQUIRE(span.name == "service.name");
@@ -162,9 +166,9 @@ TEST_CASE("writer") {
     }
     REQUIRE(seen_ids ==
             std::unordered_map<uint64_t, std::unordered_set<uint64_t>>{{1, {1, 2, 3, 4, 5}},
-                                                                       {2, {6, 7, 8, 9, 10}},
-                                                                       {3, {11, 12, 13, 14, 15}},
-                                                                       {4, {16, 17, 18, 19, 20}}});
+                                                                       {2, {1, 2, 3, 4, 5}},
+                                                                       {3, {1, 2, 3, 4, 5}},
+                                                                       {4, {1, 2, 3, 4, 5}}});
   }
 
   SECTION("writes happen periodically") {
@@ -174,32 +178,33 @@ TEST_CASE("writer") {
     AgentWriter<SpanInfo> writer{std::move(handle_ptr),
                                  "v0.1.0",
                                  write_interval,
-                                 max_queued_spans,
+                                 max_queued_traces,
                                  disable_retry,
                                  "hostname",
                                  6319};
-    // Send 7 spans at 1 Span per second. Since the write period is 2s, there should be 4 different
-    // writes. We don't count the number of writes because that could flake, but we do check that
-    // all 7 Spans are written, implicitly testing that multiple writes happen.
+    // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
+    // different writes. We don't count the number of writes because that could flake, but we do
+    // check that all 7 traces are written, implicitly testing that multiple writes happen.
     std::thread sender([&]() {
       for (uint64_t i = 1; i <= 7; i++) {
-        writer.write(std::move(
-            SpanInfo{"service.name", "service", "resource", "web", i, 1, 0, 0, 69, 420}));
+        writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+            SpanInfo{"service.name", "service", "resource", "web", 1, i, 0, 0, 69, 420}}});
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
     });
     // Wait until data is written.
-    std::unordered_set<uint64_t> span_ids;
-    while (span_ids.size() < 7) {
+    std::unordered_set<uint64_t> trace_ids;
+    while (trace_ids.size() < 7) {
       handle->waitUntilPerformIsCalled();
-      auto data = handle->getSpans();
-      REQUIRE(data->size() == 1);
-      std::transform((*data)[0].begin(), (*data)[0].end(),
-                     std::inserter(span_ids, span_ids.begin()),
-                     [](SpanInfo& span) -> uint64_t { return span.span_id; });
+      auto data = handle->getTraces();
+      std::transform((*data).begin(), (*data).end(), std::inserter(trace_ids, trace_ids.begin()),
+                     [](std::vector<SpanInfo>& trace) -> uint64_t {
+                       REQUIRE(trace.size() == 1);
+                       return trace[0].trace_id;
+                     });
     }
-    // We got all 7 spans without calling flush ourselves.
-    REQUIRE(span_ids == std::unordered_set<uint64_t>{1, 2, 3, 4, 5, 6, 7});
+    // We got all 7 traces without calling flush ourselves.
+    REQUIRE(trace_ids == std::unordered_set<uint64_t>{1, 2, 3, 4, 5, 6, 7});
     sender.join();
   }
 
@@ -210,13 +215,17 @@ TEST_CASE("writer") {
                                                          std::chrono::milliseconds(2500)};
     AgentWriter<SpanInfo> writer{std::move(handle_ptr),
                                  "v0.1.0",
-                                 only_send_spans_when_we_flush,
-                                 max_queued_spans,
+                                 only_send_traces_when_we_flush,
+                                 max_queued_traces,
                                  retry_periods,
                                  "hostname",
                                  6319};
-    writer.write(
-        std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
+    // Redirect cerr, so the the terminal output doesn't imply failure.
+    std::stringstream error_message;
+    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+
+    writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+        SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
 
     SECTION("will retry") {
       handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT, CURLE_OK};
@@ -229,18 +238,20 @@ TEST_CASE("writer") {
       writer.flush();
       REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
     }
+
+    std::cerr.rdbuf(stderr);  // Restore stderr.
   }
 
   SECTION("multiple requests don't append headers") {
     // Regression test for an issue where CURL only allows appending headers, not changing them,
     // therefore leading to extraneous headers.
     for (int i = 0; i < 5; i++) {
-      writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}));
-      writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 2, 1, 0, 69, 420}));
-      writer.write(
-          std::move(SpanInfo{"service.name", "service", "resource", "web", 1, 3, 1, 0, 69, 420}));
+      writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+          SpanInfo{"service.name", "service", "resource", "web", 1, 1, 0, 0, 69, 420}}});
+      writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+          SpanInfo{"service.name", "service", "resource", "web", 1, 2, 1, 0, 69, 420}}});
+      writer.write(std::unique_ptr<std::vector<SpanInfo>>{new std::vector<SpanInfo>{
+          SpanInfo{"service.name", "service", "resource", "web", 1, 3, 1, 0, 69, 420}}});
       writer.flush();
       REQUIRE(handle->headers ==
               std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},

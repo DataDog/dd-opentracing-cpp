@@ -16,18 +16,18 @@ uint64_t getId() {
 
 Tracer::Tracer(TracerOptions options)
     : Tracer(options,
-             std::shared_ptr<Writer<Span>>(
-                 new AgentWriter<Span>{options.agent_host, options.agent_port}),
+             std::shared_ptr<SpanBuffer<Span>>{new WritingSpanBuffer<Span>{
+                 std::make_shared<AgentWriter<Span>>(options.agent_host, options.agent_port)}},
              getRealTime, getId) {}
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer<Span>> writer, TimeProvider get_time,
-               IdProvider get_id)
-    : opts_(options), writer_(std::move(writer)), get_time_(get_time), get_id_(get_id) {}
+Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer<Span>> buffer,
+               TimeProvider get_time, IdProvider get_id)
+    : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), writer_, get_time_, get_id_,
+  return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), buffer_, get_time_, get_id_,
                                                   opts_.service, opts_.type, operation_name,
                                                   operation_name, options}});
 } catch (const std::bad_alloc &) {

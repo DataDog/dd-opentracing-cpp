@@ -14,13 +14,13 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 }  // namespace
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> writer,
+Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span>> buffer,
            TimeProvider get_time, IdProvider next_id, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource,
            const ot::StartSpanOptions &options)
     : tracer_(std::move(tracer)),
       get_time_(get_time),
-      writer_(std::move(writer)),
+      buffer_(std::move(buffer)),
       start_time_(get_time_()),
       name(span_name),
       resource(resource),
@@ -50,12 +50,13 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<Writer<Span>> w
     parent_id = parent_span_context->id();
     context_ = parent_span_context->withId(span_id);
   }
+  buffer_->registerSpan(*this);
 }
 
 Span::Span(Span &&other)
     : tracer_(other.tracer_),
       get_time_(other.get_time_),
-      writer_(other.writer_),
+      buffer_(other.buffer_),
       start_time_(other.start_time_),
       name(other.name),
       service(other.service),
@@ -86,7 +87,7 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   // Set end time.
   auto end_time = get_time_();
   duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  writer_->write(std::move(*this));
+  buffer_->finishSpan(std::move(*this));
 } catch (const std::bad_alloc &) {
   // At least don't crash.
 }
@@ -240,6 +241,10 @@ const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 
 uint64_t Span::traceId() const {
   return trace_id;  // Never modified, hence un-locked access.
+}
+
+uint64_t Span::spanId() const {
+  return span_id;  // Never modified, hence un-locked access.
 }
 
 }  // namespace opentracing
