@@ -21,9 +21,10 @@ using Trace = std::unique_ptr<std::vector<Span>>;
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {
  public:
-  // Creates a new Span, usually called by Tracer::CreateSpanFromOptions.
+  // Creates a new Span, usually called by Tracer::StartSpanWithOptions.
   Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span>> buffer,
-       TimeProvider get_time, IdProvider next_id, std::string span_service, std::string span_type,
+       TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
+       SpanContext context, TimePoint start_time, std::string span_service, std::string span_type,
        std::string span_name, ot::string_view resource, const ot::StartSpanOptions &options);
 
   Span() = delete;
@@ -64,6 +65,7 @@ class Span : public ot::Span {
   std::string service;
   std::string resource;
   std::string type;
+  // TODO[willgittoes-dd]: Consider making the ID members const.
   uint64_t span_id;
   uint64_t trace_id;
   uint64_t parent_id;

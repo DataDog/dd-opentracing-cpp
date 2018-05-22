@@ -1,5 +1,6 @@
 #include <datadog/opentracing.h>
 
+#include "noopspan.h"
 #include "span.h"
 #include "tracer.h"
 
@@ -18,18 +19,47 @@ Tracer::Tracer(TracerOptions options)
     : Tracer(options,
              std::shared_ptr<SpanBuffer<Span>>{new WritingSpanBuffer<Span>{
                  std::make_shared<AgentWriter<Span>>(options.agent_host, options.agent_port)}},
-             getRealTime, getId) {}
+             getRealTime, getId, ConstantRateSampler(options.sample_rate)) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer<Span>> buffer,
-               TimeProvider get_time, IdProvider get_id)
-    : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
+               TimeProvider get_time, IdProvider get_id, SampleProvider sampler)
+    : opts_(options),
+      buffer_(std::move(buffer)),
+      get_time_(get_time),
+      get_id_(get_id),
+      sampler_(sampler) {}
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  return std::move(std::unique_ptr<Span>{new Span{shared_from_this(), buffer_, get_time_, get_id_,
-                                                  opts_.service, opts_.type, operation_name,
-                                                  operation_name, options}});
+  // Get a new span id.
+  auto span_id = get_id_();
+
+  auto span_context = SpanContext{span_id, span_id, {}};
+  auto trace_id = span_id;
+  auto parent_id = uint64_t{0};
+
+  // Create context from parent context if possible.
+  for (auto &reference : options.references) {
+    if (auto parent_context = dynamic_cast<const SpanContext *>(reference.second)) {
+      span_context = parent_context->withId(span_id);
+      trace_id = parent_context->trace_id();
+      parent_id = parent_context->id();
+      break;
+    }
+  }
+
+  if (sampler_.sample(span_id)) {
+    auto span = std::unique_ptr<ot::Span>{new Span{shared_from_this(), buffer_, get_time_, span_id,
+                                                   trace_id, parent_id, std::move(span_context),
+                                                   get_time_(), opts_.service, opts_.type,
+                                                   operation_name, operation_name, options}};
+    sampler_.tag(span);
+    return std::move(span);
+  } else {
+    return std::move(std::unique_ptr<ot::Span>{new NoopSpan{
+        shared_from_this(), span_id, trace_id, parent_id, std::move(span_context), options}});
+  }
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;

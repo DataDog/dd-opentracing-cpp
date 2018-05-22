@@ -1,3 +1,4 @@
+#include "../src/sample.h"
 #include "../src/span.h"
 #include "mocks.h"
 
@@ -15,9 +16,10 @@ TEST_CASE("tracer") {
   auto buffer = new MockBuffer();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
+  SampleProvider sampler = KeepAllSampler();
   TracerOptions tracer_options{"", 0, "service_name", "web"};
-  std::shared_ptr<Tracer> tracer{
-      new Tracer{tracer_options, std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id}};
+  std::shared_ptr<Tracer> tracer{new Tracer{
+      tracer_options, std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, sampler}};
   const ot::StartSpanOptions span_options;
 
   SECTION("names spans correctly") {
