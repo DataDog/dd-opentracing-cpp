@@ -51,7 +51,7 @@ TEST_CASE("sample") {
   }
 
   SECTION("constant rate sampler") {
-    double rate = 0.5;
+    double rate = 0.25;
     std::shared_ptr<Tracer> tracer{new Tracer{tracer_options,
                                               std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time,
                                               get_id, ConstantRateSampler(rate)}};
@@ -64,12 +64,40 @@ TEST_CASE("sample") {
 
     auto size = buffer->traces.size();
     // allow for a tiny bit of variance. double brackets because of macro
-    REQUIRE((size >= 49 && size <= 51));
+    REQUIRE((size >= 24 && size <= 26));
     auto rate_string = std::to_string(rate);
     std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
       auto span = trace_iter.second.finished_spans->at(0);
       REQUIRE(span.name == "/constant_rate_sample");
       REQUIRE(span.meta["_sample_rate"] == rate_string);
     });
+  }
+
+  SECTION("constant rate sampler applied to child spans") {
+    double rate = 1.0;
+    std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
+                                                  std::shared_ptr<SpanBuffer<Span>>{buffer},
+                                                  get_time, get_id, ConstantRateSampler(rate)}};
+    auto ot_root_span = tracer->StartSpan("/constant_rate_sample");
+    auto ot_child_span =
+        tracer->StartSpan("/child_span", {opentracing::ChildOf(&ot_root_span->context())});
+
+    ot_child_span->Finish();
+    ot_root_span->Finish();
+
+    // One trace should have been captured.
+    REQUIRE(buffer->traces.size() == 1);
+
+    // The spans should actually be datadog::opentracing::Span objects.
+    auto root_span = dynamic_cast<const Span *>(ot_root_span.get());
+    REQUIRE(root_span != nullptr);
+    auto child_span = dynamic_cast<const Span *>(ot_child_span.get());
+    REQUIRE(child_span != nullptr);
+    // The trace id should be the same.
+    REQUIRE(root_span->traceId() == child_span->traceId());
+    // The span id should be different.
+    REQUIRE(root_span->spanId() != child_span->spanId());
+    // Both spans should be recorded under the same trace.
+    REQUIRE(buffer->traces[root_span->traceId()].finished_spans->size() == 2);
   }
 }

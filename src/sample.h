@@ -7,13 +7,15 @@
 
 #include <opentracing/tracer.h>
 
+#include "propagation.h"
+
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
 typedef struct {
-  std::function<bool(uint64_t)> sample;
+  std::function<bool(SpanContext&)> sample;
   std::function<void(std::unique_ptr<ot::Span>&)> tag;
 } SampleProvider;
 
