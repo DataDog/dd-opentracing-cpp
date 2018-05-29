@@ -15,61 +15,47 @@ const std::string datadog_service_name_tag = "service.name";
 }  // namespace
 
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span>> buffer,
-           TimeProvider get_time, IdProvider next_id, std::string span_service,
+           TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
+           SpanContext context, TimePoint start_time, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource,
            const ot::StartSpanOptions &options)
     : tracer_(std::move(tracer)),
-      get_time_(get_time),
       buffer_(std::move(buffer)),
-      start_time_(get_time_()),
-      name(span_name),
-      resource(resource),
+      get_time_(get_time),
+      span_id(span_id),
+      trace_id(trace_id),
+      parent_id(parent_id),
+      context_(std::move(context)),
+      start_time_(start_time),
       service(span_service),
       type(span_type),
-      span_id(next_id()),
-      trace_id(span_id),
-      parent_id(0),
+      name(span_name),
+      resource(resource),
       error(0),
       start(std::chrono::duration_cast<std::chrono::nanoseconds>(
                 start_time_.absolute_time.time_since_epoch())
                 .count()),
-      duration(0),
-      context_(span_id, span_id, {}) {
-  // Extract context (if present) from options.
-  // TODO[willgittoes-dd]: Consider making all this logic happen in the initializer list, so we can
-  // make the ID members const.
-  const SpanContext *parent_span_context = nullptr;
-  for (auto &reference : options.references) {
-    if (auto span_context = dynamic_cast<const SpanContext *>(reference.second)) {
-      parent_span_context = span_context;
-      break;
-    }
-  }
-  if (parent_span_context != nullptr) {
-    trace_id = parent_span_context->trace_id();
-    parent_id = parent_span_context->id();
-    context_ = parent_span_context->withId(span_id);
-  }
+      duration(0) {
   buffer_->registerSpan(*this);
 }
 
 Span::Span(Span &&other)
     : tracer_(other.tracer_),
-      get_time_(other.get_time_),
       buffer_(other.buffer_),
-      start_time_(other.start_time_),
-      name(other.name),
-      service(other.service),
-      resource(other.resource),
-      type(other.type),
+      get_time_(other.get_time_),
       span_id(other.span_id),
       trace_id(other.trace_id),
       parent_id(other.parent_id),
+      context_(std::move(other.context_)),
+      start_time_(other.start_time_),
+      service(other.service),
+      type(other.type),
+      name(other.name),
+      resource(other.resource),
       error(other.error),
       start(other.start),
       duration(other.duration),
-      meta(other.meta),
-      context_(std::move(other.context_)) {
+      meta(other.meta) {
   is_finished_ = (bool)other.is_finished_;  // Copy the value.
 }
 
