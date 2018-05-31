@@ -1,15 +1,81 @@
 version: 2
-jobs:
-  build:
-    docker:
-      - image: ubuntu:latest
+
+source_dependency_versions: &source_dependency_versions
+  MSGPACK_VERSION: 3.0.1
+  OPENTRACING_VERSION: 1.4.2
+
+defaults: &defaults
+  working_directory: ~/dd-opentracing-cpp
+
+# Run steps used in more than one job.
+# Unfortunately YAML can't merge lists (only objects), so jobs that share some-but-not-all steps in
+# common must still list all the steps. However the step content itself can be deduplicated.
+_run:
+  # TODO(willgittoes-dd): Cache the results of building source dependencies.
+  build_source_dependencies: &build_source_dependencies
+    name: Build source dependencies
+    command: |
+      # OpenTracing.
+      wget -O opentracing-cpp.tar.gz "https://github.com/opentracing/opentracing-cpp/archive/v${OPENTRACING_VERSION}.tar.gz"
+      mkdir -p "opentracing-cpp/.build"
+      tar zxvf opentracing-cpp.tar.gz -C opentracing-cpp --strip-components=1 
+      pushd "opentracing-cpp/.build"
+      cmake ..
+      make
+      popd
+      # Msgpack
+      wget -O msgpack.tar.gz "https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz"
+      mkdir -p "msgpack/.build"
+      tar zxvf "msgpack.tar.gz" -C msgpack --strip-components=1
+      pushd "msgpack/.build"
+      cmake ..
+      make
+      popd
+  install_source_dependencies: &install_source_dependencies
+    name: Install source dependencies
+    command: |
+      SOURCE_DEPS=("opentracing-cpp" "msgpack")
+      for i in "${SOURCE_DEPS[@]}"
+      do
+        pushd "${i}/.build"
+        make install # Always install to lib, to be used for main build.
+        if [ ! -z "$BUILD_DIR" ]
+        then # Optionally install to build dir if we're going to package it.
+          make install DESTDIR=$BUILD_DIR
+        fi
+        popd
+      done
+  build: &build
+    name: Build
+    command: |
+      rm -rf .build
+      mkdir -p .build
+      cd .build
+      cmake $CMAKE_ARGS ..
+      make
+  install: &install
+    name: Install
+    command: |
+      cd .build
+      make install # Always install to lib, to be used for main build.
+      if [ ! -z "$BUILD_DIR" ]
+      then # Optionally install to build dir if we're going to package it.
+        make install DESTDIR=$BUILD_DIR
+      fi
+  test: &test
+    name: Run Datadog C++ OpenTracing tests
+    command: |
+      cd .build
+      ctest --output-on-failure
+
+# Job templates.
+_jobs:
+  build_base: &build_base
+    <<: *defaults
+    environment:
+      <<: *source_dependency_versions
     steps:
       - checkout
-      - run:
-          name: Install OS dependencies
-          command: |
-            apt-get update
-            apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake clang-format-5.0
       - run:
           name: Run clang-format
           command: |
@@ -22,73 +88,216 @@ jobs:
                 exit 1
               fi
             done
+      - run: *build_source_dependencies
+      - run: *install_source_dependencies
+      - run: *build
+      - persist_to_workspace:
+          root: .
+          paths:
+            - opentracing-cpp
+            - msgpack
+            - ./
+      - run: *install
+      - run: *test
+
+  test_base: &test_base
+    <<: *defaults
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    environment:
+      <<: *source_dependency_versions
+    steps:
+      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
+      - attach_workspace:
+          at: .
+      - run: *install_source_dependencies
+      - run: *build
+      - run: *install
+      - run: *test
+
+  package_base: &package_base
+    <<: *defaults
+    environment:
+      <<: *source_dependency_versions
+      BUILD_DIR: "/tmp/build"
+      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+    steps:
+      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
+      - attach_workspace:
+          at: .
+      - run: *install_source_dependencies
+      - run: *install
       - run:
-          name: Compile OpenTracing dependency
+          name: Build .deb
           command: |
-            wget -O opentracing-cpp.tar.gz https://github.com/opentracing/opentracing-cpp/archive/v1.3.0.tar.gz
-            tar zxvf opentracing-cpp.tar.gz
-            mkdir opentracing-cpp-1.3.0/.build
-            pushd opentracing-cpp-1.3.0/.build
-            cmake ..
-            make
-            make install
-            popd
+            # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
+            DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
+            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            mkdir -p $PACKAGE_DIR
+            echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME}"
+            # TODO(willgittoes-dd): Add changelog to package.
+            fpm -s dir -t deb -n datadog-opentracing \
+              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing_VERSION_ARCH.deb \
+              -v "${DD_CPP_VERSION}-${CODENAME}" \
+              -m "<will.gittoes@datadoghq.com>" \
+              --deb-priority "optional" \
+              --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
+              -d libcurl4-openssl-dev \
+              ./
+      - store_artifacts:
+          path: /tmp/packages
+
+  package_nginx_module_base: &package_nginx_module_base
+    <<: *defaults
+    environment:
+      <<: *source_dependency_versions
+      BUILD_DIR: "/tmp/build"
+      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+    steps:
+      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
+      - attach_workspace:
+          at: .
+      - run: *install_source_dependencies
+      - run: *install
       - run:
-          name: Compile Msgpack dependency
+          name: Download nginx
           command: |
-            wget https://github.com/msgpack/msgpack-c/releases/download/cpp-2.1.5/msgpack-2.1.5.tar.gz
-            tar zxvf msgpack-2.1.5.tar.gz
-            mkdir msgpack-2.1.5/.build
-            pushd msgpack-2.1.5/.build
-            cmake ..
-            make
-            make install
-            popd
+            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            wget http://nginx.org/keys/nginx_signing.key
+            apt-key add nginx_signing.key
+            echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+            echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+            apt-get update
+            # Installs latest stable nginx.
+            apt-get install nginx
       - run:
-          name: Run Datadog C++ OpenTracing tests
-          command: |
-            rm -rf .build
-            mkdir .build
-            pushd .build
-            cmake ..
-            make
-            ctest --output-on-failure
-            make install
-            popd
-      - run:
-          name: Run Datadog C++ OpenTracing tests (with tsan and usan)
-          command: |
-            rm -rf .build
-            mkdir .build
-            pushd .build
-            cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..
-            make
-            ctest --output-on-failure
-            popd
-      - run:
-          name: Run Datadog C++ OpenTracing tests (with asan)
-          command: |
-            rm -rf .build
-            mkdir .build
-            pushd .build
-            cmake -DSANITIZE_ADDRESS=On ..
-            make
-            ctest --output-on-failure
-            popd
-      - run:
-          name: Nginx module builds
+          name: Download and patch nginx module code
           command: |
             wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v0.2.1.tar.gz
             tar zxvf nginx-opentracing.tar.gz
             pushd nginx-opentracing-0.2.1
             patch -p1 < ../nginx-opentracing-datadog.patch
             popd
-            wget http://nginx.org/download/nginx-1.13.10.tar.gz
-            tar zxvf nginx-1.13.10.tar.gz
-            pushd nginx-1.13.10
-            ./configure \
+      - run:
+          name: Build nginx modules
+          command: |
+            NGINX_VERSION=$(nginx -v 2>&1 | sed -nr 's/.*nginx\/([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
+            # TODO(willgittoes-dd): Consider using source from source package, rather than re-downloading.
+            wget http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz
+            tar zxvf nginx-$NGINX_VERSION.tar.gz
+            pushd nginx-$NGINX_VERSION
+            NGINX_CONFIGURE_ARGS=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/configure arguments: //p')
+            eval "./configure \
+              $NGINX_CONFIGURE_ARGS \
               --add-dynamic-module=../nginx-opentracing-0.2.1/opentracing \
-              --add-dynamic-module=../nginx-opentracing-0.2.1/datadog
-            make
-            make install
-            popd
+              --add-dynamic-module=../nginx-opentracing-0.2.1/datadog"
+            make modules
+            MODULE_INSTALL_PATH=$(echo $NGINX_CONFIGURE_ARGS | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
+            mkdir -p $BUILD_DIR$MODULE_INSTALL_PATH
+            cp objs/ngx_http_opentracing_module.so $BUILD_DIR$MODULE_INSTALL_PATH
+            cp objs/ngx_http_datadog_module.so $BUILD_DIR$MODULE_INSTALL_PATH
+      - run:
+          name: Build nginx module .deb
+          command: |
+            # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
+            DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
+            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            NGINX_VERSION=$(nginx -v 2>&1 | sed -nr 's/.*nginx\/([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
+            mkdir -p $PACKAGE_DIR
+            echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME} for nginx version ${NGINX_VERSION}"
+            # TODO(willgittoes-dd): Add changelog to package.
+            fpm -s dir -t deb -n datadog-opentracing-nginx \
+              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing-nginx_VERSION_ARCH.deb \
+              -v "${DD_CPP_VERSION}-${CODENAME}" \
+              -m "<will.gittoes@datadoghq.com>" \
+              --deb-priority "optional" \
+              --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
+              -d libcurl4-openssl-dev -d "nginx > ${NGINX_VERSION}" \
+              ./
+      - store_artifacts:
+          path: /tmp/packages
+
+
+jobs:
+  # TODO(willgittoes-dd): Move base images to docker-images repo, once I have permissions.
+  build_ubuntu_18_04: &build_ubuntu_18_04
+    <<: *build_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+
+  build_ubuntu_16_04: &build_ubuntu_16_04
+    <<: *build_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+
+  build:
+    <<: *build_ubuntu_18_04
+
+  test_tsan:
+    <<: *test_base
+    environment:
+      <<: *source_dependency_versions
+      CMAKE_ARGS: -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
+
+  test_asan:
+    <<: *test_base
+    environment:
+      <<: *source_dependency_versions
+      CMAKE_ARGS: -DSANITIZE_ADDRESS=On
+
+  package_ubuntu_18_04:
+    <<: *package_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+
+  package_ubuntu_16_04:
+    <<: *package_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+
+  package_nginx_module_ubuntu_18_04:
+    <<: *package_nginx_module_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+
+  package_nginx_module_ubuntu_16_04:
+    <<: *package_nginx_module_base
+    docker:
+      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+
+workflows:
+  version: 2
+  build_test_deploy:
+    jobs:
+      - build_ubuntu_18_04
+      - build_ubuntu_16_04
+      - test_tsan:
+          requires:
+            - build_ubuntu_18_04
+      - test_asan:
+          requires:
+            - build_ubuntu_18_04
+      - package_nginx_module_ubuntu_18_04:
+          requires:
+            - build_ubuntu_18_04
+          filters:
+            tags:
+              only: /.*/
+      - package_nginx_module_ubuntu_16_04:
+          requires:
+            - build_ubuntu_16_04
+          filters:
+            tags:
+              only: /.*/
+      - package_ubuntu_18_04:
+          requires:
+            - build_ubuntu_18_04
+          filters:
+            tags:
+              only: /.*/
+      - package_ubuntu_16_04:
+          requires:
+            - build_ubuntu_16_04
+          filters:
+            tags:
+              only: /.*/

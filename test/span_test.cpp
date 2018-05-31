@@ -21,9 +21,20 @@ TEST_CASE("span") {
   const ot::StartSpanOptions span_options;
 
   SECTION("receives id") {
-    Span span{
-        nullptr,     std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, "", "", "", "",
-        span_options};
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer<Span>>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "",
+              "",
+              "",
+              "",
+              span_options};
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
@@ -34,9 +45,20 @@ TEST_CASE("span") {
   }
 
   SECTION("registers with SpanBuffer") {
-    Span span{
-        nullptr,     std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, "", "", "", "",
-        span_options};
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer<Span>>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "",
+              "",
+              "",
+              "",
+              span_options};
     REQUIRE(buffer->traces.size() == 1);
     REQUIRE(buffer->traces.find(100) != buffer->traces.end());
     REQUIRE(buffer->traces[100].finished_spans->size() == 0);
@@ -44,9 +66,20 @@ TEST_CASE("span") {
   }
 
   SECTION("timed correctly") {
-    Span span{
-        nullptr,     std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, "", "", "", "",
-        span_options};
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer<Span>>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "",
+              "",
+              "",
+              "",
+              span_options};
     advanceSeconds(time, 10);
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
@@ -56,9 +89,20 @@ TEST_CASE("span") {
   }
 
   SECTION("finishes once") {
-    Span span{
-        nullptr,     std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, "", "", "", "",
-        span_options};
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer<Span>>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "",
+              "",
+              "",
+              "",
+              span_options};
     const ot::FinishSpanOptions finish_options;
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++) {
@@ -71,9 +115,20 @@ TEST_CASE("span") {
   }
 
   SECTION("handles tags") {
-    Span span{
-        nullptr,     std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, "", "", "", "",
-        span_options};
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer<Span>>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "",
+              "",
+              "",
+              "",
+              span_options};
 
     span.SetTag("bool", true);
     span.SetTag("double", 6.283185);
@@ -111,10 +166,15 @@ TEST_CASE("span") {
   }
 
   SECTION("maps datadog tags to span data") {
+    auto span_id = get_id();
     Span span{nullptr,
               std::shared_ptr<SpanBuffer<Span>>{buffer},
               get_time,
-              get_id,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
               "original service",
               "original type",
               "original span name",
@@ -139,10 +199,15 @@ TEST_CASE("span") {
   }
 
   SECTION("OpenTracing operation name works") {
+    auto span_id = get_id();
     Span span{nullptr,
               std::shared_ptr<SpanBuffer<Span>>{buffer},
               get_time,
-              get_id,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
               "original service",
               "original type",
               "original span name",

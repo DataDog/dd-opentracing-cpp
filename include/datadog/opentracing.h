@@ -13,6 +13,7 @@ struct TracerOptions {
   uint32_t agent_port = 8126;
   std::string service;
   std::string type = "web";
+  double sample_rate = 1.0;
 };
 
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);

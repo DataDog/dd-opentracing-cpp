@@ -70,6 +70,7 @@ struct MockBuffer : public SpanBuffer<Span> {
     auto trace = traces.find(span.traceId());
     if (trace == traces.end()) {
       std::cerr << "Missing trace for finished span" << std::endl;
+      return;
     }
     trace->second.finished_spans->emplace_back(SpanInfo::fromSpan(span));
   }
