@@ -6,11 +6,11 @@ source_dependency_versions: &source_dependency_versions
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
-    - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    - image: datadog/docker-library:ubuntu-18.04-v0.2.0
 
 image_ubuntu_16_04: &image_ubuntu_16_04
   docker:
-    - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+    - image: datadog/docker-library:ubuntu-16.04-v0.2.0
 
 
 defaults: &defaults
@@ -227,7 +227,6 @@ _jobs:
 
 
 jobs:
-  # TODO(willgittoes-dd): Move base images to docker-images repo, once I have permissions.
   build_ubuntu_18_04: &build_ubuntu_18_04
     <<: *build_base
     <<: *image_ubuntu_18_04
