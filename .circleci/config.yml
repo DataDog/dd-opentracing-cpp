@@ -4,6 +4,15 @@ source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
   OPENTRACING_VERSION: 1.4.2
 
+image_ubuntu_18_04: &image_ubuntu_18_04
+  docker:
+    - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+
+image_ubuntu_16_04: &image_ubuntu_16_04
+  docker:
+    - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+
+
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
 
@@ -102,8 +111,7 @@ _jobs:
 
   test_base: &test_base
     <<: *defaults
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    <<: *image_ubuntu_18_04
     environment:
       <<: *source_dependency_versions
     steps:
@@ -222,13 +230,11 @@ jobs:
   # TODO(willgittoes-dd): Move base images to docker-images repo, once I have permissions.
   build_ubuntu_18_04: &build_ubuntu_18_04
     <<: *build_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    <<: *image_ubuntu_18_04
 
   build_ubuntu_16_04: &build_ubuntu_16_04
     <<: *build_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+    <<: *image_ubuntu_16_04
 
   build:
     <<: *build_ubuntu_18_04
@@ -247,23 +253,19 @@ jobs:
 
   package_ubuntu_18_04:
     <<: *package_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    <<: *image_ubuntu_18_04
 
   package_ubuntu_16_04:
     <<: *package_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+    <<: *image_ubuntu_16_04
 
   package_nginx_module_ubuntu_18_04:
     <<: *package_nginx_module_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-18.04-v0.1.0
+    <<: *image_ubuntu_18_04
 
   package_nginx_module_ubuntu_16_04:
     <<: *package_nginx_module_base
-    docker:
-      - image: willgittoesdd/cpp-ci-base:ubuntu-16.04-v0.1.0
+    <<: *image_ubuntu_16_04
 
 workflows:
   version: 2
