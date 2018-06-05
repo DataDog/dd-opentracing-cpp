@@ -1,3 +1,7 @@
+# Original from envoyproject/envoy:examples/front-proxy/service-envoy.yaml
+# Modified by DataDog:
+# - add tracing configuration for dd-opentracing-cpp
+# - add /trace prefix to routes
 static_resources:
   listeners:
   - address:

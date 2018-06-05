@@ -1,3 +1,7 @@
+# Original from envoyproject/envoy:examples/front-proxy/Dockerfile-frontenvoy
+# Modified by DataDog:
+# - add build and install step for dd-opentracing-cpp library
+
 # Build and run envoyproxy/envoy, traced by Datadog
 # This build context should match the one envoy uses to avoid shared library version problems (eg:
 FROM ubuntu:16.04 as build

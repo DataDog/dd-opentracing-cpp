@@ -1,3 +1,6 @@
+# Original from envoyproject/envoy:examples/front-proxy/docker-compose.yml
+# Modified by DataDog:
+# - use ddopentracing dockerfiles
 version: '2'
 services:
   front-envoy:

@@ -1,3 +1,6 @@
+# Original from envoytracing/envoy:examples/front-proxy/service.py
+# Modified by DataDog:
+# - change URL for call to service 2 from service 1
 from flask import Flask
 from flask import request
 import socket
