@@ -1,3 +1,5 @@
+#include <datadog/opentracing.h>
+
 #include "../src/version_check.h"
 
 #define CATCH_CONFIG_MAIN
