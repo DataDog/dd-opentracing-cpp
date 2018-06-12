@@ -1,10 +1,10 @@
 Component,Origin,License,Copyright
-vendored,catch2,Boost Software License Version 1.0,Copyright (c) 2018 Two Blue Cubes Ltd
+vendored,catch2,BSL-1.0,Copyright (c) 2018 Two Blue Cubes Ltd
 vendored,nlohmann/json,MIT,Copyright (c) 2013-2018 Niels Lohmann <http://nlohmann.me>
 vendored,sanitizers-cmake,MIT,Copyright (c) 2013 Matthew Arsenault 2015-2016 RWTH Aachen University Federal Republic of Germany
-vendored,envoy-tracing-example,Apache License 2,Copyright 2016-2018 Envoy Project Authors
+vendored,envoy-tracing-example,Apache-2.0,Copyright 2016-2018 Envoy Project Authors
 required,opentracing-cpp,MIT,Copyright (c) 2016 Open Tracing API
-required,msgpack-c,Boost Software License Version 1,Copyright (C) 2008-2015 FURUHASHI Sadayuki
-required,libcurl,MIT/X derivate license,Copyright (c) 1996 - 2018 Daniel Stenberg daniel@haxx.se and many contributors
-optional,nginx-opentracing,Apache License 2,Copyright (c) 2016 Open Tracing API
-build,cmake,BSD 3-clause,Copyright 2000-2018 Kitware Inc and Contributors
+required,msgpack-c,BSL-1.0,Copyright (C) 2008-2015 FURUHASHI Sadayuki
+required,libcurl,curl,Copyright (c) 1996 - 2018 Daniel Stenberg daniel@haxx.se and many contributors
+optional,nginx-opentracing,Apache-2.0,Copyright (c) 2016 Open Tracing API
+build,cmake,BSD-3-Clause,Copyright 2000-2018 Kitware Inc and Contributors
