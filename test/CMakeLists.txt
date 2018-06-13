@@ -7,6 +7,7 @@ macro(_datadog_test TEST_NAME)
 endmacro()
 
 _datadog_test(opentracing_test opentracing_test.cpp)
+_datadog_test(version_check_test version_check_test.cpp)
 _datadog_test(propagation_test propagation_test.cpp)
 _datadog_test(span_buffer_test span_buffer_test.cpp)
 _datadog_test(span_test span_test.cpp)
