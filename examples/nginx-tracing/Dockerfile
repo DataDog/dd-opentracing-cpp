@@ -57,7 +57,7 @@ WORKDIR ..
 
 RUN ldconfig
 
-ADD ./nginx-tracing/nginx.conf /usr/local/nginx/conf/nginx.conf
+ADD ./examples/nginx-tracing/nginx.conf /usr/local/nginx/conf/nginx.conf
 RUN /usr/local/nginx/sbin/nginx -t
 
 EXPOSE 80

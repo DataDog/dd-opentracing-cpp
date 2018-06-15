@@ -5,8 +5,8 @@ version: '2'
 services:
   front-envoy:
     build:
-      context: ..
-      dockerfile: envoy-tracing/Dockerfile-ddopentracing-envoy
+      context: ../..
+      dockerfile: examples/envoy-tracing/Dockerfile-ddopentracing-envoy
     volumes:
       - ./front-envoy.yaml:/etc/front-envoy.yaml
     networks:
@@ -20,8 +20,8 @@ services:
 
   service1:
     build:
-      context: ..
-      dockerfile: envoy-tracing/Dockerfile-ddopentracing-service
+      context: ../..
+      dockerfile: examples/envoy-tracing/Dockerfile-ddopentracing-service
     volumes:
       - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:
@@ -35,8 +35,8 @@ services:
 
   service2:
     build:
-      context: ..
-      dockerfile: envoy-tracing/Dockerfile-ddopentracing-service
+      context: ../..
+      dockerfile: examples/envoy-tracing/Dockerfile-ddopentracing-service
     volumes:
       - ./service-envoy.yaml:/etc/service-envoy.yaml
     networks:

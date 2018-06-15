@@ -22,7 +22,11 @@ TRACE_HEADERS_TO_PROPAGATE = [
     'X-B3-Flags',
 
     # Jaeger header (for native client)
-    "uber-trace-id"
+    "uber-trace-id",
+
+    # Datadog headers
+    'X-Datadog-Trace-Id',
+    'X-Datadog-Parent-Id'
 ]
 
 @app.route('/service/<service_number>')
