@@ -36,6 +36,11 @@ Either just run `circleci build` or:
 
 If you want [sanitizers](https://github.com/google/sanitizers) to be enabled, then instead of `cmake ..`, use either `cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..` or `cmake -DSANITIZE_ADDRESS=On ..`, running the tests will now also check with the sanitizers.
 
+**Running integration/e2e tests**
+
+    cd test/integration
+    ./run_integration_tests_local.sh
+
 ## Usage
 
 ### Tracing C++ Code

@@ -1,0 +1,218 @@
+[
+  [
+    {
+      "duration": 100600,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59788"
+      },
+      "name": "/",
+      "parent_id": 3077890638333398801,
+      "resource": "/",
+      "service": "",
+      "span_id": 1038003031200511244,
+      "start": 1529366415347993400,
+      "trace_id": 3077890638333398801,
+      "type": "web"
+    },
+    {
+      "duration": 201300,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59788"
+      },
+      "name": "/",
+      "parent_id": 3077890638333398801,
+      "resource": "/",
+      "service": "",
+      "span_id": 558024124467689323,
+      "start": 1529366415348126300,
+      "trace_id": 3077890638333398801,
+      "type": "web"
+    },
+    {
+      "duration": 443100,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59788"
+      },
+      "name": "nginx /index.html",
+      "parent_id": 0,
+      "resource": "nginx /index.html",
+      "service": "",
+      "span_id": 3077890638333398801,
+      "start": 1529366415347934600,
+      "trace_id": 3077890638333398801,
+      "type": "web"
+    }
+  ],
+  [
+    {
+      "duration": 56600,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59790"
+      },
+      "name": "/",
+      "parent_id": 2273817048390843606,
+      "resource": "/",
+      "service": "",
+      "span_id": 4586175885466938091,
+      "start": 1529366415361258900,
+      "trace_id": 2273817048390843606,
+      "type": "web"
+    },
+    {
+      "duration": 109100,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59790"
+      },
+      "name": "/",
+      "parent_id": 2273817048390843606,
+      "resource": "/",
+      "service": "",
+      "span_id": 15925010764088517852,
+      "start": 1529366415361338400,
+      "trace_id": 2273817048390843606,
+      "type": "web"
+    },
+    {
+      "duration": 269600,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59790"
+      },
+      "name": "nginx /index.html",
+      "parent_id": 0,
+      "resource": "nginx /index.html",
+      "service": "",
+      "span_id": 2273817048390843606,
+      "start": 1529366415361216900,
+      "trace_id": 2273817048390843606,
+      "type": "web"
+    }
+  ],
+  [
+    {
+      "duration": 74300,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59792"
+      },
+      "name": "/",
+      "parent_id": 16270541406347938660,
+      "resource": "/",
+      "service": "",
+      "span_id": 1906642885562923028,
+      "start": 1529366415374230300,
+      "trace_id": 16270541406347938660,
+      "type": "web"
+    },
+    {
+      "duration": 138700,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "http_user_agent": "curl/7.58.0",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59792"
+      },
+      "name": "/",
+      "parent_id": 16270541406347938660,
+      "resource": "/",
+      "service": "",
+      "span_id": 8844214294041295617,
+      "start": 1529366415374335800,
+      "trace_id": 16270541406347938660,
+      "type": "web"
+    },
+    {
+      "duration": 365200,
+      "error": 0,
+      "meta": {
+        "_sample_rate": "1.000000",
+        "component": "nginx",
+        "http.host": "localhost",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "",
+        "http.url": "http://localhost/",
+        "nginx.worker_pid": "315",
+        "peer.address": "127.0.0.1:59792"
+      },
+      "name": "nginx /index.html",
+      "parent_id": 0,
+      "resource": "nginx /index.html",
+      "service": "",
+      "span_id": 16270541406347938660,
+      "start": 1529366415374176000,
+      "trace_id": 16270541406347938660,
+      "type": "web"
+    }
+  ]
+]

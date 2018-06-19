@@ -1,0 +1,6 @@
+version: "3.2"
+services:
+  nginx-integration-test:
+    build:
+      context: ../../..
+      dockerfile: test/integration/nginx/Dockerfile

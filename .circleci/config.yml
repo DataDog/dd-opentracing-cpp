@@ -76,6 +76,17 @@ _run:
     command: |
       cd .build
       ctest --output-on-failure
+  install_nginx: &install_nginx
+    name: Install nginx
+    command: |
+      CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+      wget http://nginx.org/keys/nginx_signing.key
+      apt-key add nginx_signing.key
+      echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+      echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+      apt-get update
+      # Installs latest stable nginx.
+      apt-get install nginx
 
 # Job templates.
 _jobs:
@@ -103,8 +114,6 @@ _jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - opentracing-cpp
-            - msgpack
             - ./
       - run: *install
       - run: *test
@@ -160,24 +169,14 @@ _jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts and persist_to_workspace
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
           at: .
       - run: *install_source_dependencies
       - run: *install
-      - run:
-          name: Download nginx
-          command: |
-            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            wget http://nginx.org/keys/nginx_signing.key
-            apt-key add nginx_signing.key
-            echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            apt-get update
-            # Installs latest stable nginx.
-            apt-get install nginx
+      - run: *install_nginx
       - run:
           name: Download and patch nginx module code
           command: |
@@ -222,6 +221,10 @@ _jobs:
               --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
               -d libcurl4-openssl-dev -d "nginx > ${NGINX_VERSION}" \
               ./
+      - persist_to_workspace:
+          root: /tmp/
+          paths:
+            - packages
       - store_artifacts:
           path: /tmp/packages
 
@@ -266,6 +269,37 @@ jobs:
     <<: *package_nginx_module_base
     <<: *image_ubuntu_16_04
 
+  integration_test_nginx_ubuntu_18_04:
+    <<: *defaults
+    <<: *image_ubuntu_18_04
+    steps:
+      - attach_workspace:
+          at: .
+      - run: *install_nginx
+      - run: # TODO(willgittoes-dd): Move to base image.
+          name: Install WireMock
+          command: |
+            apt-get install -y openjdk-8-jre jq golang
+            wget http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
+      - run:
+          name: Install Datadog OpenTracing nginx module
+          command: |
+            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            apt install -y ./packages/datadog-opentracing-nginx*${CODENAME}*.deb
+            ldconfig
+            NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
+            # Different nginx configs have different webroots for the sample page. Make sure our
+            # config points to the right one.
+            WEB_ROOT=$(grep -rh '^\s*root' /etc/nginx/ | head -1)
+            cp test/integration/nginx/nginx.conf $NGINX_CONF
+            sed -i "s|$(grep -rh '^\s*root' /etc/nginx/ | head -1)|${WEB_ROOT}|g" ${NGINX_CONF}
+      - run:
+          name: Run tests
+          command: |
+            cd ./test/integration/nginx/
+            ./nginx_integration_test.sh
+
+
 workflows:
   version: 2
   build_test_deploy:
@@ -299,6 +333,12 @@ workflows:
       - package_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
+          filters:
+            tags:
+              only: /.*/
+      - integration_test_nginx_ubuntu_18_04:
+          requires:
+            - package_nginx_module_ubuntu_18_04
           filters:
             tags:
               only: /.*/
