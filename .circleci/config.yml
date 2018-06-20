@@ -7,11 +7,11 @@ source_dependency_versions: &source_dependency_versions
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
-    - image: datadog/docker-library:ubuntu-18.04-v0.2.0
+    - image: datadog/docker-library:ubuntu-18.04-v0.2.1
 
 image_ubuntu_16_04: &image_ubuntu_16_04
   docker:
-    - image: datadog/docker-library:ubuntu-16.04-v0.2.0
+    - image: datadog/docker-library:ubuntu-16.04-v0.2.1
 
 
 defaults: &defaults
@@ -277,11 +277,6 @@ jobs:
       - attach_workspace:
           at: .
       - run: *install_nginx
-      - run: # TODO(willgittoes-dd): Move to base image.
-          name: Install WireMock
-          command: |
-            apt-get install -y openjdk-8-jre jq golang
-            wget http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
       - run:
           name: Install Datadog OpenTracing nginx module
           command: |

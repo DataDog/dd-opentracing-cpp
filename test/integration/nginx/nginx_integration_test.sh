@@ -5,14 +5,19 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
-# Get wiremock if not already present
-wget -nc http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
 # Get msgpack command-line interface
 go get github.com/jakm/msgpack-cli
 go install github.com/jakm/msgpack-cli
 
+# Get wiremock
+if ! which wiremock >/dev/null
+then
+  wget  http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
+  echo "#!/bin/bash\nset -x\njava -jar $(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
+  chmod a+x /usr/local/bin/wiremock
+fi
 # Start wiremock in background
-java -jar wiremock-standalone-2.18.0.jar --port 8129 &
+wiremock --port 8129 &
 # Wait for wiremock to start
 sleep 5 
 # Set wiremock to respond to trace requests
