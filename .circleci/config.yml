@@ -125,6 +125,7 @@ _jobs:
     environment:
       <<: *source_dependency_versions
     steps:
+      - checkout
       - run: *build_source_dependencies
       - run: *install_source_dependencies
       - run: *build
