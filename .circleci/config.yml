@@ -293,7 +293,7 @@ jobs:
             # config points to the right one.
             WEB_ROOT=$(grep -rh '^\s*root' /etc/nginx/ | head -1)
             cp test/integration/nginx/nginx.conf $NGINX_CONF
-            sed -i "s|$(grep -rh '^\s*root' /etc/nginx/ | head -1)|${WEB_ROOT}|g" ${NGINX_CONF}
+            sed -i "s|$(grep -rh '^\s*root' ${NGINX_CONF} | head -1)|${WEB_ROOT}|g" ${NGINX_CONF}
       - run:
           name: Run tests
           command: |
