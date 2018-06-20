@@ -119,15 +119,15 @@ _jobs:
       - run: *install
       - run: *test
 
-  test_base: &test_base
+  test_sanitizer_base: &test_sanitizer_base
     <<: *defaults
     <<: *image_ubuntu_18_04
     environment:
       <<: *source_dependency_versions
     steps:
-      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
-      - attach_workspace:
-          at: .
+      - run: *build_source_dependencies
+      - run: *install_source_dependencies
+      - run: *build
       - run: *install_source_dependencies
       - run: *build
       - run: *install
@@ -243,13 +243,13 @@ jobs:
     <<: *build_ubuntu_18_04
 
   test_tsan:
-    <<: *test_base
+    <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
       CMAKE_ARGS: -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
 
   test_asan:
-    <<: *test_base
+    <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
       CMAKE_ARGS: -DSANITIZE_ADDRESS=On
@@ -307,12 +307,8 @@ workflows:
     jobs:
       - build_ubuntu_18_04
       - build_ubuntu_16_04
-      - test_tsan:
-          requires:
-            - build_ubuntu_18_04
-      - test_asan:
-          requires:
-            - build_ubuntu_18_04
+      - test_tsan
+      - test_asan
       - package_nginx_module_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
