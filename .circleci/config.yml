@@ -3,6 +3,7 @@ version: 2
 source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
   OPENTRACING_VERSION: 1.4.2
+  NGINX_OPENTRACING_VERSION: 0.4.0
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
@@ -180,9 +181,9 @@ _jobs:
       - run:
           name: Download and patch nginx module code
           command: |
-            wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v0.2.1.tar.gz
+            wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v${NGINX_OPENTRACING_VERSION}.tar.gz
             tar zxvf nginx-opentracing.tar.gz
-            pushd nginx-opentracing-0.2.1
+            pushd nginx-opentracing-${NGINX_OPENTRACING_VERSION}
             patch -p1 < ../nginx-opentracing-datadog.patch
             popd
       - run:
@@ -196,8 +197,8 @@ _jobs:
             NGINX_CONFIGURE_ARGS=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/configure arguments: //p')
             eval "./configure \
               $NGINX_CONFIGURE_ARGS \
-              --add-dynamic-module=../nginx-opentracing-0.2.1/opentracing \
-              --add-dynamic-module=../nginx-opentracing-0.2.1/datadog"
+              --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/opentracing \
+              --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/datadog"
             make modules
             MODULE_INSTALL_PATH=$(echo $NGINX_CONFIGURE_ARGS | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
             mkdir -p $BUILD_DIR$MODULE_INSTALL_PATH
