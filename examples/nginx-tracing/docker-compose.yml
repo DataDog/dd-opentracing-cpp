@@ -6,7 +6,7 @@ services:
       dockerfile: examples/nginx-tracing/Dockerfile
     ports:
       - "8080:80"
-  docker-dd-agent:
+  dd-agent:
     container_name: dd-agent
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
