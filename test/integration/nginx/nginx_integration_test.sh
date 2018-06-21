@@ -24,7 +24,8 @@ curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPatte
 
 if which nginx >/dev/null
 then # Running in CI (with nginx from repo)
-  RUN_NGINX='service nginx restart'
+  service nginx stop
+  RUN_NGINX='nginx'
 else # Running locally/in Dockerfile (with source-compiled nginx)
   RUN_NGINX='/usr/local/nginx/sbin/nginx'
 fi
@@ -63,5 +64,19 @@ then
   echo -e "Expected:\n${EXPECTED}\n"
   echo "Diff:"
   echo "${DIFF}"
+  exit 1
+fi
+
+# Check that libcurl isn't writing to stdout
+pkill nginx
+eval "${RUN_NGINX} -g \"daemon off;\" 1> /tmp/nginx_log.txt &"
+curl -s localhost?[1-10000] 1> /dev/null
+pkill nginx
+
+if [ "$(cat /tmp/nginx_log.txt)" != "" ]
+then
+  echo "Nginx stdout should be empty, but was:"
+  cat /tmp/nginx_log.txt
+  echo ""
   exit 1
 fi
