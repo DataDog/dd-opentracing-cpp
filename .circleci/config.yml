@@ -3,14 +3,15 @@ version: 2
 source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
   OPENTRACING_VERSION: 1.4.2
+  NGINX_OPENTRACING_VERSION: 0.4.0
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
-    - image: datadog/docker-library:ubuntu-18.04-v0.2.0
+    - image: datadog/docker-library:ubuntu-18.04-v0.2.1
 
 image_ubuntu_16_04: &image_ubuntu_16_04
   docker:
-    - image: datadog/docker-library:ubuntu-16.04-v0.2.0
+    - image: datadog/docker-library:ubuntu-16.04-v0.2.1
 
 
 defaults: &defaults
@@ -76,6 +77,17 @@ _run:
     command: |
       cd .build
       ctest --output-on-failure
+  install_nginx: &install_nginx
+    name: Install nginx
+    command: |
+      CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+      wget http://nginx.org/keys/nginx_signing.key
+      apt-key add nginx_signing.key
+      echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+      echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
+      apt-get update
+      # Installs latest stable nginx.
+      apt-get install nginx
 
 # Job templates.
 _jobs:
@@ -103,21 +115,20 @@ _jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - opentracing-cpp
-            - msgpack
             - ./
       - run: *install
       - run: *test
 
-  test_base: &test_base
+  test_sanitizer_base: &test_sanitizer_base
     <<: *defaults
     <<: *image_ubuntu_18_04
     environment:
       <<: *source_dependency_versions
     steps:
-      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
-      - attach_workspace:
-          at: .
+      - checkout
+      - run: *build_source_dependencies
+      - run: *install_source_dependencies
+      - run: *build
       - run: *install_source_dependencies
       - run: *build
       - run: *install
@@ -160,30 +171,20 @@ _jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts and persist_to_workspace
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
           at: .
       - run: *install_source_dependencies
       - run: *install
-      - run:
-          name: Download nginx
-          command: |
-            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            wget http://nginx.org/keys/nginx_signing.key
-            apt-key add nginx_signing.key
-            echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            apt-get update
-            # Installs latest stable nginx.
-            apt-get install nginx
+      - run: *install_nginx
       - run:
           name: Download and patch nginx module code
           command: |
-            wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v0.2.1.tar.gz
+            wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v${NGINX_OPENTRACING_VERSION}.tar.gz
             tar zxvf nginx-opentracing.tar.gz
-            pushd nginx-opentracing-0.2.1
+            pushd nginx-opentracing-${NGINX_OPENTRACING_VERSION}
             patch -p1 < ../nginx-opentracing-datadog.patch
             popd
       - run:
@@ -197,8 +198,8 @@ _jobs:
             NGINX_CONFIGURE_ARGS=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/configure arguments: //p')
             eval "./configure \
               $NGINX_CONFIGURE_ARGS \
-              --add-dynamic-module=../nginx-opentracing-0.2.1/opentracing \
-              --add-dynamic-module=../nginx-opentracing-0.2.1/datadog"
+              --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/opentracing \
+              --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/datadog"
             make modules
             MODULE_INSTALL_PATH=$(echo $NGINX_CONFIGURE_ARGS | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
             mkdir -p $BUILD_DIR$MODULE_INSTALL_PATH
@@ -222,6 +223,10 @@ _jobs:
               --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
               -d libcurl4-openssl-dev -d "nginx > ${NGINX_VERSION}" \
               ./
+      - persist_to_workspace:
+          root: /tmp/
+          paths:
+            - packages
       - store_artifacts:
           path: /tmp/packages
 
@@ -239,13 +244,13 @@ jobs:
     <<: *build_ubuntu_18_04
 
   test_tsan:
-    <<: *test_base
+    <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
       CMAKE_ARGS: -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
 
   test_asan:
-    <<: *test_base
+    <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
       CMAKE_ARGS: -DSANITIZE_ADDRESS=On
@@ -266,18 +271,40 @@ jobs:
     <<: *package_nginx_module_base
     <<: *image_ubuntu_16_04
 
+  integration_test_nginx_ubuntu_18_04:
+    <<: *defaults
+    <<: *image_ubuntu_18_04
+    steps:
+      - attach_workspace:
+          at: .
+      - run: *install_nginx
+      - run:
+          name: Install Datadog OpenTracing nginx module
+          command: |
+            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            apt install -y ./packages/datadog-opentracing-nginx*${CODENAME}*.deb
+            ldconfig
+            NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
+            # Different nginx configs have different webroots for the sample page. Make sure our
+            # config points to the right one.
+            WEB_ROOT=$(grep -rh '^\s*root' /etc/nginx/ | head -1)
+            cp test/integration/nginx/nginx.conf $NGINX_CONF
+            sed -i "s|$(grep -rh '^\s*root' ${NGINX_CONF} | head -1)|${WEB_ROOT}|g" ${NGINX_CONF}
+      - run:
+          name: Run tests
+          command: |
+            cd ./test/integration/nginx/
+            ./nginx_integration_test.sh
+
+
 workflows:
   version: 2
   build_test_deploy:
     jobs:
       - build_ubuntu_18_04
       - build_ubuntu_16_04
-      - test_tsan:
-          requires:
-            - build_ubuntu_18_04
-      - test_asan:
-          requires:
-            - build_ubuntu_18_04
+      - test_tsan
+      - test_asan
       - package_nginx_module_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
@@ -299,6 +326,12 @@ workflows:
       - package_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
+          filters:
+            tags:
+              only: /.*/
+      - integration_test_nginx_ubuntu_18_04:
+          requires:
+            - package_nginx_module_ubuntu_18_04
           filters:
             tags:
               only: /.*/

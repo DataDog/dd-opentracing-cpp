@@ -36,6 +36,11 @@ Either just run `circleci build` or:
 
 If you want [sanitizers](https://github.com/google/sanitizers) to be enabled, then instead of `cmake ..`, use either `cmake -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On ..` or `cmake -DSANITIZE_ADDRESS=On ..`, running the tests will now also check with the sanitizers.
 
+**Running integration/e2e tests**
+
+    cd test/integration
+    ./run_integration_tests_local.sh
+
 ## Usage
 
 ### Tracing C++ Code
@@ -49,9 +54,9 @@ Currently nginx needs compilation against any modules used, although there may b
 #### Quick-start with Docker
 
 1. Get a Datadog agent up and running
-2. Modify nginx-tracing/nginx.conf to set the `datadog_agent_host` and `datadog_agent_port`
-3. `docker-compose build`
-4. `docker-compose up`
+2. Modify examples/nginx-tracing/nginx.conf to set the `datadog_agent_host` and `datadog_agent_port`
+3. `cd examples/nginx`
+4. `docker-compose up --build`
 5. Visit http://localhost:8080
 
 #### Build it yourself
