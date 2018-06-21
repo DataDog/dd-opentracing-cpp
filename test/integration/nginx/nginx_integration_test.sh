@@ -7,13 +7,12 @@
 
 # Get msgpack command-line interface
 go get github.com/jakm/msgpack-cli
-go install github.com/jakm/msgpack-cli
 
 # Get wiremock
 if ! which wiremock >/dev/null
 then
   wget  http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
-  echo "#!/bin/bash\nset -x\njava -jar $(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
+  printf "#!/bin/bash\nset -x\njava -jar $(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 fi
 # Start wiremock in background
@@ -38,7 +37,8 @@ curl -s localhost 1> /tmp/curl_log.txt
 curl -s localhost 1> /tmp/curl_log.txt
 
 # Read out the traces sent to the agent.
-while [[ -z "${REQUESTS}" || $(echo "${REQUESTS}" | jq -r '.requests | length') == "0" ]]
+I=0
+while ((I++ < 15)) && [[ -z "${REQUESTS}" || $(echo "${REQUESTS}" | jq -r '.requests | length') == "0" ]]
 do
   sleep 1
   REQUESTS=$(curl -s http://localhost:8129/__admin/requests)
