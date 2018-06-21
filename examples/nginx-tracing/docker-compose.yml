@@ -6,3 +6,15 @@ services:
       dockerfile: examples/nginx-tracing/Dockerfile
     ports:
       - "8080:80"
+  docker-dd-agent:
+    container_name: dd-agent
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/proc/:/host/proc/:ro'
+      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+    environment:
+      - 'DD_API_KEY=YOUR_KEY_HERE'
+      - 'DD_APM_ENABLED=true'
+    image: 'datadog/agent'
+    ports:
+        - "127.0.0.1:8126:8126"
