@@ -30,7 +30,9 @@ else # Running locally/in Dockerfile (with source-compiled nginx)
   NGINX='/usr/local/nginx/sbin/nginx'
 fi
 RUN_NGINX="
+  sleep 3 # Wait for previously killed nginx to stop
   $NGINX -g \"daemon off;\" 1>/tmp/nginx_log.txt &
+  sleep 3 # Wait for nginx to start
   NGINX_PID=\$!"
 
 # Send requests to nginx
