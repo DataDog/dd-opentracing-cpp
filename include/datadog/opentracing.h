@@ -14,6 +14,9 @@ struct TracerOptions {
   std::string service;
   std::string type = "web";
   double sample_rate = 1.0;
+  // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
+  // than 10s, so that is the upper bound.
+  int64_t write_period_ms = 1000;
 };
 
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);

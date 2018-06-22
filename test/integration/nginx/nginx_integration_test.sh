@@ -31,8 +31,7 @@ else # Running locally/in Dockerfile (with source-compiled nginx)
 fi
 RUN_NGINX="
   $NGINX -g \"daemon off;\" 1>/tmp/nginx_log.txt &
-  NGINX_PID=\$!
-  sleep 1"
+  NGINX_PID=\$!"
 
 # Send requests to nginx
 eval "$RUN_NGINX"
