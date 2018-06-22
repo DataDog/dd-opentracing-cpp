@@ -25,13 +25,17 @@ curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPatte
 if which nginx >/dev/null
 then # Running in CI (with nginx from repo)
   service nginx stop
-  RUN_NGINX='nginx'
+  NGINX='nginx'
 else # Running locally/in Dockerfile (with source-compiled nginx)
-  RUN_NGINX='/usr/local/nginx/sbin/nginx'
+  NGINX='/usr/local/nginx/sbin/nginx'
 fi
+RUN_NGINX="
+  $NGINX -g \"daemon off;\" 1>/tmp/nginx_log.txt &
+  NGINX_PID=\$!
+  sleep 1"
 
 # Send requests to nginx
-eval $RUN_NGINX
+eval "$RUN_NGINX"
 
 curl -s localhost 1> /tmp/curl_log.txt
 curl -s localhost 1> /tmp/curl_log.txt
@@ -45,6 +49,7 @@ do
   REQUESTS=$(curl -s http://localhost:8129/__admin/requests)
 done
 
+pkill java # Exit wiremock
 echo "${REQUESTS}" | jq -r '.requests[0].request.bodyAsBase64' | base64 -d > ~/requests.bin
 /root/go/bin/msgpack-cli decode ~/requests.bin --pp > ~/got.json
 
@@ -68,10 +73,11 @@ then
 fi
 
 # Check that libcurl isn't writing to stdout
-pkill nginx
-eval "${RUN_NGINX} -g \"daemon off;\" 1> /tmp/nginx_log.txt &"
+kill $NGINX_PID
+rm /tmp/nginx_log.txt
+eval "$RUN_NGINX"
 curl -s localhost?[1-10000] 1> /dev/null
-pkill nginx
+kill $NGINX_PID
 
 if [ "$(cat /tmp/nginx_log.txt)" != "" ]
 then
