@@ -34,10 +34,10 @@ index 0000000..2647cc1
 +done
 diff --git a/datadog/src/ngx_http_datadog_module.cpp b/datadog/src/ngx_http_datadog_module.cpp
 new file mode 100644
-index 0000000..4f0c61f
+index 0000000..829439e
 --- /dev/null
 +++ b/datadog/src/ngx_http_datadog_module.cpp
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,146 @@
 +// NOTE: Unpolished module, still in incubation. When complete, will be
 +// submitted to nginx-opentracing.
 +
@@ -63,6 +63,7 @@ index 0000000..4f0c61f
 +  ngx_str_t agent_port;
 +  ngx_str_t service_name;
 +  ngx_str_t sample_rate;
++  ngx_str_t write_period_ms;
 +};
 +
 +static ngx_int_t datadog_init_worker(ngx_cycle_t *cycle) {
@@ -90,12 +91,6 @@ index 0000000..4f0c61f
 +  if (main_conf->service_name.data) {
 +    options.service = to_string(main_conf->service_name);
 +  }
-+  auto tracer = datadog::opentracing::makeTracer(options);
-+  if (!tracer) {
-+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
-+                  "Failed to create Datadog tracer");
-+    return NGX_OK;
-+  }
 +  if (main_conf->sample_rate.data) {
 +    try {
 +      options.sample_rate = std::stod(to_string(main_conf->sample_rate));
@@ -109,10 +104,31 @@ index 0000000..4f0c61f
 +      return NGX_OK;
 +    }
 +    if (!(options.sample_rate >= 0.0 && options.sample_rate <= 1.0)) {
-+      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
-+                    "datadog_sample_rate is invalid (must be between 0.0 and 1.0");
++      ngx_log_error(
++          NGX_LOG_ERR, cycle->log, 0,
++          "datadog_sample_rate is invalid (must be between 0.0 and 1.0");
 +      return NGX_OK;
 +    }
++  }
++  if (main_conf->write_period_ms.data) {
++    try {
++      options.write_period_ms =
++          std::stoi(to_string(main_conf->write_period_ms));
++    } catch (const std::invalid_argument &ia) {
++      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
++                    "Failed to parse datadog_write_period_ms");
++      return NGX_OK;
++    } catch (const std::out_of_range &oor) {
++      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
++                    "datadog_write_period_ms is out of range");
++      return NGX_OK;
++    }
++  }
++  auto tracer = datadog::opentracing::makeTracer(options);
++  if (!tracer) {
++    ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
++                  "Failed to create Datadog tracer");
++    return NGX_OK;
 +  }
 +  opentracing::Tracer::InitGlobal(std::move(tracer));
 +  return NGX_OK;
@@ -150,7 +166,10 @@ index 0000000..4f0c61f
 +     offsetof(datadog_main_conf_t, agent_port), nullptr},
 +    {ngx_string("datadog_sample_rate"), NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
 +     ngx_conf_set_str_slot, NGX_HTTP_MAIN_CONF_OFFSET,
-+     offsetof(datadog_main_conf_t, sample_rate), nullptr}};
++     offsetof(datadog_main_conf_t, sample_rate), nullptr},
++    {ngx_string("datadog_write_period_ms"), NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
++     ngx_conf_set_str_slot, NGX_HTTP_MAIN_CONF_OFFSET,
++     offsetof(datadog_main_conf_t, write_period_ms), nullptr}};
 +
 +ngx_module_t ngx_http_datadog_module = {
 +    NGX_MODULE_V1,
