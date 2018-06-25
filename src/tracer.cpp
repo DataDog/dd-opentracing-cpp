@@ -1,4 +1,5 @@
 #include <datadog/opentracing.h>
+#include <cstdlib>
 
 #include "noopspan.h"
 #include "span.h"
@@ -20,7 +21,7 @@ Tracer::Tracer(TracerOptions options)
              std::shared_ptr<SpanBuffer<Span>>{
                  new WritingSpanBuffer<Span>{std::make_shared<AgentWriter<Span>>(
                      options.agent_host, options.agent_port,
-                     std::chrono::milliseconds(options.write_period_ms))}},
+                     std::chrono::milliseconds(llabs(options.write_period_ms)))}},
              getRealTime, getId, ConstantRateSampler(options.sample_rate)) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer<Span>> buffer,
