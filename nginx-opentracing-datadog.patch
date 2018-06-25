@@ -34,10 +34,10 @@ index 0000000..2647cc1
 +done
 diff --git a/datadog/src/ngx_http_datadog_module.cpp b/datadog/src/ngx_http_datadog_module.cpp
 new file mode 100644
-index 0000000..740357d
+index 0000000..829439e
 --- /dev/null
 +++ b/datadog/src/ngx_http_datadog_module.cpp
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,146 @@
 +// NOTE: Unpolished module, still in incubation. When complete, will be
 +// submitted to nginx-opentracing.
 +
@@ -62,6 +62,7 @@ index 0000000..740357d
 +  ngx_str_t agent_host;
 +  ngx_str_t agent_port;
 +  ngx_str_t service_name;
++  ngx_str_t sample_rate;
 +  ngx_str_t write_period_ms;
 +};
 +
@@ -87,9 +88,32 @@ index 0000000..740357d
 +      return NGX_OK;
 +    }
 +  }
++  if (main_conf->service_name.data) {
++    options.service = to_string(main_conf->service_name);
++  }
++  if (main_conf->sample_rate.data) {
++    try {
++      options.sample_rate = std::stod(to_string(main_conf->sample_rate));
++    } catch (const std::invalid_argument &ia) {
++      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
++                    "Failed to parse datadog_sample_rate");
++      return NGX_OK;
++    } catch (const std::out_of_range &oor) {
++      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
++                    "datadog_sample_rate is out of range");
++      return NGX_OK;
++    }
++    if (!(options.sample_rate >= 0.0 && options.sample_rate <= 1.0)) {
++      ngx_log_error(
++          NGX_LOG_ERR, cycle->log, 0,
++          "datadog_sample_rate is invalid (must be between 0.0 and 1.0");
++      return NGX_OK;
++    }
++  }
 +  if (main_conf->write_period_ms.data) {
 +    try {
-+      options.write_period_ms = std::stoi(to_string(main_conf->write_period_ms));
++      options.write_period_ms =
++          std::stoi(to_string(main_conf->write_period_ms));
 +    } catch (const std::invalid_argument &ia) {
 +      ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
 +                    "Failed to parse datadog_write_period_ms");
@@ -99,9 +123,6 @@ index 0000000..740357d
 +                    "datadog_write_period_ms is out of range");
 +      return NGX_OK;
 +    }
-+  }
-+  if (main_conf->service_name.data) {
-+    options.service = to_string(main_conf->service_name);
 +  }
 +  auto tracer = datadog::opentracing::makeTracer(options);
 +  if (!tracer) {
@@ -143,6 +164,9 @@ index 0000000..740357d
 +    {ngx_string("datadog_agent_port"), NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
 +     ngx_conf_set_str_slot, NGX_HTTP_MAIN_CONF_OFFSET,
 +     offsetof(datadog_main_conf_t, agent_port), nullptr},
++    {ngx_string("datadog_sample_rate"), NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
++     ngx_conf_set_str_slot, NGX_HTTP_MAIN_CONF_OFFSET,
++     offsetof(datadog_main_conf_t, sample_rate), nullptr},
 +    {ngx_string("datadog_write_period_ms"), NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
 +     ngx_conf_set_str_slot, NGX_HTTP_MAIN_CONF_OFFSET,
 +     offsetof(datadog_main_conf_t, write_period_ms), nullptr}};
