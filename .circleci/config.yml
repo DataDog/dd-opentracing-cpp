@@ -2,8 +2,8 @@ version: 2
 
 source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
-  OPENTRACING_VERSION: 1.4.2
-  NGINX_OPENTRACING_VERSION: 0.4.0
+  OPENTRACING_VERSION: 1.5.0
+  NGINX_OPENTRACING_VERSION: 0.5.0
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
@@ -138,7 +138,7 @@ _jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -151,26 +151,28 @@ _jobs:
             # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
             DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            mkdir -p $PACKAGE_DIR
+            mkdir -p $ARTIFACT_DIR
             echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME}"
             # TODO(willgittoes-dd): Add changelog to package.
             fpm -s dir -t deb -n datadog-opentracing \
-              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing_VERSION_ARCH.deb \
+              -C $BUILD_DIR -p $ARTIFACT_DIR/datadog-opentracing_VERSION_ARCH.deb \
               -v "${DD_CPP_VERSION}-${CODENAME}" \
               -m "<will.gittoes@datadoghq.com>" \
               --deb-priority "optional" \
               --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
               -d libcurl4-openssl-dev \
               ./
-      - store_artifacts:
-          path: /tmp/packages
+      - persist_to_workspace:
+          root: /tmp/
+          paths:
+            - artifacts
 
   package_nginx_module_base: &package_nginx_module_base
     <<: *defaults
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts and persist_to_workspace
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -211,11 +213,11 @@ _jobs:
             DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
             NGINX_VERSION=$(nginx -v 2>&1 | sed -nr 's/.*nginx\/([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
-            mkdir -p $PACKAGE_DIR
+            mkdir -p $ARTIFACT_DIR
             echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME} for nginx version ${NGINX_VERSION}"
             # TODO(willgittoes-dd): Add changelog to package.
             fpm -s dir -t deb -n datadog-opentracing-nginx \
-              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing-nginx_VERSION_ARCH.deb \
+              -C $BUILD_DIR -p $ARTIFACT_DIR/datadog-opentracing-nginx_VERSION_ARCH.deb \
               -v "${DD_CPP_VERSION}-${CODENAME}" \
               -m "<will.gittoes@datadoghq.com>" \
               --deb-priority "optional" \
@@ -225,9 +227,7 @@ _jobs:
       - persist_to_workspace:
           root: /tmp/
           paths:
-            - packages
-      - store_artifacts:
-          path: /tmp/packages
+            - artifacts
 
 _run_on_release_tag: &run_on_release_tag
   filters:
@@ -289,8 +289,13 @@ jobs:
       - run: *install_source_dependencies
       - run: *build
       - run: *install
-      - store_artifacts:
-          path: /tmp/build
+      - run:
+          name: "Copy plugin to artifact folder"
+          command: cp /tmp/build/*plugin* /tmp/artifacts
+      - persist_to_workspace:
+          root: /tmp/
+          paths:
+            - artifacts
 
   integration_test_nginx_ubuntu_18_04:
     <<: *defaults
@@ -303,7 +308,7 @@ jobs:
           name: Install Datadog OpenTracing nginx module
           command: |
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            apt install -y ./packages/datadog-opentracing-nginx*${CODENAME}*.deb
+            apt install -y ./artifacts/datadog-opentracing-nginx*${CODENAME}*.deb
             ldconfig
             NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
             # Different nginx configs have different webroots for the sample page. Make sure our
@@ -316,6 +321,20 @@ jobs:
           command: |
             cd ./test/integration/nginx/
             ./nginx_integration_test.sh
+
+  publish_artifacts:
+    <<: *defaults
+    <<: *image_ubuntu_18_04
+    environment:
+      BUILD_DIR: "/tmp/build"
+      ARTIFACT_DIR: "/tmp/artifacts"
+    steps:
+      - attach_workspace:
+          at: .
+      - persist_to_workspace:
+          root: ./
+          paths:
+            - artifacts
 
 
 _workflow_filters:
@@ -370,3 +389,11 @@ workflows:
           requires:
             - package_nginx_module_ubuntu_18_04
           <<: *run_always
+      - publish_artifacts:
+          requires:
+            - package_nginx_module_ubuntu_16_04
+            - package_nginx_module_ubuntu_18_04
+            - package_ubuntu_16_04
+            - package_ubuntu_18_04
+            - plugin
+          <<: *run_on_release_tag
