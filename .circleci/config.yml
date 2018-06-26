@@ -281,7 +281,7 @@ jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      CMAKE_ARGS: -DBUILD_SHARED=ON -DBUILD_PLUGIN=ON
+      CMAKE_ARGS: -DBUILD_SHARED=OFF -DBUILD_PLUGIN=ON
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -291,7 +291,7 @@ jobs:
       - run: *install
       - run:
           name: "Copy plugin to artifact folder"
-          command: cp /tmp/build/*plugin* /tmp/artifacts
+          command: cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts
       - persist_to_workspace:
           root: /tmp/
           paths:
@@ -325,21 +325,19 @@ jobs:
   publish_artifacts:
     <<: *defaults
     <<: *image_ubuntu_18_04
-    environment:
-      BUILD_DIR: "/tmp/build"
-      ARTIFACT_DIR: "/tmp/artifacts"
     steps:
       - attach_workspace:
           at: .
-      - persist_to_workspace:
-          root: ./
-          paths:
-            - artifacts
+      store_artifacts:
+          path: /tmp/artifacts
 
 
 _workflow_filters:
   _version_tag: &version_tag
-    only: /v[0-9]+\.[0-9]+\.[0-9].*+/
+    # Allows semver or "test" tags, with any suffix.
+    # eg v1.2.3 v0.1.1 v1.2.3-ayy-lmao test test-ayy-lmao
+    # "test" is useful if you want to ensure all workflows run without creating a version.
+    only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*+/
 
   _run_always: &run_always
     filters:
