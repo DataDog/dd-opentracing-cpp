@@ -364,7 +364,7 @@ workflows:
           <<: *run_on_release_tag
       - package_ubuntu_16_04:
           requires:
-            - run_on_release_tag
+            - build_ubuntu_16_04
           <<: *run_always
       - integration_test_nginx_ubuntu_18_04:
           requires:
