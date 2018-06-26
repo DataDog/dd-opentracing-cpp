@@ -8,9 +8,6 @@ namespace opentracing {
 namespace {
 const std::string agent_api_path = "/v0.3/traces";
 const std::string agent_protocol = "http://";
-// Max amount of time to wait between sending traces to agent. Agent discards traces older than
-// 10s, so that is the upper bound.
-const std::chrono::milliseconds default_write_period = std::chrono::seconds(1);
 const size_t max_queued_traces = 7000;
 // Retry sending traces to agent a couple of times. Any more than that and the agent won't accept
 // them.
@@ -22,9 +19,10 @@ const long default_timeout_ms = 2000L;
 }  // namespace
 
 template <class Span>
-AgentWriter<Span>::AgentWriter(std::string host, uint32_t port)
-    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version,
-                  default_write_period, max_queued_traces, default_retry_periods, host, port){};
+AgentWriter<Span>::AgentWriter(std::string host, uint32_t port,
+                               std::chrono::milliseconds write_period)
+    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version, write_period,
+                  max_queued_traces, default_retry_periods, host, port){};
 
 template <class Span>
 AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,

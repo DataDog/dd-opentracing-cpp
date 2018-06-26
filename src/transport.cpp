@@ -7,6 +7,10 @@
 namespace datadog {
 namespace opentracing {
 
+size_t write_callback_unused(char* ptr, size_t size, size_t nmemb, void* userdata) {
+  return size * nmemb;
+}
+
 CurlHandle::CurlHandle() {
   curl_global_init(CURL_GLOBAL_ALL);
   handle_ = curl_easy_init();
@@ -15,6 +19,13 @@ CurlHandle::CurlHandle() {
   if (rcode != CURLE_OK) {
     tearDownHandle();
     throw std::runtime_error(std::string("Unable to set curl error buffer: ") +
+                             curl_easy_strerror(rcode));
+  }
+  // Don't write responses to stdout.
+  rcode = curl_easy_setopt(handle_, CURLOPT_WRITEFUNCTION, write_callback_unused);
+  if (rcode != CURLE_OK) {
+    tearDownHandle();
+    throw std::runtime_error(std::string("Unable to set curl write callback: ") +
                              curl_easy_strerror(rcode));
   }
 }

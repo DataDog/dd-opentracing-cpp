@@ -5,6 +5,26 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
+# Command to run nginx
+if which nginx >/dev/null
+then # Running in CI (with nginx from repo)
+  service nginx stop
+  NGINX='nginx'
+else # Running locally/in Dockerfile (with source-compiled nginx)
+  NGINX='/usr/local/nginx/sbin/nginx'
+fi
+function run_nginx() {
+  eval "$NGINX -g \"daemon off;\" 1>/tmp/nginx_log.txt &"
+  NGINX_PID=$!
+  sleep 3 # Wait for nginx to start
+}
+function kill_nginx() {
+  kill $NGINX_PID
+  wait $NGINX_PID
+}
+
+# TEST 1: Ensure the right traces sent to the agent.
+
 # Get msgpack command-line interface
 go get github.com/jakm/msgpack-cli
 
@@ -17,20 +37,14 @@ then
 fi
 # Start wiremock in background
 wiremock --port 8129 &
+WIREMOCK_PID=$!
 # Wait for wiremock to start
 sleep 5 
 # Set wiremock to respond to trace requests
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8129/__admin/mappings/new
 
-if which nginx >/dev/null
-then # Running in CI (with nginx from repo)
-  RUN_NGINX='service nginx restart'
-else # Running locally/in Dockerfile (with source-compiled nginx)
-  RUN_NGINX='/usr/local/nginx/sbin/nginx'
-fi
-
 # Send requests to nginx
-eval $RUN_NGINX
+run_nginx
 
 curl -s localhost 1> /tmp/curl_log.txt
 curl -s localhost 1> /tmp/curl_log.txt
@@ -65,3 +79,21 @@ then
   echo "${DIFF}"
   exit 1
 fi
+
+kill_nginx
+kill $WIREMOCK_PID
+wait $WIREMOCK_PID
+# TEST 2: Check that libcurl isn't writing to stdout
+rm /tmp/nginx_log.txt
+run_nginx
+curl -s localhost?[1-10000] 1> /dev/null
+
+if [ "$(cat /tmp/nginx_log.txt)" != "" ]
+then
+  echo "Nginx stdout should be empty, but was:"
+  cat /tmp/nginx_log.txt
+  echo ""
+  exit 1
+fi
+
+kill_nginx

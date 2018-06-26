@@ -35,7 +35,7 @@ class AgentWriter : public Writer<Span> {
  public:
   // Creates an AgentWriter that uses curl to send Traces to a Datadog agent. May throw a
   // runtime_exception.
-  AgentWriter(std::string host, uint32_t port);
+  AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
               std::chrono::milliseconds write_period, size_t max_queued_traces,
