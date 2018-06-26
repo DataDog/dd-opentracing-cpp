@@ -7,11 +7,11 @@ source_dependency_versions: &source_dependency_versions
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
-    - image: datadog/docker-library:ubuntu-18.04-v0.2.1
+    - image: datadog/docker-library:dd_opentracing_cpp_ubuntu_18.04_0_2_1
 
 image_ubuntu_16_04: &image_ubuntu_16_04
   docker:
-    - image: datadog/docker-library:ubuntu-16.04-v0.2.1
+    - image: datadog/docker-library:dd_opentracing_cpp_ubuntu_16.04_0_2_1
 
 
 defaults: &defaults
