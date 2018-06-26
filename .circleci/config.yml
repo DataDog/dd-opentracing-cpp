@@ -138,7 +138,7 @@ _jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in store_artifacts
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -162,17 +162,15 @@ _jobs:
               --url "https://github.com/DataDog/dd-opentracing-cpp/tags" \
               -d libcurl4-openssl-dev \
               ./
-      - persist_to_workspace:
-          root: /tmp/
-          paths:
-            - artifacts
+      - store_artifacts:
+          path: /tmp/artifacts
 
   package_nginx_module_base: &package_nginx_module_base
     <<: *defaults
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace and store_artifacts
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -209,8 +207,8 @@ _jobs:
       - run:
           name: Build nginx module .deb
           command: |
-            # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
-            DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
+            # Version number "v1.2.3" -> "1.2.3", otherwise ensure numeric prefix.
+            DD_CPP_VERSION=$(git describe --tags --always | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 's/\([^0-9].*\)/0-\1/' -e 'p')
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
             NGINX_VERSION=$(nginx -v 2>&1 | sed -nr 's/.*nginx\/([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
             mkdir -p $ARTIFACT_DIR
@@ -228,6 +226,8 @@ _jobs:
           root: /tmp/
           paths:
             - artifacts
+      - store_artifacts:
+          path: /tmp/artifacts
 
 _run_on_release_tag: &run_on_release_tag
   filters:
@@ -250,13 +250,13 @@ jobs:
     <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
-      CMAKE_ARGS: -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
-      CMAKE_ARGS: -DSANITIZE_ADDRESS=On
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
 
   package_ubuntu_18_04:
     <<: *package_base
@@ -291,11 +291,9 @@ jobs:
       - run: *install
       - run:
           name: "Copy plugin to artifact folder"
-          command: cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts
-      - persist_to_workspace:
-          root: /tmp/
-          paths:
-            - artifacts
+          command: cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts/libdd_opentracing_plugin.so
+      - store_artifacts:
+          path: /tmp/artifacts
 
   integration_test_nginx_ubuntu_18_04:
     <<: *defaults
@@ -321,15 +319,6 @@ jobs:
           command: |
             cd ./test/integration/nginx/
             ./nginx_integration_test.sh
-
-  publish_artifacts:
-    <<: *defaults
-    <<: *image_ubuntu_18_04
-    steps:
-      - attach_workspace:
-          at: .
-      - store_artifacts:
-          path: /tmp/artifacts
 
 
 _workflow_filters:
@@ -387,11 +376,3 @@ workflows:
           requires:
             - package_nginx_module_ubuntu_18_04
           <<: *run_always
-      - publish_artifacts:
-          requires:
-            - package_nginx_module_ubuntu_16_04
-            - package_nginx_module_ubuntu_18_04
-            - package_ubuntu_16_04
-            - package_ubuntu_18_04
-            - plugin
-          <<: *run_on_release_tag
