@@ -328,24 +328,14 @@ _workflow_filters:
     # "test" is useful if you want to ensure all workflows run without creating a version.
     only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*+/
 
-  _run_always: &run_always
-    filters:
-      tags:
-        <<: *version_tag
-
-  _run_on_release_tag: &run_on_release_tag
-    filters:
-      tags:
-        <<: *version_tag
-      branches:
-        ignore: /.*/
-
 workflows:
   version: 2
   build_test:
     triggers:
       - schedule:
-        <<: *run_always
+          filters:
+            tags:
+              <<: *version_tag
     jobs:
       - build_ubuntu_18_04
       - test_tsan
@@ -363,7 +353,11 @@ workflows:
   build_test_release:
     triggers:
       - schedule:
-        <<: *run_on_release_tag
+          filters:
+            tags:
+              <<: *version_tag
+            branches:
+              ignore: /.*/
     jobs:
       - build_ubuntu_18_04
       - build_ubuntu_16_04
