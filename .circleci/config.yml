@@ -343,7 +343,9 @@ _workflow_filters:
 workflows:
   version: 2
   build_test:
-    <<: *run_always
+    triggers:
+      - schedule:
+        <<: *run_always
     jobs:
       - build_ubuntu_18_04
       - test_tsan
@@ -359,7 +361,9 @@ workflows:
             - package_nginx_module_ubuntu_18_04
 
   build_test_release:
-    <<: *run_on_release_tag
+    triggers:
+      - schedule:
+        <<: *run_on_release_tag
     jobs:
       - build_ubuntu_18_04
       - build_ubuntu_16_04
