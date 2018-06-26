@@ -95,6 +95,7 @@ _jobs:
     <<: *defaults
     environment:
       <<: *source_dependency_versions
+      CMAKE_ARGS: -DBUILD_TESTING=On
     steps:
       - checkout
       - run:
@@ -127,8 +128,6 @@ _jobs:
     steps:
       - checkout
       - run: *build_source_dependencies
-      - run: *install_source_dependencies
-      - run: *build
       - run: *install_source_dependencies
       - run: *build
       - run: *install
@@ -230,6 +229,10 @@ _jobs:
       - store_artifacts:
           path: /tmp/packages
 
+_run_on_release_tag: &run_on_release_tag
+  filters:
+    tags:
+      only: /v[0-9]+\.[0-9]+\.[0-9]+/
 
 jobs:
   build_ubuntu_18_04: &build_ubuntu_18_04
@@ -271,6 +274,24 @@ jobs:
     <<: *package_nginx_module_base
     <<: *image_ubuntu_16_04
 
+  # Builds the dynamic plugin as well as the shared lib.
+  plugin:
+    <<: *defaults
+    <<: *image_ubuntu_18_04
+    environment:
+      <<: *source_dependency_versions
+      BUILD_DIR: "/tmp/build"
+      CMAKE_ARGS: -DBUILD_SHARED=ON -DBUILD_PLUGIN=ON
+    steps:
+      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
+      - attach_workspace:
+          at: .
+      - run: *install_source_dependencies
+      - run: *build
+      - run: *install
+      - store_artifacts:
+          path: /tmp/build
+
   integration_test_nginx_ubuntu_18_04:
     <<: *defaults
     <<: *image_ubuntu_18_04
@@ -297,41 +318,55 @@ jobs:
             ./nginx_integration_test.sh
 
 
+_workflow_filters:
+  _version_tag: &version_tag
+    only: /v[0-9]+\.[0-9]+\.[0-9]+/
+
+  _run_always: &run_always
+    filters:
+      tags:
+        <<: *version_tag
+
+  _run_on_release_tag: &run_on_release_tag
+    filters:
+      tags:
+        <<: *version_tag
+      branches:
+        ignore: /.*/
+
 workflows:
   version: 2
   build_test_deploy:
     jobs:
-      - build_ubuntu_18_04
-      - build_ubuntu_16_04
-      - test_tsan
-      - test_asan
+      - build_ubuntu_18_04:
+          <<: *run_always
+      - build_ubuntu_16_04:
+          <<: *run_on_release_tag
+      - test_tsan:
+          <<: *run_always
+      - test_asan:
+          <<: *run_always
+      - plugin:
+          requires:
+            - build_ubuntu_18_04
+          <<: *run_on_release_tag
       - package_nginx_module_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_always
       - package_nginx_module_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_on_release_tag
       - package_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_on_release_tag
       - package_ubuntu_16_04:
           requires:
-            - build_ubuntu_16_04
-          filters:
-            tags:
-              only: /.*/
+            - run_on_release_tag
+          <<: *run_always
       - integration_test_nginx_ubuntu_18_04:
           requires:
             - package_nginx_module_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_always

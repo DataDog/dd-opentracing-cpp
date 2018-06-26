@@ -29,7 +29,7 @@ ADD ./ ./dd-opentracing-cpp/
 RUN rm -rf dd-opentracing-cpp/.build 
 RUN mkdir dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
-RUN cmake ..
+RUN cmake -DBUILD_TESTING=ON ..
 RUN make
 RUN make install
 # Warning: Sanitizers (tsan, usan, asan) are not run on these tests, see the CircleCI

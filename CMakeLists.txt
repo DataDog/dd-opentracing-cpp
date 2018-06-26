@@ -1,6 +1,15 @@
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required(VERSION 3.1)
 
 project(dd-opentracing-cpp)
+
+option(BUILD_SHARED "Builds shared library" ON)
+option(BUILD_STATIC "Builds static library" OFF)
+option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
+option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
+
+if(BUILD_TESTING)
+  set(BUILD_SHARED ON)
+endif()
 
 # Configure the compiler.
 set(CMAKE_CXX_STANDARD 14)
@@ -23,7 +32,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
   endif(GIT_FOUND)
 endif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
 
-configure_file (
+configure_file(
   "${PROJECT_SOURCE_DIR}/src/version_number.h.in"
   "${PROJECT_BINARY_DIR}/version_number.h")
 include_directories("${PROJECT_BINARY_DIR}")
@@ -51,22 +60,43 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 
 # Outputs
 ## Shared lib
-add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
-add_sanitizers(dd_opentracing)
-target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
+if(BUILD_SHARED)
+  add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
+  add_sanitizers(dd_opentracing)
+  target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
+endif()
 
 ## Static lib
-add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
-add_sanitizers(dd_opentracing-static)
-set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
-target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
+if(BUILD_STATIC)
+  add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
+  add_sanitizers(dd_opentracing-static)
+  set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
+  target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
 
-install(TARGETS dd_opentracing dd_opentracing-static
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+  install(TARGETS dd_opentracing dd_opentracing-static
+          LIBRARY DESTINATION lib
+          ARCHIVE DESTINATION lib)
+endif()
+
+## Plugin
+if(BUILD_PLUGIN)
+  if(CMAKE_SYSTEM_NAME MATCHES "Darwin" OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR "Plugin cannot be built on Mac, and requires GCC")
+  endif()
+
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/export.map
+      "{ global: OpenTracingMakeTracerFactory; local: *; };")
+  add_library(dd_opentracing_plugin MODULE ${DD_OPENTRACING_SOURCES})
+  target_link_libraries(dd_opentracing_plugin PUBLIC ${DATADOG_LINK_LIBRARIES}
+                        -static-libstdc++
+                        -static-libgcc
+                        -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/export.map)
+  install(TARGETS dd_opentracing_plugin
+          LIBRARY DESTINATION lib)
+endif()
 
 # Tests
 include(CTest)
-if (BUILD_TESTING)
+if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
