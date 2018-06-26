@@ -342,37 +342,44 @@ _workflow_filters:
 
 workflows:
   version: 2
-  build_test_deploy:
+  build_test:
+    <<: *run_always
     jobs:
-      - build_ubuntu_18_04:
-          <<: *run_always
-      - build_ubuntu_16_04:
-          <<: *run_on_release_tag
-      - test_tsan:
-          <<: *run_always
-      - test_asan:
-          <<: *run_always
-      - plugin:
-          requires:
-            - build_ubuntu_18_04
-          <<: *run_on_release_tag
+      - build_ubuntu_18_04
+      - test_tsan
+      - test_asan
       - package_nginx_module_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
-          <<: *run_always
-      - package_nginx_module_ubuntu_16_04:
-          requires:
-            - build_ubuntu_16_04
-          <<: *run_on_release_tag
-      - package_ubuntu_18_04:
-          requires:
-            - build_ubuntu_18_04
-          <<: *run_on_release_tag
       - package_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
-          <<: *run_always
       - integration_test_nginx_ubuntu_18_04:
           requires:
             - package_nginx_module_ubuntu_18_04
-          <<: *run_always
+
+  build_test_release:
+    <<: *run_on_release_tag
+    jobs:
+      - build_ubuntu_18_04
+      - build_ubuntu_16_04
+      - test_tsan
+      - test_asan
+      - plugin:
+          requires:
+            - build_ubuntu_18_04
+      - package_nginx_module_ubuntu_18_04:
+          requires:
+            - build_ubuntu_18_04
+      - package_nginx_module_ubuntu_16_04:
+          requires:
+            - build_ubuntu_16_04
+      - package_ubuntu_18_04:
+          requires:
+            - build_ubuntu_18_04
+      - package_ubuntu_16_04:
+          requires:
+            - build_ubuntu_16_04
+      - integration_test_nginx_ubuntu_18_04:
+          requires:
+            - package_nginx_module_ubuntu_18_04
