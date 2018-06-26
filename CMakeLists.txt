@@ -64,6 +64,10 @@ if(BUILD_SHARED)
   add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing)
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
+
+  install(TARGETS dd_opentracing
+          LIBRARY DESTINATION lib
+          ARCHIVE DESTINATION lib)
 endif()
 
 ## Static lib
@@ -73,7 +77,7 @@ if(BUILD_STATIC)
   set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
   target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
 
-  install(TARGETS dd_opentracing dd_opentracing-static
+  install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION lib
           ARCHIVE DESTINATION lib)
 endif()
