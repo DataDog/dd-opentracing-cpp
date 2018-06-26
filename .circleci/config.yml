@@ -291,7 +291,9 @@ jobs:
       - run: *install
       - run:
           name: "Copy plugin to artifact folder"
-          command: cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts/libdd_opentracing_plugin.so
+          command: |
+            mkdir -p /tmp/artifacts
+            cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts/libdd_opentracing_plugin.so
       - store_artifacts:
           path: /tmp/artifacts
 
