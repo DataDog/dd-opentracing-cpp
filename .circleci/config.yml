@@ -2,16 +2,16 @@ version: 2
 
 source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
-  OPENTRACING_VERSION: 1.4.2
-  NGINX_OPENTRACING_VERSION: 0.4.0
+  OPENTRACING_VERSION: 1.5.0
+  NGINX_OPENTRACING_VERSION: 0.5.0
 
 image_ubuntu_18_04: &image_ubuntu_18_04
   docker:
-    - image: datadog/docker-library:ubuntu-18.04-v0.2.1
+    - image: datadog/docker-library:dd_opentracing_cpp_ubuntu_18.04_0_2_1
 
 image_ubuntu_16_04: &image_ubuntu_16_04
   docker:
-    - image: datadog/docker-library:ubuntu-16.04-v0.2.1
+    - image: datadog/docker-library:dd_opentracing_cpp_ubuntu_16.04_0_2_1
 
 
 defaults: &defaults
@@ -95,6 +95,7 @@ _jobs:
     <<: *defaults
     environment:
       <<: *source_dependency_versions
+      CMAKE_ARGS: -DBUILD_TESTING=On
     steps:
       - checkout
       - run:
@@ -129,8 +130,6 @@ _jobs:
       - run: *build_source_dependencies
       - run: *install_source_dependencies
       - run: *build
-      - run: *install_source_dependencies
-      - run: *build
       - run: *install
       - run: *test
 
@@ -139,7 +138,7 @@ _jobs:
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in store_artifacts
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -152,11 +151,11 @@ _jobs:
             # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
             DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            mkdir -p $PACKAGE_DIR
+            mkdir -p $ARTIFACT_DIR
             echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME}"
             # TODO(willgittoes-dd): Add changelog to package.
             fpm -s dir -t deb -n datadog-opentracing \
-              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing_VERSION_ARCH.deb \
+              -C $BUILD_DIR -p $ARTIFACT_DIR/datadog-opentracing_VERSION_ARCH.deb \
               -v "${DD_CPP_VERSION}-${CODENAME}" \
               -m "<will.gittoes@datadoghq.com>" \
               --deb-priority "optional" \
@@ -164,14 +163,14 @@ _jobs:
               -d libcurl4-openssl-dev \
               ./
       - store_artifacts:
-          path: /tmp/packages
+          path: /tmp/artifacts
 
   package_nginx_module_base: &package_nginx_module_base
     <<: *defaults
     environment:
       <<: *source_dependency_versions
       BUILD_DIR: "/tmp/build"
-      PACKAGE_DIR: "/tmp/packages" # Also used in store_artifacts and persist_to_workspace
+      ARTIFACT_DIR: "/tmp/artifacts" # Also used in persist_to_workspace and store_artifacts
     steps:
       # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
       - attach_workspace:
@@ -208,15 +207,15 @@ _jobs:
       - run:
           name: Build nginx module .deb
           command: |
-            # Version number "v1.2.3" -> "1.2.3", otherwise leave unmodified.
-            DD_CPP_VERSION=$(git describe --tags --always  | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 'p')
+            # Version number "v1.2.3" -> "1.2.3", otherwise ensure numeric prefix.
+            DD_CPP_VERSION=$(git describe --tags --always | sed -n -e 's/v\([0-9]*\.[0-9]*\.[0-9]*\)/\1/' -e 's/\([^0-9].*\)/0-\1/' -e 'p')
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
             NGINX_VERSION=$(nginx -v 2>&1 | sed -nr 's/.*nginx\/([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
-            mkdir -p $PACKAGE_DIR
+            mkdir -p $ARTIFACT_DIR
             echo "Building .deb with dd-opentracing-cpp version ${DD_CPP_VERSION}-${CODENAME} for nginx version ${NGINX_VERSION}"
             # TODO(willgittoes-dd): Add changelog to package.
             fpm -s dir -t deb -n datadog-opentracing-nginx \
-              -C $BUILD_DIR -p $PACKAGE_DIR/datadog-opentracing-nginx_VERSION_ARCH.deb \
+              -C $BUILD_DIR -p $ARTIFACT_DIR/datadog-opentracing-nginx_VERSION_ARCH.deb \
               -v "${DD_CPP_VERSION}-${CODENAME}" \
               -m "<will.gittoes@datadoghq.com>" \
               --deb-priority "optional" \
@@ -226,10 +225,14 @@ _jobs:
       - persist_to_workspace:
           root: /tmp/
           paths:
-            - packages
+            - artifacts
       - store_artifacts:
-          path: /tmp/packages
+          path: /tmp/artifacts
 
+_run_on_release_tag: &run_on_release_tag
+  filters:
+    tags:
+      only: /v[0-9]+\.[0-9]+\.[0-9]+/
 
 jobs:
   build_ubuntu_18_04: &build_ubuntu_18_04
@@ -247,13 +250,13 @@ jobs:
     <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
-      CMAKE_ARGS: -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
       <<: *source_dependency_versions
-      CMAKE_ARGS: -DSANITIZE_ADDRESS=On
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
 
   package_ubuntu_18_04:
     <<: *package_base
@@ -271,6 +274,29 @@ jobs:
     <<: *package_nginx_module_base
     <<: *image_ubuntu_16_04
 
+  # Builds the shared lib.
+  plugin:
+    <<: *defaults
+    <<: *image_ubuntu_18_04
+    environment:
+      <<: *source_dependency_versions
+      BUILD_DIR: "/tmp/build"
+      CMAKE_ARGS: -DBUILD_SHARED=OFF -DBUILD_PLUGIN=ON
+    steps:
+      # No checkout step since changing the source file timestamps forces a rebuild. Source is in workspace.
+      - attach_workspace:
+          at: .
+      - run: *install_source_dependencies
+      - run: *build
+      - run: *install
+      - run:
+          name: "Copy plugin to artifact folder"
+          command: |
+            mkdir -p /tmp/artifacts
+            cp /tmp/build/usr/local/lib/libdd_opentracing_plugin.so /tmp/artifacts/libdd_opentracing_plugin.so
+      - store_artifacts:
+          path: /tmp/artifacts
+
   integration_test_nginx_ubuntu_18_04:
     <<: *defaults
     <<: *image_ubuntu_18_04
@@ -282,7 +308,7 @@ jobs:
           name: Install Datadog OpenTracing nginx module
           command: |
             CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
-            apt install -y ./packages/datadog-opentracing-nginx*${CODENAME}*.deb
+            apt install -y ./artifacts/datadog-opentracing-nginx*${CODENAME}*.deb
             ldconfig
             NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
             # Different nginx configs have different webroots for the sample page. Make sure our
@@ -297,41 +323,58 @@ jobs:
             ./nginx_integration_test.sh
 
 
+_workflow_filters:
+  _version_tag: &version_tag
+    # Allows semver or "test" tags, with any suffix.
+    # eg v1.2.3 v0.1.1 v1.2.3-ayy-lmao test test-ayy-lmao
+    # "test" is useful if you want to ensure all workflows run without creating a version.
+    only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*+/
+
+  _run_always: &run_always
+    filters:
+      tags:
+        <<: *version_tag
+
+  _run_on_release_tag: &run_on_release_tag
+    filters:
+      tags:
+        <<: *version_tag
+      branches:
+        ignore: /.*/
+
 workflows:
   version: 2
   build_test_deploy:
     jobs:
-      - build_ubuntu_18_04
-      - build_ubuntu_16_04
-      - test_tsan
-      - test_asan
+      - build_ubuntu_18_04:
+          <<: *run_always
+      - build_ubuntu_16_04:
+          <<: *run_on_release_tag
+      - test_tsan:
+          <<: *run_always
+      - test_asan:
+          <<: *run_always
+      - plugin:
+          requires:
+            - build_ubuntu_18_04
+          <<: *run_on_release_tag
       - package_nginx_module_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_always
       - package_nginx_module_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_on_release_tag
       - package_ubuntu_18_04:
           requires:
             - build_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_on_release_tag
       - package_ubuntu_16_04:
           requires:
             - build_ubuntu_16_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_always
       - integration_test_nginx_ubuntu_18_04:
           requires:
             - package_nginx_module_ubuntu_18_04
-          filters:
-            tags:
-              only: /.*/
+          <<: *run_always
