@@ -274,7 +274,7 @@ jobs:
     <<: *package_nginx_module_base
     <<: *image_ubuntu_16_04
 
-  # Builds the dynamic plugin as well as the shared lib.
+  # Builds the shared lib.
   plugin:
     <<: *defaults
     <<: *image_ubuntu_18_04
