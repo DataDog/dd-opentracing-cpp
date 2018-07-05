@@ -73,7 +73,7 @@ TEST_CASE("sample") {
     });
   }
 
-  SECTION("constant rate sampler applied to child spans") {
+  SECTION("constant rate sampler applied to child spans within same trace") {
     double rate = 1.0;
     std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
                                                   std::shared_ptr<SpanBuffer<Span>>{buffer},
@@ -99,5 +99,30 @@ TEST_CASE("sample") {
     REQUIRE(root_span->spanId() != child_span->spanId());
     // Both spans should be recorded under the same trace.
     REQUIRE(buffer->traces[root_span->traceId()].finished_spans->size() == 2);
+  }
+
+  SECTION("constant rate sampler applied to child spans from upstream") {
+    double rate = 0.25;
+    std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
+                                                  std::shared_ptr<SpanBuffer<Span>>{buffer},
+                                                  get_time, get_id, ConstantRateSampler(rate)}};
+    for (int i = 0; i < 100; i++) {
+      // Each trace requires a unique span context (trace id) to represent an extracted context
+      // from upstream.
+      SpanContext span_context{uint64_t(100 + i), uint64_t(200 + i), {}};
+      auto span = tracer->StartSpan("/child_span", {opentracing::ChildOf(&span_context)});
+      const ot::FinishSpanOptions finish_options;
+      span->FinishWithOptions(finish_options);
+    }
+
+    auto size = buffer->traces.size();
+    // allow for a tiny bit of variance. double brackets because of macro
+    REQUIRE((size >= 24 && size <= 26));
+    auto rate_string = std::to_string(rate);
+    std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
+      auto span = trace_iter.second.finished_spans->at(0);
+      REQUIRE(span.name == "/child_span");
+      REQUIRE(span.meta["_sample_rate"] == rate_string);
+    });
   }
 }
