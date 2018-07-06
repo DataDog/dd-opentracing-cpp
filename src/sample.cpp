@@ -49,14 +49,12 @@ SampleProvider ConstantRateSampler(double rate) {
           return true;
         }
 
-        if (context.id() == context.trace_id()) {
-          // A new trace, so a decision needs to be made.
-          uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
-          if (hashed_id < max_trace_id) {
-            // Chosen for sampling. Add mark to context and return.
-            context.setBaggageItem(sample_type_baggage_key, "ConstantRateSampler");
-            return true;
-          }
+        // Apply the sample rate to all traces, new and existing (extracted from upstream).
+        uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
+        if (hashed_id < max_trace_id) {
+          // Chosen for sampling. Add mark to context and return.
+          context.setBaggageItem(sample_type_baggage_key, "ConstantRateSampler");
+          return true;
         }
         // Not chosen for sampling.
         return false;
