@@ -192,7 +192,7 @@ bool AgentWriter<Span>::postTraces(std::unique_ptr<Handle> &handle, std::strings
 }
 
 // Make sure we generate code for a Span-writing Writer.
-template class AgentWriter<Span>;
+template class AgentWriter<SpanData>;
 
 }  // namespace opentracing
 }  // namespace datadog

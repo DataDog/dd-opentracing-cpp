@@ -15,7 +15,7 @@ namespace opentracing {
 
 class Span;
 template <class Span>
-using Trace = std::unique_ptr<std::vector<Span>>;
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<Span>>>;
 
 // Takes Traces and writes them (eg. sends them to Datadog).
 template <class Span>

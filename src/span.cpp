@@ -14,49 +14,48 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 }  // namespace
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span>> buffer,
+SpanData::SpanData(uint64_t span_id, uint64_t trace_id, uint64_t parent_id, std::string service,
+                   std::string type, std::string name, ot::string_view resource, int64_t start)
+    : span_id(span_id),
+      trace_id(trace_id),
+      parent_id(parent_id),
+      service(service),
+      type(type),
+      name(name),
+      resource(resource),
+      error(0),
+      duration(0),
+      start(start) {}
+
+SpanData::SpanData() {}
+
+uint64_t SpanData::traceId() const { return trace_id; }
+uint64_t SpanData::spanId() const { return span_id; }
+
+std::unique_ptr<SpanData> makeSpanData(int64_t span_id, uint64_t trace_id, uint64_t parent_id,
+                                       std::string service, std::string type, std::string name,
+                                       ot::string_view resource, int64_t start) {
+  return std::unique_ptr<SpanData>{
+      new SpanData(span_id, trace_id, parent_id, service, type, name, resource, start)};
+}
+
+std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
+
+Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<SpanData>> buffer,
            TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
            SpanContext context, TimePoint start_time, std::string span_service,
-           std::string span_type, std::string span_name, ot::string_view resource,
-           const ot::StartSpanOptions &options)
+           std::string span_type, std::string span_name, ot::string_view resource)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
-      span_id(span_id),
-      trace_id(trace_id),
-      parent_id(parent_id),
       context_(std::move(context)),
       start_time_(start_time),
-      service(span_service),
-      type(span_type),
-      name(span_name),
-      resource(resource),
-      error(0),
-      start(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                start_time_.absolute_time.time_since_epoch())
-                .count()),
-      duration(0) {
-  buffer_->registerSpan(*this);
-}
-
-Span::Span(Span &&other)
-    : tracer_(other.tracer_),
-      buffer_(other.buffer_),
-      get_time_(other.get_time_),
-      span_id(other.span_id),
-      trace_id(other.trace_id),
-      parent_id(other.parent_id),
-      context_(std::move(other.context_)),
-      start_time_(other.start_time_),
-      service(other.service),
-      type(other.type),
-      name(other.name),
-      resource(other.resource),
-      error(other.error),
-      start(other.start),
-      duration(other.duration),
-      meta(other.meta) {
-  is_finished_ = (bool)other.is_finished_;  // Copy the value.
+      span_(makeSpanData(span_id, trace_id, parent_id, span_service, span_type, span_name,
+                         resource,
+                         std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             start_time_.absolute_time.time_since_epoch())
+                             .count())) {
+  buffer_->registerSpan(*span_.get());  // Doens't keep reference.
 }
 
 Span::~Span() {
@@ -72,16 +71,20 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   std::lock_guard<std::mutex> lock{mutex_};
   // Set end time.
   auto end_time = get_time_();
-  duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  buffer_->finishSpan(std::move(*this));
+  span_->duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
+  buffer_->finishSpan(std::move(span_));
+  // According to the OT lifecycle, no more methods should be called on this Span. But just in case
+  // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
+  span_ = stubSpanData();
 } catch (const std::bad_alloc &) {
   // At least don't crash.
 }
 
 void Span::SetOperationName(ot::string_view operation_name) noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  name = operation_name;
-  resource = operation_name;
+  span_->name = operation_name;
+  span_->resource = operation_name;
 }
 
 namespace {
@@ -200,13 +203,13 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     if (key == datadog_span_type_tag) {
-      type = result;
+      span_->type = result;
     } else if (key == datadog_resource_name_tag) {
-      resource = result;
+      span_->resource = result;
     } else if (key == datadog_service_name_tag) {
-      service = result;
+      span_->service = result;
     } else {
-      meta[key] = result;
+      span_->meta[key] = result;
     }
   }
 }
@@ -226,11 +229,11 @@ const ot::SpanContext &Span::context() const noexcept { return context_; }
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 
 uint64_t Span::traceId() const {
-  return trace_id;  // Never modified, hence un-locked access.
+  return span_->trace_id;  // Never modified, hence un-locked access.
 }
 
 uint64_t Span::spanId() const {
-  return span_id;  // Never modified, hence un-locked access.
+  return span_->span_id;  // Never modified, hence un-locked access.
 }
 
 }  // namespace opentracing

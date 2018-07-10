@@ -14,11 +14,12 @@ class Span;
 template <class Span>
 class Writer;
 template <class Span>
-using Trace = std::unique_ptr<std::vector<Span>>;
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<Span>>>;
 
 template <class Span>
 struct PendingTrace {
-  PendingTrace() : finished_spans(std::make_unique<std::vector<Span>>()), all_spans() {}
+  PendingTrace()
+      : finished_spans(Trace<Span>{new std::vector<std::unique_ptr<Span>>()}), all_spans() {}
 
   Trace<Span> finished_spans;
   std::unordered_set<uint64_t> all_spans;
@@ -31,7 +32,7 @@ class SpanBuffer {
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
   virtual void registerSpan(const Span& span) = 0;
-  virtual void finishSpan(Span&& span) = 0;
+  virtual void finishSpan(std::unique_ptr<Span> span) = 0;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.
@@ -41,7 +42,7 @@ class WritingSpanBuffer : public SpanBuffer<Span> {
   WritingSpanBuffer(std::shared_ptr<Writer<Span>> writer);
 
   void registerSpan(const Span& span) override;
-  void finishSpan(Span&& span) override;
+  void finishSpan(std::unique_ptr<Span> span) override;
 
  private:
   std::shared_ptr<Writer<Span>> writer_;

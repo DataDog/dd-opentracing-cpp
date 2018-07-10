@@ -76,7 +76,7 @@ COPY ./test/integration/nginx/nginx.conf /usr/local/nginx/conf/nginx.conf
 
 # Get Wiremock
 ADD http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar wiremock-standalone-2.18.0.jar
-RUN printf "#!/bin/bash\nset -x\njava -jar $(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
+RUN printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 
 COPY ./test/integration/nginx/nginx_integration_test.sh ./nginx_integration_test.sh
