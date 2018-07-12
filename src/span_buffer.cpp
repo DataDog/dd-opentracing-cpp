@@ -5,24 +5,20 @@
 namespace datadog {
 namespace opentracing {
 
-template <class Span>
-WritingSpanBuffer<Span>::WritingSpanBuffer(std::shared_ptr<Writer<Span>> writer)
-    : writer_(writer) {}
+WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<Writer> writer) : writer_(writer) {}
 
-template <class Span>
-void WritingSpanBuffer<Span>::registerSpan(const Span& span) {
+void WritingSpanBuffer::registerSpan(const SpanData& span) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   uint64_t trace_id = span.traceId();
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
-    traces_.emplace(std::make_pair(trace_id, PendingTrace<Span>{}));
+    traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
     trace = traces_.find(trace_id);
   }
   trace->second.all_spans.insert(span.spanId());
 }
 
-template <class Span>
-void WritingSpanBuffer<Span>::finishSpan(std::unique_ptr<Span> span) {
+void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   auto trace_iter = traces_.find(span->traceId());
   if (trace_iter == traces_.end()) {
@@ -40,9 +36,6 @@ void WritingSpanBuffer<Span>::finishSpan(std::unique_ptr<Span> span) {
     traces_.erase(trace_iter);
   }
 }
-
-// Make sure we generate code for a Span-buffering SpanBuffer.
-template class WritingSpanBuffer<SpanData>;
 
 }  // namespace opentracing
 }  // namespace datadog

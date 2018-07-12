@@ -18,14 +18,13 @@ uint64_t getId() {
 
 Tracer::Tracer(TracerOptions options)
     : Tracer(options,
-             std::shared_ptr<SpanBuffer<SpanData>>{
-                 new WritingSpanBuffer<SpanData>{std::make_shared<AgentWriter<SpanData>>(
-                     options.agent_host, options.agent_port,
-                     std::chrono::milliseconds(llabs(options.write_period_ms)))}},
+             std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{std::make_shared<AgentWriter>(
+                 options.agent_host, options.agent_port,
+                 std::chrono::milliseconds(llabs(options.write_period_ms)))}},
              getRealTime, getId, ConstantRateSampler(options.sample_rate)) {}
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer<SpanData>> buffer,
-               TimeProvider get_time, IdProvider get_id, SampleProvider sampler)
+Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
+               IdProvider get_id, SampleProvider sampler)
     : opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),

@@ -10,43 +10,38 @@
 namespace datadog {
 namespace opentracing {
 
-class Span;
-template <class Span>
+class SpanData;
 class Writer;
-template <class Span>
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<Span>>>;
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
-template <class Span>
 struct PendingTrace {
   PendingTrace()
-      : finished_spans(Trace<Span>{new std::vector<std::unique_ptr<Span>>()}), all_spans() {}
+      : finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}), all_spans() {}
 
-  Trace<Span> finished_spans;
+  Trace finished_spans;
   std::unordered_set<uint64_t> all_spans;
 };
 
 // Keeps track of Spans until there is a complete trace.
-template <class Span>
 class SpanBuffer {
  public:
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
-  virtual void registerSpan(const Span& span) = 0;
-  virtual void finishSpan(std::unique_ptr<Span> span) = 0;
+  virtual void registerSpan(const SpanData& span) = 0;
+  virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.
-template <class Span>
-class WritingSpanBuffer : public SpanBuffer<Span> {
+class WritingSpanBuffer : public SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<Writer<Span>> writer);
+  WritingSpanBuffer(std::shared_ptr<Writer> writer);
 
-  void registerSpan(const Span& span) override;
-  void finishSpan(std::unique_ptr<Span> span) override;
+  void registerSpan(const SpanData& span) override;
+  void finishSpan(std::unique_ptr<SpanData> span) override;
 
  private:
-  std::shared_ptr<Writer<Span>> writer_;
-  std::unordered_map<uint64_t, PendingTrace<Span>> traces_;
+  std::shared_ptr<Writer> writer_;
+  std::unordered_map<uint64_t, PendingTrace> traces_;
   mutable std::mutex mutex_;
 };
 

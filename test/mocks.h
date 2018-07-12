@@ -12,87 +12,60 @@
 namespace datadog {
 namespace opentracing {
 
-// Simply encapsulates the unique information about a Span.
-struct SpanInfo {
-  std::string name;
-  std::string service;
-  std::string resource;
-  std::string type;
-  uint64_t span_id;
-  uint64_t trace_id;
-  uint64_t parent_id;
-  int32_t error;
-  int64_t start;
-  int64_t duration;
-  std::unordered_map<std::string, std::string> meta;  // Aka, tags.
+// Allows creation of a SpanData.
+struct TestSpanData : public SpanData {
+  TestSpanData() {}
 
-  uint64_t traceId() const { return trace_id; }
-  uint64_t spanId() const { return span_id; }
+  TestSpanData(std::string type, std::string service, ot::string_view resource, std::string name,
+               uint64_t trace_id, uint64_t span_id, uint64_t parent_id, int64_t start,
+               int64_t duration, int32_t error)
+      : SpanData(type, service, resource, name, trace_id, span_id, parent_id, start, duration,
+                 error) {}
+  TestSpanData(const TestSpanData& other) : SpanData(other) {}
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
                      parent_id, error);
-
-  // Returns a struct that describes the unique information of a span.
-  static SpanInfo fromSpan(Span& span) {
-    // Encode Span into msgpack and decode into SpanInfo.
-    std::stringstream buffer;
-    msgpack::pack(buffer, span);
-    // Decode.
-    buffer.seekg(0);
-    std::string str(buffer.str());
-    msgpack::object_handle oh = msgpack::unpack(str.data(), str.size());
-    msgpack::object deserialized = oh.get();
-    SpanInfo dst;
-    deserialized.convert(dst);
-    return dst;
-  }
 };
 
-struct MockBuffer : public SpanBuffer<Span> {
-  // struct Trace {
-  //   std::unique_ptr<std::vector<SpanInfo>> finished_spans;
-  //   size_t all_spans;
-  // };
-
+struct MockBuffer : public SpanBuffer {
   MockBuffer(){};
 
-  void registerSpan(const Span& span) override {
+  void registerSpan(const SpanData& span) override {
     uint64_t trace_id = span.traceId();
     auto trace = traces.find(trace_id);
     if (trace == traces.end()) {
-      traces.emplace(std::make_pair(trace_id, PendingTrace<SpanInfo>{}));
+      traces.emplace(std::make_pair(trace_id, PendingTrace{}));
       trace = traces.find(trace_id);
     }
     trace->second.all_spans.insert(span.spanId());
   }
 
-  void finishSpan(Span&& span) override {
-    auto trace = traces.find(span.traceId());
+  void finishSpan(std::unique_ptr<SpanData> span) override {
+    auto trace = traces.find(span->traceId());
     if (trace == traces.end()) {
       std::cerr << "Missing trace for finished span" << std::endl;
       return;
     }
-    trace->second.finished_spans->emplace_back(SpanInfo::fromSpan(span));
+    trace->second.finished_spans->push_back(std::move(span));
   }
 
-  std::unordered_map<uint64_t, PendingTrace<SpanInfo>> traces;
+  std::unordered_map<uint64_t, PendingTrace> traces;
 };
 
 // A Writer implementation that allows access to the Spans recorded.
-template <class Span>
-struct MockWriter : public Writer<Span> {
+struct MockWriter : public Writer {
   MockWriter() {}
   ~MockWriter() override {}
 
-  void write(Trace<Span> trace) override {
+  void write(Trace trace) override {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     traces.emplace_back();
     for (auto& span : *trace) {
-      traces.back().push_back(span);
+      traces.back().push_back(std::move(span));
     }
   }
 
-  std::vector<std::vector<Span>> traces;
+  std::vector<std::vector<std::unique_ptr<SpanData>>> traces;
 
  private:
   mutable std::mutex mutex_;
@@ -171,10 +144,10 @@ struct MockHandle : public Handle {
 
   // Note, this returns any traces that have been added to the request - NOT traces that have been
   // successfully posted.
-  std::unique_ptr<std::vector<std::vector<SpanInfo>>> getTraces() {
+  std::unique_ptr<std::vector<std::vector<TestSpanData>>> getTraces() {
     std::unique_lock<std::mutex> lock(mutex);
-    std::unique_ptr<std::vector<std::vector<SpanInfo>>> dst{
-        new std::vector<std::vector<SpanInfo>>{}};
+    std::unique_ptr<std::vector<std::vector<TestSpanData>>> dst{
+        new std::vector<std::vector<TestSpanData>>{}};
     if (options.find(CURLOPT_POSTFIELDS) != options.end()) {
       std::string packed_span = options[CURLOPT_POSTFIELDS];
       msgpack::object_handle oh = msgpack::unpack(packed_span.data(), packed_span.size());

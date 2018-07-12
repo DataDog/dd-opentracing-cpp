@@ -14,34 +14,36 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 }  // namespace
 
-SpanData::SpanData(uint64_t span_id, uint64_t trace_id, uint64_t parent_id, std::string service,
-                   std::string type, std::string name, ot::string_view resource, int64_t start)
-    : span_id(span_id),
-      trace_id(trace_id),
-      parent_id(parent_id),
+SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
+                   std::string name, uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
+                   int64_t start, int64_t duration, int32_t error)
+    : type(type),
       service(service),
-      type(type),
-      name(name),
       resource(resource),
-      error(0),
-      duration(0),
-      start(start) {}
+      name(name),
+      trace_id(trace_id),
+      span_id(span_id),
+      parent_id(parent_id),
+      start(start),
+      duration(duration),
+      error(error) {}
 
 SpanData::SpanData() {}
 
 uint64_t SpanData::traceId() const { return trace_id; }
 uint64_t SpanData::spanId() const { return span_id; }
 
-std::unique_ptr<SpanData> makeSpanData(int64_t span_id, uint64_t trace_id, uint64_t parent_id,
-                                       std::string service, std::string type, std::string name,
-                                       ot::string_view resource, int64_t start) {
+std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
+                                       ot::string_view resource, std::string name,
+                                       uint64_t trace_id, int64_t span_id, uint64_t parent_id,
+                                       int64_t start) {
   return std::unique_ptr<SpanData>{
-      new SpanData(span_id, trace_id, parent_id, service, type, name, resource, start)};
+      new SpanData(type, service, resource, name, trace_id, span_id, parent_id, start, 0, 0)};
 }
 
 std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<SpanData>> buffer,
+Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
            TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
            SpanContext context, TimePoint start_time, std::string span_service,
            std::string span_type, std::string span_name, ot::string_view resource)
@@ -50,8 +52,8 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer<Span
       get_time_(get_time),
       context_(std::move(context)),
       start_time_(start_time),
-      span_(makeSpanData(span_id, trace_id, parent_id, span_service, span_type, span_name,
-                         resource,
+      span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
+                         parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
                              start_time_.absolute_time.time_since_epoch())
                              .count())) {
