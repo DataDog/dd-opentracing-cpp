@@ -32,7 +32,7 @@ go get github.com/jakm/msgpack-cli
 if ! which wiremock >/dev/null
 then
   wget  http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar
-  printf "#!/bin/bash\nset -x\njava -jar $(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
+  printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 fi
 # Start wiremock in background

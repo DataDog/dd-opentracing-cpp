@@ -18,8 +18,8 @@ TEST_CASE("tracer") {
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   SampleProvider sampler = KeepAllSampler();
   TracerOptions tracer_options{"", 0, "service_name", "web"};
-  std::shared_ptr<Tracer> tracer{new Tracer{
-      tracer_options, std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time, get_id, sampler}};
+  std::shared_ptr<Tracer> tracer{
+      new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, sampler}};
   const ot::StartSpanOptions span_options;
 
   SECTION("names spans correctly") {
@@ -27,11 +27,11 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto result = buffer->traces[100].finished_spans->at(0);
-    REQUIRE(result.type == "web");
-    REQUIRE(result.service == "service_name");
-    REQUIRE(result.name == "/what_up");
-    REQUIRE(result.resource == "/what_up");
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->type == "web");
+    REQUIRE(result->service == "service_name");
+    REQUIRE(result->name == "/what_up");
+    REQUIRE(result->resource == "/what_up");
   }
 
   SECTION("spans receive id") {
@@ -39,9 +39,9 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto result = buffer->traces[100].finished_spans->at(0);
-    REQUIRE(result.span_id == 100);
-    REQUIRE(result.trace_id == 100);
-    REQUIRE(result.parent_id == 0);
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->span_id == 100);
+    REQUIRE(result->trace_id == 100);
+    REQUIRE(result->parent_id == 0);
   }
 }

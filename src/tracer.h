@@ -16,10 +16,8 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-template <class Span>
 class Writer;
-class Span;
-template <class Span>
+class SpanData;
 class SpanBuffer;
 
 // The interface for providing IDs to spans and traces.
@@ -33,7 +31,7 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   Tracer(TracerOptions options);
 
   // Creates a Tracer by copying the given options and injecting the given dependencies.
-  Tracer(TracerOptions options, std::shared_ptr<SpanBuffer<Span>> buffer, TimeProvider get_time,
+  Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id, SampleProvider sample);
 
   Tracer() = delete;
@@ -66,7 +64,7 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
 
   const TracerOptions opts_;
   // Keeps finished spans until their entire trace is finished.
-  std::shared_ptr<SpanBuffer<Span>> buffer_;
+  std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   IdProvider get_id_;
   SampleProvider sampler_;

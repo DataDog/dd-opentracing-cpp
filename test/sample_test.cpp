@@ -20,28 +20,26 @@ TEST_CASE("sample") {
   const ot::StartSpanOptions span_options;
 
   SECTION("keep all traces") {
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options,
-                                              std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time,
-                                              get_id, KeepAllSampler()}};
+    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
+                                              get_time, get_id, KeepAllSampler()}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_kept", span_options);
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
     REQUIRE(buffer->traces.size() == 1);
-    auto result = buffer->traces[100].finished_spans->at(0);
-    REQUIRE(result.type == "web");
-    REQUIRE(result.service == "service_name");
-    REQUIRE(result.name == "/should_be_kept");
-    REQUIRE(result.resource == "/should_be_kept");
+    auto &result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->type == "web");
+    REQUIRE(result->service == "service_name");
+    REQUIRE(result->name == "/should_be_kept");
+    REQUIRE(result->resource == "/should_be_kept");
     // This sampler should not set the _sample_rate tag.
-    REQUIRE(result.meta["_sample_rate"] == std::string());
+    REQUIRE(result->meta["_sample_rate"] == std::string());
   }
 
   SECTION("discard all tracer") {
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options,
-                                              std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time,
-                                              get_id, DiscardAllSampler()}};
+    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
+                                              get_time, get_id, DiscardAllSampler()}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
     const ot::FinishSpanOptions finish_options;
@@ -52,9 +50,8 @@ TEST_CASE("sample") {
 
   SECTION("constant rate sampler") {
     double rate = 0.25;
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options,
-                                              std::shared_ptr<SpanBuffer<Span>>{buffer}, get_time,
-                                              get_id, ConstantRateSampler(rate)}};
+    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
+                                              get_time, get_id, ConstantRateSampler(rate)}};
 
     for (int i = 0; i < 100; i++) {
       auto span = tracer->StartSpanWithOptions("/constant_rate_sample", span_options);
@@ -67,18 +64,19 @@ TEST_CASE("sample") {
     REQUIRE((size >= 24 && size <= 26));
     auto rate_string = std::to_string(rate);
     std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
-      auto span = trace_iter.second.finished_spans->at(0);
-      REQUIRE(span.name == "/constant_rate_sample");
-      REQUIRE(span.meta["_sample_rate"] == rate_string);
+      auto &span = trace_iter.second.finished_spans->at(0);
+      REQUIRE(span->name == "/constant_rate_sample");
+      REQUIRE(span->meta["_sample_rate"] == rate_string);
     });
   }
 
   SECTION("constant rate sampler applied to child spans within same trace") {
     double rate = 1.0;
     std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
-                                                  std::shared_ptr<SpanBuffer<Span>>{buffer},
-                                                  get_time, get_id, ConstantRateSampler(rate)}};
+                                                  std::shared_ptr<SpanBuffer>{buffer}, get_time,
+                                                  get_id, ConstantRateSampler(rate)}};
     auto ot_root_span = tracer->StartSpan("/constant_rate_sample");
+    uint64_t trace_id = (dynamic_cast<const Span *>(ot_root_span.get()))->traceId();
     auto ot_child_span =
         tracer->StartSpan("/child_span", {opentracing::ChildOf(&ot_root_span->context())});
 
@@ -88,24 +86,22 @@ TEST_CASE("sample") {
     // One trace should have been captured.
     REQUIRE(buffer->traces.size() == 1);
 
-    // The spans should actually be datadog::opentracing::Span objects.
-    auto root_span = dynamic_cast<const Span *>(ot_root_span.get());
-    REQUIRE(root_span != nullptr);
-    auto child_span = dynamic_cast<const Span *>(ot_child_span.get());
-    REQUIRE(child_span != nullptr);
+    // Both spans should be recorded under the same trace.
+    REQUIRE(buffer->traces[trace_id].finished_spans->size() == 2);
+
     // The trace id should be the same.
+    auto &root_span = buffer->traces[trace_id].finished_spans->at(1);
+    auto &child_span = buffer->traces[trace_id].finished_spans->at(0);
     REQUIRE(root_span->traceId() == child_span->traceId());
     // The span id should be different.
     REQUIRE(root_span->spanId() != child_span->spanId());
-    // Both spans should be recorded under the same trace.
-    REQUIRE(buffer->traces[root_span->traceId()].finished_spans->size() == 2);
   }
 
   SECTION("constant rate sampler applied to child spans from upstream") {
     double rate = 0.25;
     std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
-                                                  std::shared_ptr<SpanBuffer<Span>>{buffer},
-                                                  get_time, get_id, ConstantRateSampler(rate)}};
+                                                  std::shared_ptr<SpanBuffer>{buffer}, get_time,
+                                                  get_id, ConstantRateSampler(rate)}};
     for (int i = 0; i < 100; i++) {
       // Each trace requires a unique span context (trace id) to represent an extracted context
       // from upstream.
@@ -120,9 +116,9 @@ TEST_CASE("sample") {
     REQUIRE((size >= 24 && size <= 26));
     auto rate_string = std::to_string(rate);
     std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
-      auto span = trace_iter.second.finished_spans->at(0);
-      REQUIRE(span.name == "/child_span");
-      REQUIRE(span.meta["_sample_rate"] == rate_string);
+      auto &span = trace_iter.second.finished_spans->at(0);
+      REQUIRE(span->name == "/child_span");
+      REQUIRE(span->meta["_sample_rate"] == rate_string);
     });
   }
 }

@@ -18,17 +18,14 @@ const std::vector<std::chrono::milliseconds> default_retry_periods{
 const long default_timeout_ms = 2000L;
 }  // namespace
 
-template <class Span>
-AgentWriter<Span>::AgentWriter(std::string host, uint32_t port,
-                               std::chrono::milliseconds write_period)
+AgentWriter::AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, config::tracer_version, write_period,
                   max_queued_traces, default_retry_periods, host, port){};
 
-template <class Span>
-AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-                               std::chrono::milliseconds write_period, size_t max_queued_traces,
-                               std::vector<std::chrono::milliseconds> retry_periods,
-                               std::string host, uint32_t port)
+AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
+                         std::chrono::milliseconds write_period, size_t max_queued_traces,
+                         std::vector<std::chrono::milliseconds> retry_periods, std::string host,
+                         uint32_t port)
     : tracer_version_(tracer_version),
       write_period_(write_period),
       max_queued_traces_(max_queued_traces),
@@ -37,9 +34,7 @@ AgentWriter<Span>::AgentWriter(std::unique_ptr<Handle> handle, std::string trace
   startWriting(std::move(handle));
 }
 
-template <class Span>
-void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
-                                    uint32_t port) {
+void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port) {
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
@@ -59,13 +54,9 @@ void AgentWriter<Span>::setUpHandle(std::unique_ptr<Handle> &handle, std::string
                       {"Datadog-Meta-Tracer-Version", tracer_version_}});
 }  // namespace opentracing
 
-template <class Span>
-AgentWriter<Span>::~AgentWriter() {
-  stop();
-}
+AgentWriter::~AgentWriter() { stop(); }
 
-template <class Span>
-void AgentWriter<Span>::stop() {
+void AgentWriter::stop() {
   {
     std::unique_lock<std::mutex> lock(mutex_);
     if (stop_writing_) {
@@ -77,8 +68,7 @@ void AgentWriter<Span>::stop() {
   worker_->join();
 }
 
-template <class Span>
-void AgentWriter<Span>::write(Trace<Span> trace) {
+void AgentWriter::write(Trace trace) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;
@@ -89,8 +79,7 @@ void AgentWriter<Span>::write(Trace<Span> trace) {
   traces_.push_back(std::move(trace));
 };
 
-template <class Span>
-void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
+void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
   // Start worker that sends Traces to agent.
   // We can capture 'this' because destruction of this stops the thread and the lambda.
   worker_ = std::make_unique<std::thread>(
@@ -118,8 +107,7 @@ void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
             traces_.clear();
           }  // lock on mutex_ ends.
           // Send spans, not in critical period.
-          retryFiniteOnFail(
-              [&]() { return AgentWriter<Span>::postTraces(handle, buffer, num_traces); });
+          retryFiniteOnFail([&]() { return AgentWriter::postTraces(handle, buffer, num_traces); });
           // Let thread calling 'flush' that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -131,8 +119,7 @@ void AgentWriter<Span>::startWriting(std::unique_ptr<Handle> handle) {
       std::move(handle));
 }
 
-template <class Span>
-void AgentWriter<Span>::flush() try {
+void AgentWriter::flush() try {
   std::unique_lock<std::mutex> lock(mutex_);
   flush_worker_ = true;
   condition_.notify_all();
@@ -141,8 +128,7 @@ void AgentWriter<Span>::flush() try {
 } catch (const std::bad_alloc &) {
 }
 
-template <class Span>
-void AgentWriter<Span>::retryFiniteOnFail(std::function<bool()> f) const {
+void AgentWriter::retryFiniteOnFail(std::function<bool()> f) const {
   for (std::chrono::milliseconds backoff : retry_periods_) {
     if (f()) {
       return;
@@ -160,9 +146,8 @@ void AgentWriter<Span>::retryFiniteOnFail(std::function<bool()> f) const {
   f();  // Final try after final sleep.
 }
 
-template <class Span>
-bool AgentWriter<Span>::postTraces(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
-                                   size_t num_traces) try {
+bool AgentWriter::postTraces(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
+                             size_t num_traces) try {
   handle->setHeaders({{"X-Datadog-Trace-Count", std::to_string(num_traces)}});
 
   // We have to set the size manually, because msgpack uses null characters.
@@ -190,9 +175,6 @@ bool AgentWriter<Span>::postTraces(std::unique_ptr<Handle> &handle, std::strings
   // Drop spans, but live to fight another day.
   return true;  // Don't attempt to retry.
 }
-
-// Make sure we generate code for a Span-writing Writer.
-template class AgentWriter<Span>;
 
 }  // namespace opentracing
 }  // namespace datadog
