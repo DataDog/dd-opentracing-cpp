@@ -9,7 +9,9 @@ cc_library(
     strip_include_prefix = "include",
     visibility = ["//visibility:public"],
     deps = [
-      "//3rd_party:nlohmann",
+        "//:3rd_party_nlohmann",
+        "@io_opentracing_cpp//:opentracing",
+        "@com_github_msgpack_msgpack_c//:msgpack",
     ],
     copts = ["-std=c++14"],
 )
@@ -19,9 +21,7 @@ genrule(
     srcs = glob([
          "CMakeLists.txt",
          "src/*",
-    ]) + [
-         "//3rd_party:sanitizers_cmake",
-    ],
+    ]),
     outs = [
       "version_number.h"
     ],
@@ -31,7 +31,21 @@ genrule(
     VERSION_NUMBER_H_OUT=$${PWD}/$(location :version_number.h)
     CMAKE_ROOT=$$(dirname $${PWD}/$(location :CMakeLists.txt))
     cd $$TEMP_DIR
-    cmake -DBUILD_SHARED=OFF -DBUILD_TESTING=OFF -L $$CMAKE_ROOT
+    cmake -DHEADERS_ONLY=ON -L $$CMAKE_ROOT
     mv version_number.h $$VERSION_NUMBER_H_OUT
     """,
+)
+
+cc_library(
+    name = "3rd_party_nlohmann",
+    hdrs = ["3rd_party/include/nlohmann/json.hpp"],
+    strip_include_prefix = "3rd_party/include",
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "3rd_party_catch2",
+    hdrs = ["3rd_party/include/catch2/catch.hpp"],
+    strip_include_prefix = "3rd_party/include",
+    visibility = ["//visibility:public"],
 )

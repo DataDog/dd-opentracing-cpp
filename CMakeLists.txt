@@ -6,6 +6,7 @@ option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
+option(HEADERS_ONLY "Only generate version_number.h" OFF)
 
 if(BUILD_TESTING)
   set(BUILD_SHARED ON)
@@ -36,6 +37,10 @@ configure_file(
   "${PROJECT_SOURCE_DIR}/src/version_number.h.in"
   "${PROJECT_BINARY_DIR}/version_number.h")
 include_directories("${PROJECT_BINARY_DIR}")
+
+if(HEADERS_ONLY)
+  return()
+endif()
 
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
