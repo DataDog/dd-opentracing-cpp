@@ -3,10 +3,10 @@
 
 #include <datadog/opentracing.h>
 #include "clock.h"
+#include "publisher.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
-#include "writer.h"
 
 #include <functional>
 #include <random>
@@ -33,6 +33,9 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   // Creates a Tracer by copying the given options and injecting the given dependencies.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id, SampleProvider sample);
+
+  // Creates a Tracer that exposes data for an external HTTP client to publish
+  Tracer(TracerOptions options, std::shared_ptr<TracePublisher> &publisher);
 
   Tracer() = delete;
 

@@ -3,6 +3,9 @@
 
 #include <opentracing/tracer.h>
 
+#include <deque>
+#include <map>
+
 namespace ot = opentracing;
 
 namespace datadog {
@@ -32,7 +35,24 @@ struct TracerOptions {
   std::string operation_name_override = "";
 };
 
+// TracePublisher exposes the data required to publish traces to the
+// Datadog Agent.
+class TracePublisher {
+ public:
+  TracePublisher() {}
+  virtual ~TracePublisher() {}
+
+  // Returns the Datadog Agent endpoint that traces should be published to.
+  virtual const std::string path() = 0;
+  virtual std::size_t pendingTraces() = 0;
+  virtual void clearTraces() = 0;
+  virtual const std::map<std::string, std::string> headers() = 0;
+  virtual const std::string payload() = 0;
+};
+
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
+std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options,
+                                       std::shared_ptr<TracePublisher> &publisher);
 
 }  // namespace opentracing
 }  // namespace datadog

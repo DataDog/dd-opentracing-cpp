@@ -7,6 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include "publisher.h"
 #include "span.h"
 #include "transport.h"
 
@@ -16,15 +17,18 @@ namespace opentracing {
 class SpanData;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
-// Takes Traces and writes them (eg. sends them to Datadog).
+// A Writer is used to submit completed traces to the Datadog agent.
 class Writer {
  public:
-  Writer() {}
+  Writer();
 
   virtual ~Writer() {}
 
   // Writes the given Trace.
   virtual void write(Trace trace) = 0;
+
+ protected:
+  std::shared_ptr<AgentHttpPublisher> trace_publisher_;
 };
 
 // A Writer that sends Traces (collections of Spans) to a Datadog agent.
@@ -34,10 +38,9 @@ class AgentWriter : public Writer {
   // runtime_exception.
   AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period);
 
-  AgentWriter(std::unique_ptr<Handle> handle, std::string tracer_version,
-              std::chrono::milliseconds write_period, size_t max_queued_traces,
-              std::vector<std::chrono::milliseconds> retry_periods, std::string host,
-              uint32_t port);
+  AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
+              size_t max_queued_traces, std::vector<std::chrono::milliseconds> retry_periods,
+              std::string host, uint32_t port);
 
   // Does not flush on destruction, buffered traces may be lost. Stops all threads.
   ~AgentWriter() override;
@@ -59,13 +62,12 @@ class AgentWriter : public Writer {
   // or when flush() is called manually.
   void startWriting(std::unique_ptr<Handle> handle);
   // Posts the given Traces to the Agent. Returns true if it succeeds, otherwise false.
-  static bool postTraces(std::unique_ptr<Handle> &handle, std::stringstream &buffer,
-                         size_t num_traces);
+  static bool postTraces(std::unique_ptr<Handle> &handle,
+                         std::map<std::string, std::string> headers, std::string payload);
   // Retries the given function a finite number of times according to retry_periods_. Retries when
   // f() returns false.
   void retryFiniteOnFail(std::function<bool()> f) const;
 
-  const std::string tracer_version_;
   // How often to send Traces.
   const std::chrono::milliseconds write_period_;
   const size_t max_queued_traces_;
@@ -86,8 +88,19 @@ class AgentWriter : public Writer {
   bool stop_writing_ = false;
   // If set to true, flushes worker (which sets it false again). Locked by mutex_;
   bool flush_worker_ = false;
-  // Multiple producer (potentially), single consumer. Locked by mutex_.
-  std::deque<Trace> traces_;
+};
+
+// A writer that collects trace data but uses an external mechanism to transmit the data
+// to the Datadog Agent.
+class ExternalWriter : public Writer {
+ public:
+  ExternalWriter() {}
+  ~ExternalWriter() {}
+
+  // Implements Writer methods.
+  void write(Trace trace) override;
+
+  std::shared_ptr<TracePublisher> publisher() { return trace_publisher_; }
 };
 
 }  // namespace opentracing
