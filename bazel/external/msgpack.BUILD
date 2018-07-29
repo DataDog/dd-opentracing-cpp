@@ -5,8 +5,6 @@ cc_library(
         "include/**/*.h",
         "include/**/*.hpp",
     ]),
-    # hdrs = glob([
-    # ]),
     includes = [
         "include",
     ],
