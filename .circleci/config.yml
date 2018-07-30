@@ -4,7 +4,6 @@ source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
   OPENTRACING_VERSION: 1.5.0
   CURL_VERSION: 7.60.0
-  NGINX_VERSION: 1.14.0
 
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
@@ -41,10 +40,11 @@ jobs:
           command: |
             rm -rf .build
             mkdir -p .build
+            mkdir -p /tmp/build/
             cd .build
             cmake $CMAKE_ARGS ..
             make
-            cp libdd_opentracing_plugin.so /tmp/build
+            cp libdd_opentracing_plugin.so /tmp/build/libdd_opentracing_plugin.so
       - persist_to_workspace:
           root: /tmp/
           paths:
@@ -86,6 +86,7 @@ jobs:
     <<: *defaults
     environment:
       NGINX_OPENTRACING_VERSION: 0.4.0
+      NGINX_VERSION: 1.14.0
     steps:
       - checkout
       - attach_workspace:
