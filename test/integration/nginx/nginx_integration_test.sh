@@ -36,12 +36,12 @@ then
   chmod a+x /usr/local/bin/wiremock
 fi
 # Start wiremock in background
-wiremock --port 8129 &
+wiremock --port 8126 &
 WIREMOCK_PID=$!
 # Wait for wiremock to start
 sleep 5 
 # Set wiremock to respond to trace requests
-curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8129/__admin/mappings/new
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8126/__admin/mappings/new
 
 # Send requests to nginx
 run_nginx
@@ -55,7 +55,7 @@ I=0
 while ((I++ < 15)) && [[ -z "${REQUESTS}" || $(echo "${REQUESTS}" | jq -r '.requests | length') == "0" ]]
 do
   sleep 1
-  REQUESTS=$(curl -s http://localhost:8129/__admin/requests)
+  REQUESTS=$(curl -s http://localhost:8126/__admin/requests)
 done
 
 echo "${REQUESTS}" | jq -r '.requests[0].request.bodyAsBase64' | base64 -d > ~/requests.bin
@@ -64,7 +64,7 @@ echo "${REQUESTS}" | jq -r '.requests[0].request.bodyAsBase64' | base64 -d > ~/r
 # Compare what we got (got.json) to what we expect (expected.json).
 
 # Do a comparison that strips out data that changes (randomly generated ids, times, durations)
-STRIP_QUERY='del(.[] | .[] | .start, .duration, .span_id, .trace_id, .parent_id) | del(.[] | .[] | .meta | ."peer.address", ."nginx.worker_pid", ."http.host")'
+STRIP_QUERY='del(.[] | .[] | .start, .duration, .span_id, .trace_id, .parent_id) | del(.[] | .[] | .meta | ."http_user_agent", ."peer.address", ."nginx.worker_pid", ."http.host")'
 GOT=$(cat ~/got.json | jq -rS "${STRIP_QUERY}")
 EXPECTED=$(cat expected.json | jq -rS "${STRIP_QUERY}")
 DIFF=$(diff <(echo "$GOT") <(echo "$EXPECTED"))
@@ -72,6 +72,7 @@ DIFF=$(diff <(echo "$GOT") <(echo "$EXPECTED"))
 if [[ ! -z "${DIFF}" ]]
 then
   cat /tmp/curl_log.txt
+  echo ""
   echo "Incorrect traces sent to agent"
   echo -e "Got:\n${GOT}\n"
   echo -e "Expected:\n${EXPECTED}\n"
@@ -81,8 +82,7 @@ then
 fi
 
 kill_nginx
-kill $WIREMOCK_PID
-wait $WIREMOCK_PID
+pkill -P $WIREMOCK_PID
 # TEST 2: Check that libcurl isn't writing to stdout
 rm /tmp/nginx_log.txt
 run_nginx
