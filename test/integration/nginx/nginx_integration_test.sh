@@ -52,14 +52,19 @@ curl -s localhost 1> /tmp/curl_log.txt
 
 # Read out the traces sent to the agent.
 I=0
-while ((I++ < 15)) && [[ -z "${REQUESTS}" || $(echo "${REQUESTS}" | jq -r '.requests | length') == "0" ]]
+touch ~/got.json
+while ((I++ < 15)) && [[ $(jq 'length' ~/got.json) != "3" ]]
 do
   sleep 1
+  rm -rf ~/requests.json
   REQUESTS=$(curl -s http://localhost:8126/__admin/requests)
+  echo "${REQUESTS}" | jq -r '.requests[].request.bodyAsBase64' | while read line; 
+  do 
+    echo $line | base64 -d > ~/requests.bin; /root/go/bin/msgpack-cli decode ~/requests.bin | jq . >> ~/requests.json;
+  done;
+  # Merge 1 or more agent requests back into a single list of traces.
+  jq -s 'add' ~/requests.json > ~/got.json
 done
-
-echo "${REQUESTS}" | jq -r '.requests[0].request.bodyAsBase64' | base64 -d > ~/requests.bin
-/root/go/bin/msgpack-cli decode ~/requests.bin --pp > ~/got.json
 
 # Compare what we got (got.json) to what we expect (expected.json).
 
