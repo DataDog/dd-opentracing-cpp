@@ -2,7 +2,7 @@ version: 2
 
 source_dependency_versions: &source_dependency_versions
   MSGPACK_VERSION: 3.0.1
-  OPENTRACING_VERSION: 1.5.0
+  OPENTRACING_VERSION: 1.4.0
   CURL_VERSION: 7.60.0
 
 defaults: &defaults
@@ -16,7 +16,6 @@ jobs:
     environment:
       <<: *source_dependency_versions
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_SHARED=OFF
-      NGINX_OPENTRACING_VERSION: 0.4.0
     steps:
       - checkout
       - run:
