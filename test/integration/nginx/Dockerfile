@@ -35,7 +35,7 @@ RUN apt-get update && \
   apt-get install -y git gnupg lsb-release wget curl tar cmake openjdk-8-jre golang jq
 
 # Install nginx
-RUN CODENAME=$(lsb_release -c | cut -f2) && \
+RUN CODENAME=$(lsb_release -s -c) && \
   wget http://nginx.org/keys/nginx_signing.key && \
   apt-key add nginx_signing.key && \
   echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \

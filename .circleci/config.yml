@@ -93,7 +93,7 @@ jobs:
       - run:
           name: Install nginx
           command: |
-            CODENAME=$(lsb_release -c | cut -f2) # eg "bionic", "xenial"
+            CODENAME=$(lsb_release -s -c) # eg "bionic", "xenial"
             wget http://nginx.org/keys/nginx_signing.key
             apt-key add nginx_signing.key
             echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list

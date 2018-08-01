@@ -56,7 +56,7 @@ touch ~/got.json
 while ((I++ < 15)) && [[ $(jq 'length' ~/got.json) != "3" ]]
 do
   sleep 1
-  rm -rf ~/requests.json
+  echo "" > ~/requests.json
   REQUESTS=$(curl -s http://localhost:8126/__admin/requests)
   echo "${REQUESTS}" | jq -r '.requests[].request.bodyAsBase64' | while read line; 
   do 
