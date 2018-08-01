@@ -84,6 +84,54 @@ TEST_CASE("span") {
     REQUIRE(result->duration == 10000000000);
   }
 
+  SECTION("audits span data") {
+    std::list<std::pair<std::string, std::string>> test_cases{
+        // Should remove query params
+        {"/", "/"},
+        {"/?asdf", "/?"},
+        {"/search", "/search"},
+        {"/search?", "/search?"},
+        {"/search?id=100&private=true", "/search?"},
+        {"/search?id=100&private=true?", "/search?"},
+        // Should replace all digits
+        {"/1", "/?"},
+        {"/9999", "/?"},
+        {"/user/1", "/user/?"},
+        {"/user/1/", "/user/?/"},
+        {"/user/1/repo/50", "/user/?/repo/?"},
+        {"/user/1/repo/50/", "/user/?/repo/?/"},
+        // Should replace segments with mixed-characters
+        {"/a1/v2", "/?/?"},
+        {"/v3/1a", "/v3/?"},
+        {"/V01/v9/abc/-1?", "/V01/v9/abc/?"},
+        {"/ABC/av-1/b_2/c.3/d4d/v5f/v699/7", "/ABC/?/?/?/?/?/?/?"},
+        {"/user/asdf123/repository/01234567-9ABC-DEF0-1234", "/user/?/repository/?"},
+        {"/ABC/a-1/b_2/c.3/d4d/5f/6", "/ABC/?/?/?/?/?/?"}};
+
+    std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
+    for (auto& test_case : test_cases) {
+      auto span_id = get_id();
+      Span span{nullptr,
+                buffer_ptr,
+                get_time,
+                span_id,
+                span_id,
+                0,
+                std::move(SpanContext{span_id, span_id, {}}),
+                get_time(),
+                "",
+                "",
+                "",
+                ""};
+      span.SetTag("http.url", test_case.first);
+      const ot::FinishSpanOptions finish_options;
+      span.FinishWithOptions(finish_options);
+
+      auto& result = buffer->traces[span_id].finished_spans->back();
+      REQUIRE(result->meta.find("http.url")->second == test_case.second);
+    }
+  }
+
   SECTION("finishes once") {
     auto span_id = get_id();
     Span span{nullptr,
