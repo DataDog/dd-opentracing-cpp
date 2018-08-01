@@ -1,78 +1,62 @@
-FROM ubuntu
+FROM ubuntu:18.04 as build
 
 # Creates an image with nginx and the Datadog OpenTracing nginx module installed.
 # Runs a simple integration test.
 
-ARG OPENTRACING_VERSION=1.4.2
-ARG MSGPACK_VERSION=3.0.1
-ARG NGINX_OPENTRACING_VERSION=0.4.0
-ARG NGINX_VERSION=1.15.0
-
 RUN apt-get update && \
-  apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake openjdk-8-jre golang jq
+  apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake
 
 WORKDIR ~/
 
-# Install opentracing dependency
-ADD https://github.com/opentracing/opentracing-cpp/archive/v${OPENTRACING_VERSION}.tar.gz opentracing-cpp.tar.gz
-RUN tar zxvf opentracing-cpp.tar.gz
-RUN mkdir opentracing-cpp-${OPENTRACING_VERSION}/.build
-WORKDIR opentracing-cpp-${OPENTRACING_VERSION}/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
-
-# Install msgpack dependency
-ADD https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz msgpack.tar.gz
-RUN tar zxvf msgpack.tar.gz
-RUN mkdir msgpack-${MSGPACK_VERSION}/.build
-WORKDIR msgpack-${MSGPACK_VERSION}/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
-
-# Compile dd-opentracing-cpp
-COPY ./src ./dd-opentracing-cpp/src
 COPY ./3rd_party ./dd-opentracing-cpp/3rd_party
 COPY ./include ./dd-opentracing-cpp/include
-COPY ./CMakeLists.txt ./dd-opentracing-cpp/
-RUN find ./ -type f -print0 | xargs -0 md5sum # WHY CACHE BUSTING?
-RUN rm -rf dd-opentracing-cpp/.build 
-RUN mkdir dd-opentracing-cpp/.build
+COPY ./scripts ./dd-opentracing-cpp/scripts
+COPY ./src ./dd-opentracing-cpp/src
+COPY ./CMakeLists.txt ./dd-opentracing-cpp/CMakeLists.txt
+RUN export OPENTRACING_VERSION=1.4.0 && \
+  export MSGPACK_VERSION=3.0.1 && \
+  export CURL_VERSION=7.60.0 && \
+  cd dd-opentracing-cpp && \
+  ./scripts/install_dependencies.sh
+RUN rm -rf dd-opentracing-cpp/.build
+RUN mkdir -p dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
-RUN cmake -DBUILD_TESTING=OFF ..
+RUN cmake -DBUILD_PLUGIN=ON -DBUILD_TESTING=OFF -DBUILD_SHARED=OFF ..
 RUN make
 RUN make install
-WORKDIR ../..
 
-# Fetch and patch the nginx-opentracing module
-ADD https://github.com/opentracing-contrib/nginx-opentracing/archive/v${NGINX_OPENTRACING_VERSION}.tar.gz nginx-opentracing.tar.gz
-COPY ./nginx-opentracing-datadog.patch ./dd-opentracing-cpp/
-RUN tar zxvf nginx-opentracing.tar.gz
-WORKDIR nginx-opentracing-${NGINX_OPENTRACING_VERSION}
-RUN patch -p1 < ../dd-opentracing-cpp/nginx-opentracing-datadog.patch
-WORKDIR ..
+
+FROM ubuntu:18.04
+
+ARG NGINX_VERSION=1.14.0
+ARG NGINX_OPENTRACING_VERSION=0.4.0
+
+RUN apt-get update && \
+  apt-get install -y git gnupg lsb-release wget curl tar cmake openjdk-8-jre golang jq
 
 # Install nginx
-# Note: Installs nginx from source. In production environments you would want to install nginx from
-# the official repos, and use the packaged binary of the OpenTracing module. The CI version of this
-# integration test does exactly that. Here we just build from source since it's a bit more terse.
-ADD http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz nginx-${NGINX_VERSION}.tar.gz
-RUN tar zxvf nginx-${NGINX_VERSION}.tar.gz
-WORKDIR nginx-${NGINX_VERSION}
-RUN ./configure \
-  --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/opentracing \
-  --add-dynamic-module=../nginx-opentracing-${NGINX_OPENTRACING_VERSION}/datadog
-RUN make
-RUN make install
-WORKDIR ../
+RUN CODENAME=$(lsb_release -s -c) && \
+  wget http://nginx.org/keys/nginx_signing.key && \
+  apt-key add nginx_signing.key && \
+  echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
+  echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
+  apt-get update && \
+  apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
 
-RUN ldconfig
+# Install OpenTracing
+ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.4.0/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+RUN NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p') && \
+  tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C ${NGINX_MODULES}
+# And Datadog OT
+COPY --from=build /usr/local/lib/libdd_opentracing_plugin.so /usr/local/lib/libdd_opentracing_plugin.so
 
 # Add OpenTracing directives to nginx config
-COPY ./test/integration/nginx/nginx.conf /usr/local/nginx/conf/nginx.conf
+COPY ./test/integration/nginx/nginx.conf /tmp/nginx.conf
+RUN NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p') && \
+  mv /tmp/nginx.conf ${NGINX_CONF}
+COPY ./test/integration/nginx/dd-config.json /etc/dd-config.json
+RUN mkdir -p /var/www/
+COPY ./test/integration/nginx/index.html /var/www/index.html
 
 # Get Wiremock
 ADD http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar wiremock-standalone-2.18.0.jar
