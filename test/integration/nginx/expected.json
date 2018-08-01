@@ -6,41 +6,12 @@
         "_sample_rate": "1.000000",
         "component": "nginx",
         "http.method": "GET",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/"
       },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
-        "http.status_code": "200",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/index.html",
-      "resource": "/index.html",
+      "name": "GET /index.html",
+      "resource": "GET /index.html",
       "service": "nginx",
       "type": "web"
     }
@@ -52,41 +23,12 @@
         "_sample_rate": "1.000000",
         "component": "nginx",
         "http.method": "GET",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/"
       },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
-        "http.status_code": "200",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/index.html",
-      "resource": "/index.html",
+      "name": "GET /index.html",
+      "resource": "GET /index.html",
       "service": "nginx",
       "type": "web"
     }
@@ -98,41 +40,12 @@
         "_sample_rate": "1.000000",
         "component": "nginx",
         "http.method": "GET",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/"
       },
-      "name": "/",
-      "resource": "/",
-      "service": "nginx",
-      "type": "web"
-    },
-    {
-      "error": 0,
-      "meta": {
-        "_sample_rate": "1.000000",
-        "component": "nginx",
-        "http.method": "GET",
-        "http.status_code": "200",
-        "http.status_line": "",
-        "http.url": "http://localhost/"
-      },
-      "name": "/index.html",
-      "resource": "/index.html",
+      "name": "GET /index.html",
+      "resource": "GET /index.html",
       "service": "nginx",
       "type": "web"
     }

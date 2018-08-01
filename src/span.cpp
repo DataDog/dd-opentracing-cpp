@@ -1,6 +1,7 @@
 #include "span.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <regex>
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -12,6 +13,7 @@ namespace {
 const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
+const std::string http_url_tag = "http.url";
 }  // namespace
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
@@ -66,6 +68,25 @@ Span::~Span() {
   }
 }
 
+namespace {
+// Matches path segments with numbers (except things that look like versions).
+// Similar to, but not the same as,
+// https://github.com/datadog/dd-trace-java/blob/master/dd-trace-ot/src/main/java/datadog/opentracing/decorators/URLAsResourceName.java#L14-L16
+std::regex PATH_MIXED_ALPHANUMERICS{
+    "(\\/)(?:(?:([[:alpha:]]*)(?:\\?[^\\/]*))|(?:(?![vV]\\d{1,2}\\/)[^\\/\\d\\?]*[\\d]+[^\\/]*))"};
+}  // namespace
+
+// Imperfectly audits the data in a Span, removing some things that could cause information leaks
+// or cardinality issues.
+// If you want to add any more steps to this function, we should use a more
+// sophisticated architecture. For now, YAGNI.
+void audit(SpanData *span) {
+  auto http_tag = span->meta.find(http_url_tag);
+  if (http_tag != span->meta.end()) {
+    http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS, "$1$2?");
+  }
+}
+
 void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept try {
   if (is_finished_.exchange(true)) {
     return;
@@ -75,6 +96,7 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   auto end_time = get_time_();
   span_->duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
+  audit(span_.get());
   buffer_->finishSpan(std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
