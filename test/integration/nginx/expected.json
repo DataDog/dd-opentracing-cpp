@@ -8,10 +8,11 @@
         "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
-        "http.url": "http://localhost/"
+        "http.url": "http://localhost/",
+        "operation": "GET /index.html"
       },
-      "name": "GET /index.html",
-      "resource": "GET /index.html",
+      "name": "nginx.handle",
+      "resource": "nginx.handle",
       "service": "nginx",
       "type": "web"
     }
@@ -25,10 +26,11 @@
         "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
-        "http.url": "http://localhost/"
+        "http.url": "http://localhost/",
+        "operation": "GET /index.html"
       },
-      "name": "GET /index.html",
-      "resource": "GET /index.html",
+      "name": "nginx.handle",
+      "resource": "nginx.handle",
       "service": "nginx",
       "type": "web"
     }
@@ -42,10 +44,11 @@
         "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "",
-        "http.url": "http://localhost/"
+        "http.url": "http://localhost/",
+        "operation": "GET /index.html"
       },
-      "name": "GET /index.html",
-      "resource": "GET /index.html",
+      "name": "nginx.handle",
+      "resource": "nginx.handle",
       "service": "nginx",
       "type": "web"
     }

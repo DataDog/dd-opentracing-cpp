@@ -52,10 +52,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   }
 
   if (sampler_.sample(span_context)) {
-    auto span = std::unique_ptr<ot::Span>{new Span{shared_from_this(), buffer_, get_time_, span_id,
-                                                   trace_id, parent_id, std::move(span_context),
-                                                   get_time_(), opts_.service, opts_.type,
-                                                   operation_name, operation_name}};
+    auto span = std::unique_ptr<ot::Span>{
+        new Span{shared_from_this(), buffer_, get_time_, span_id, trace_id, parent_id,
+                 std::move(span_context), get_time_(), opts_.service, opts_.type, operation_name,
+                 operation_name, opts_.operation_name_override}};
     sampler_.tag(span);
     return std::move(span);
   } else {

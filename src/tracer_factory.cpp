@@ -16,6 +16,8 @@ namespace opentracing {
 // "agent_port": A number, defaults to 8126.
 // "type": A string, defaults to web.
 // "sample_rate": A double, defaults to 1.0.
+// "operation_name_override": A string, if not empty it overrides the operation name (and the
+//     overridden operation name is recorded in the tag "operation").
 // Extra keys will be ignored.
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
@@ -47,6 +49,9 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     }
     if (config.find("sample_rate") != config.end()) {
       options.sample_rate = config["sample_rate"];
+    }
+    if (config.find("operation_name_override") != config.end()) {
+      options.operation_name_override = config["operation_name_override"];
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";

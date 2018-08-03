@@ -32,6 +32,7 @@ TEST_CASE("span") {
               "",
               "",
               "",
+              "",
               ""};
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
@@ -55,6 +56,7 @@ TEST_CASE("span") {
               "",
               "",
               "",
+              "",
               ""};
     REQUIRE(buffer->traces.size() == 1);
     REQUIRE(buffer->traces.find(100) != buffer->traces.end());
@@ -72,6 +74,7 @@ TEST_CASE("span") {
               0,
               std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
+              "",
               "",
               "",
               "",
@@ -122,6 +125,7 @@ TEST_CASE("span") {
                 "",
                 "",
                 "",
+                "",
                 ""};
       span.SetTag("http.url", test_case.first);
       const ot::FinishSpanOptions finish_options;
@@ -142,6 +146,7 @@ TEST_CASE("span") {
               0,
               std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
+              "",
               "",
               "",
               "",
@@ -167,6 +172,7 @@ TEST_CASE("span") {
               0,
               std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
+              "",
               "",
               "",
               "",
@@ -220,7 +226,8 @@ TEST_CASE("span") {
               "original service",
               "original type",
               "original span name",
-              "original resource"};
+              "original resource",
+              ""};
     span.SetTag("span.type", "new type");
     span.SetTag("resource.name", "new resource");
     span.SetTag("service.name", "new service");
@@ -239,6 +246,34 @@ TEST_CASE("span") {
     REQUIRE(result->type == "new type");
   }
 
+  SECTION("operation name can be overridden") {
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              "overridden operation name"};
+
+    const ot::FinishSpanOptions finish_options;
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->meta ==
+            std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
+    REQUIRE(result->name == "overridden operation name");
+    REQUIRE(result->resource == "overridden operation name");
+    REQUIRE(result->service == "original service");
+    REQUIRE(result->type == "original type");
+  }
+
   SECTION("OpenTracing operation name works") {
     auto span_id = get_id();
     Span span{nullptr,
@@ -252,7 +287,8 @@ TEST_CASE("span") {
               "original service",
               "original type",
               "original span name",
-              "original resource"};
+              "original resource",
+              ""};
     span.SetOperationName("operation name");
 
     SECTION("sets resource and span name") {

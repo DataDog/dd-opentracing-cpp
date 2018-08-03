@@ -27,6 +27,9 @@ struct TracerOptions {
   // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
   // than 10s, so that is the upper bound.
   int64_t write_period_ms = 1000;
+  // If not empty, the given string overrides the operation name (and the overridden operation name
+  // is recorded in the tag "operation").
+  std::string operation_name_override = "";
 };
 
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
