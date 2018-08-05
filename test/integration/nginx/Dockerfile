@@ -4,7 +4,7 @@ FROM ubuntu:18.04 as build
 # Runs a simple integration test.
 
 RUN apt-get update && \
-  apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake
+  apt-get install -y git build-essential wget curl tar cmake
 
 WORKDIR ~/
 
@@ -32,7 +32,7 @@ ARG NGINX_VERSION=1.14.0
 ARG NGINX_OPENTRACING_VERSION=0.4.0
 
 RUN apt-get update && \
-  apt-get install -y git gnupg lsb-release wget curl tar cmake openjdk-8-jre golang jq
+  apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq
 
 # Install nginx
 RUN CODENAME=$(lsb_release -s -c) && \
@@ -44,7 +44,7 @@ RUN CODENAME=$(lsb_release -s -c) && \
   apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
 
 # Install OpenTracing
-ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.4.0/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_OPENTRACING_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
 RUN NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p') && \
   tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C ${NGINX_MODULES}
 # And Datadog OT
