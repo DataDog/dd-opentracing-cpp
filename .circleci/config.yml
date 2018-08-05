@@ -8,7 +8,7 @@ source_dependency_versions: &source_dependency_versions
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_ubuntu_18.04_0_2_1
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_0
 
 jobs:
   build:
@@ -82,7 +82,9 @@ jobs:
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
 
   integration_test_nginx:
-    <<: *defaults
+    working_directory: ~/dd-opentracing-cpp
+    docker:
+      - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_0
     environment:
       NGINX_OPENTRACING_VERSION: 0.4.0
       NGINX_VERSION: 1.14.0
