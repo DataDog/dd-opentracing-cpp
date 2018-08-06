@@ -65,7 +65,7 @@ class Span : public ot::Span {
   Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
        TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
        SpanContext context, TimePoint start_time, std::string span_service, std::string span_type,
-       std::string span_name, ot::string_view resource);
+       std::string span_name, std::string resource, std::string operation_name_override);
 
   Span() = delete;
   ~Span() override;
@@ -100,6 +100,7 @@ class Span : public ot::Span {
   TimeProvider get_time_;
   SpanContext context_;
   TimePoint start_time_;
+  std::string operation_name_override_;
 
   // Set in constructor initializer, depends on previous constructor initializer-set members:
   std::unique_ptr<SpanData> span_;

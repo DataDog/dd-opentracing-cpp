@@ -14,6 +14,7 @@ const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
+const std::string operation_name_tag = "operation";
 }  // namespace
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
@@ -48,12 +49,14 @@ std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new 
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
            TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
            SpanContext context, TimePoint start_time, std::string span_service,
-           std::string span_type, std::string span_name, ot::string_view resource)
+           std::string span_type, std::string span_name, std::string resource,
+           std::string operation_name_override)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       context_(std::move(context)),
       start_time_(start_time),
+      operation_name_override_(operation_name_override),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -96,6 +99,13 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   auto end_time = get_time_();
   span_->duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
+  // Override operation name if needed.
+  if (operation_name_override_ != "") {
+    span_->meta[operation_name_tag] = span_->name;
+    span_->name = operation_name_override_;
+    span_->resource = operation_name_override_;
+  }
+  // Audit and finish span.
   audit(span_.get());
   buffer_->finishSpan(std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case

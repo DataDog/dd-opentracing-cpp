@@ -8,16 +8,16 @@ RUN apt-get update && \
 
 WORKDIR ~/
 
-COPY ./3rd_party ./dd-opentracing-cpp/3rd_party
-COPY ./include ./dd-opentracing-cpp/include
 COPY ./scripts ./dd-opentracing-cpp/scripts
-COPY ./src ./dd-opentracing-cpp/src
-COPY ./CMakeLists.txt ./dd-opentracing-cpp/CMakeLists.txt
 RUN export OPENTRACING_VERSION=1.4.0 && \
   export MSGPACK_VERSION=3.0.1 && \
   export CURL_VERSION=7.60.0 && \
   cd dd-opentracing-cpp && \
   ./scripts/install_dependencies.sh
+COPY ./3rd_party ./dd-opentracing-cpp/3rd_party
+COPY ./include ./dd-opentracing-cpp/include
+COPY ./src ./dd-opentracing-cpp/src
+COPY ./CMakeLists.txt ./dd-opentracing-cpp/CMakeLists.txt
 RUN rm -rf dd-opentracing-cpp/.build
 RUN mkdir -p dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
