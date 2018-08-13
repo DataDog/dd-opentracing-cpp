@@ -12,7 +12,7 @@
         "operation": "GET /index.html"
       },
       "name": "nginx.handle",
-      "resource": "nginx.handle",
+      "resource": "/",
       "service": "nginx",
       "type": "web"
     }
@@ -30,7 +30,7 @@
         "operation": "GET /index.html"
       },
       "name": "nginx.handle",
-      "resource": "nginx.handle",
+      "resource": "/",
       "service": "nginx",
       "type": "web"
     }
@@ -48,7 +48,7 @@
         "operation": "GET /index.html"
       },
       "name": "nginx.handle",
-      "resource": "nginx.handle",
+      "resource": "/",
       "service": "nginx",
       "type": "web"
     }
