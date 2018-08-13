@@ -262,7 +262,6 @@ TEST_CASE("span") {
               "original resource",
               "overridden operation name"};
 
-    span.SetTag("resource.name", "new resource");
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
@@ -270,7 +269,7 @@ TEST_CASE("span") {
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
-    REQUIRE(result->resource == "new resource");
+    REQUIRE(result->resource == "overridden operation name");
     REQUIRE(result->service == "original service");
     REQUIRE(result->type == "original type");
   }
@@ -291,6 +290,7 @@ TEST_CASE("span") {
               "original resource",
               "overridden operation name"};
 
+    span.SetTag("resource.name", "new resource");
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
@@ -298,7 +298,7 @@ TEST_CASE("span") {
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
-    REQUIRE(result->resource == "overridden operation name");
+    REQUIRE(result->resource == "new resource");
     REQUIRE(result->service == "original service");
     REQUIRE(result->type == "original type");
   }
