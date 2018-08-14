@@ -1,12 +1,10 @@
-#include "writer.h"
+#include "agent_writer.h"
 #include <iostream>
 #include "publisher.h"
 #include "version_number.h"
 
 namespace datadog {
 namespace opentracing {
-
-Writer::Writer() : trace_publisher_(std::make_shared<AgentHttpPublisher>()) {}
 
 namespace {
 const std::string agent_protocol = "http://";
@@ -170,8 +168,6 @@ bool AgentWriter::postTraces(std::unique_ptr<Handle> &handle,
   // Drop spans, but live to fight another day.
   return true;  // Don't attempt to retry.
 }
-
-void ExternalWriter::write(Trace trace) { trace_publisher_->addTrace(std::move(trace)); }
 
 }  // namespace opentracing
 }  // namespace datadog

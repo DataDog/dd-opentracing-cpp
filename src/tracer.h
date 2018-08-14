@@ -27,15 +27,13 @@ uint64_t getId();
 
 class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:
-  // Creates a Tracer by copying the given options.
-  Tracer(TracerOptions options);
-
   // Creates a Tracer by copying the given options and injecting the given dependencies.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id, SampleProvider sample);
 
-  // Creates a Tracer using the preconfigured writer, usually for publishing
-  // trace data using external HTTP clients.
+  // Creates a Tracer by copying the given options and using the preconfigured writer.
+  // The writer is either an AgentWriter that publishes directly to the Datadog Agent, or
+  // an ExternalWriter that requires an external HTTP client to publish to the Datadog Agent.
   Tracer(TracerOptions options, std::shared_ptr<Writer> &writer);
 
   Tracer() = delete;

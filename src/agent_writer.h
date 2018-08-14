@@ -1,5 +1,5 @@
-#ifndef DD_OPENTRACING_WRITER_H
-#define DD_OPENTRACING_WRITER_H
+#ifndef DD_OPENTRACING_AGENT_WRITER_H
+#define DD_OPENTRACING_AGENT_WRITER_H
 
 #include <curl/curl.h>
 #include <condition_variable>
@@ -16,20 +16,6 @@ namespace opentracing {
 
 class SpanData;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
-
-// A Writer is used to submit completed traces to the Datadog agent.
-class Writer {
- public:
-  Writer();
-
-  virtual ~Writer() {}
-
-  // Writes the given Trace.
-  virtual void write(Trace trace) = 0;
-
- protected:
-  std::shared_ptr<AgentHttpPublisher> trace_publisher_;
-};
 
 // A Writer that sends Traces (collections of Spans) to a Datadog agent.
 class AgentWriter : public Writer {
@@ -90,20 +76,7 @@ class AgentWriter : public Writer {
   bool flush_worker_ = false;
 };
 
-// A writer that collects trace data but uses an external mechanism to transmit the data
-// to the Datadog Agent.
-class ExternalWriter : public Writer {
- public:
-  ExternalWriter() {}
-  ~ExternalWriter() {}
-
-  // Implements Writer methods.
-  void write(Trace trace) override;
-
-  std::shared_ptr<TracePublisher> publisher() { return trace_publisher_; }
-};
-
 }  // namespace opentracing
 }  // namespace datadog
 
-#endif  // DD_OPENTRACING_WRITER_H
+#endif  // DD_OPENTRACING_AGENT_WRITER_H

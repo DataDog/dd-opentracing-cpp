@@ -1,5 +1,5 @@
-#include "../src/writer.h"
-#include "../src/writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
+#include "../src/agent_writer.h"
+#include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
 #include "mocks.h"
 #include "version_number.h"
 

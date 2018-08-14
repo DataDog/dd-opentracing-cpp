@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include "agent_writer.h"
 #include "tracer.h"
 
 using json = nlohmann::json;
@@ -56,7 +57,11 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     error_message = "configuration has an argument with an incorrect type";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
-  return std::shared_ptr<ot::Tracer>{new TracerImpl{options}};
+  auto writer = std::shared_ptr<Writer>{
+      new AgentWriter(options.agent_host, options.agent_port,
+                      std::chrono::milliseconds(llabs(options.write_period_ms)))};
+
+  return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer}};
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
