@@ -51,8 +51,8 @@ class TracePublisher {
 };
 
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
-std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options,
-                                       std::shared_ptr<TracePublisher> &publisher);
+std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TracePublisher>> makeTracerAndPublisher(
+    const TracerOptions &options);
 
 }  // namespace opentracing
 }  // namespace datadog

@@ -34,8 +34,9 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id, SampleProvider sample);
 
-  // Creates a Tracer that exposes data for an external HTTP client to publish
-  Tracer(TracerOptions options, std::shared_ptr<TracePublisher> &publisher);
+  // Creates a Tracer using the preconfigured writer, usually for publishing
+  // trace data using external HTTP clients.
+  Tracer(TracerOptions options, std::shared_ptr<Writer> &writer);
 
   Tracer() = delete;
 

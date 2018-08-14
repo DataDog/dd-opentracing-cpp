@@ -11,8 +11,9 @@ TEST_CASE("tracer") {
     REQUIRE(tracer);
   }
   SECTION("can be created with external Writer implementation") {
-    std::shared_ptr<TracePublisher> publisher;
-    auto tracer = makeTracer(TracerOptions{}, publisher);
+    auto tp = makeTracerAndPublisher(TracerOptions{});
+    auto tracer = std::get<0>(tp);
+    auto publisher = std::get<1>(tp);
     REQUIRE(tracer);
     REQUIRE(publisher);
   }
