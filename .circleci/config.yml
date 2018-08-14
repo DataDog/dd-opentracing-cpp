@@ -86,7 +86,7 @@ jobs:
     docker:
       - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_0
     environment:
-      NGINX_OPENTRACING_VERSION: 0.4.0
+      NGINX_OPENTRACING_VERSION: 0.6.0
       NGINX_VERSION: 1.14.0
     steps:
       - checkout

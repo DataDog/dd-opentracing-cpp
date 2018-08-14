@@ -1,64 +1,35 @@
 # Builds and runs a simple nginx server, traced by Datadog
-FROM ubuntu
+FROM ubuntu:18.04
 
-RUN apt-get update
-RUN apt-get install -y git build-essential libpcre3-dev zlib1g-dev libcurl4-openssl-dev wget curl tar cmake
+ARG NGINX_VERSION=1.14.0
+ARG NGINX_OPENTRACING_VERSION=0.6.0
+ARG DATADOG_PLUGIN_VERSION=0.2.1
 
-# Install opentracing dependency
-RUN wget -O opentracing-cpp.tar.gz https://github.com/opentracing/opentracing-cpp/archive/v1.3.0.tar.gz
-RUN tar zxvf opentracing-cpp.tar.gz
-RUN mkdir opentracing-cpp-1.3.0/.build
-WORKDIR opentracing-cpp-1.3.0/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
+RUN apt-get update && \
+    apt-get install -y git gnupg wget tar
 
-# Install msgpack dependency
-RUN wget https://github.com/msgpack/msgpack-c/releases/download/cpp-2.1.5/msgpack-2.1.5.tar.gz
-RUN tar zxvf msgpack-2.1.5.tar.gz
-RUN mkdir msgpack-2.1.5/.build
-WORKDIR msgpack-2.1.5/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
+# Install nginx
+RUN wget https://nginx.org/keys/nginx_signing.key && \
+    apt-key add nginx_signing.key && \
+    echo deb https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list && \
+    echo deb-src https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install nginx=${NGINX_VERSION}-1~bionic
+# Configure nginx.
+COPY ./examples/nginx-tracing/nginx.conf /etc/nginx/nginx.conf
+COPY ./examples/nginx-tracing/dd-config.json /etc/dd-config.json
+RUN mkdir -p /var/www/
+COPY ./examples/nginx-tracing/index.html /var/www/index.html
 
-# Compile dd-opentracing-cpp
-ADD ./ ./dd-opentracing-cpp/
-RUN rm -rf dd-opentracing-cpp/.build 
-RUN mkdir dd-opentracing-cpp/.build
-WORKDIR dd-opentracing-cpp/.build
-RUN cmake -DBUILD_TESTING=ON ..
-RUN make
-RUN make install
-# Warning: Sanitizers (tsan, usan, asan) are not run on these tests, see the CircleCI
-# config.yml for an example of running tests with those checks.
-RUN ctest --output-on-failure
-WORKDIR ../..
+# Install OpenTracing
+ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_OPENTRACING_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+RUN tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
+# And Datadog OT
+ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/libdd_opentracing_plugin.so.gz libdd_opentracing_plugin.so.gz
+RUN gunzip libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 
-# Fetch and patch the nginx-opentracing module
-RUN wget -O nginx-opentracing.tar.gz https://github.com/opentracing-contrib/nginx-opentracing/archive/v0.2.1.tar.gz
-RUN tar zxvf nginx-opentracing.tar.gz
-WORKDIR nginx-opentracing-0.2.1
-RUN patch -p1 < ../dd-opentracing-cpp/nginx-opentracing-datadog.patch
-WORKDIR ..
-
-# Build nginx
-RUN wget http://nginx.org/download/nginx-1.13.10.tar.gz
-RUN tar zxvf nginx-1.13.10.tar.gz
-WORKDIR nginx-1.13.10
-RUN ./configure \
-    --add-dynamic-module=../nginx-opentracing-0.2.1/opentracing \
-    --add-dynamic-module=../nginx-opentracing-0.2.1/datadog
-RUN make
-RUN make install
-WORKDIR ..
-
-RUN ldconfig
-
-ADD ./examples/nginx-tracing/nginx.conf /usr/local/nginx/conf/nginx.conf
-RUN /usr/local/nginx/sbin/nginx -t
+# Test nginx config.
+RUN nginx -t
 
 EXPOSE 80
-CMD [ "/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
+CMD [ "nginx", "-g", "daemon off;"]
