@@ -11,7 +11,6 @@ namespace opentracing {
 
 // Accepts configuration in JSON format, with the following keys:
 // "service": Required. A string, the name of the service.
-// "span_name": Required. A string, the name of the spans.
 // "agent_host": A string, defaults to localhost.
 // "agent_port": A number, defaults to 8126.
 // "type": A string, defaults to web.
