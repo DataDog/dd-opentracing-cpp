@@ -29,7 +29,7 @@ RUN make install
 FROM ubuntu:18.04
 
 ARG NGINX_VERSION=1.14.0
-ARG NGINX_OPENTRACING_VERSION=0.4.0
+ARG NGINX_OPENTRACING_VERSION=0.6.0
 
 RUN apt-get update && \
   apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq

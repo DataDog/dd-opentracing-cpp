@@ -105,6 +105,23 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
     span_->name = operation_name_override_;
     span_->resource = operation_name_override_;
   }
+  // Apply special tags.
+  // If we add any more cases; then abstract this. For now, KISS.
+  auto tag = span_->meta.find(datadog_span_type_tag);
+  if (tag != span_->meta.end()) {
+    span_->type = tag->second;
+    span_->meta.erase(tag);
+  }
+  tag = span_->meta.find(datadog_resource_name_tag);
+  if (tag != span_->meta.end()) {
+    span_->resource = tag->second;
+    span_->meta.erase(tag);
+  }
+  tag = span_->meta.find(datadog_service_name_tag);
+  if (tag != span_->meta.end()) {
+    span_->service = tag->second;
+    span_->meta.erase(tag);
+  }
   // Audit and finish span.
   audit(span_.get());
   buffer_->finishSpan(std::move(span_));
@@ -236,15 +253,7 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   apply_visitor(VariantVisitor{result}, value);
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
-    if (key == datadog_span_type_tag) {
-      span_->type = result;
-    } else if (key == datadog_resource_name_tag) {
-      span_->resource = result;
-    } else if (key == datadog_service_name_tag) {
-      span_->service = result;
-    } else {
-      span_->meta[key] = result;
-    }
+    span_->meta[key] = result;
   }
 }
 
