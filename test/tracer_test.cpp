@@ -44,4 +44,32 @@ TEST_CASE("tracer") {
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
   }
+
+  SECTION("span context is propagated") {
+    MockTextMapCarrier carrier;
+    SpanContext context{420, 69, {{"ayy", "lmao"}, {"hi", "haha"}}};
+    auto success = tracer->Inject(context, carrier);
+    REQUIRE(success);
+    auto span_context_maybe = tracer->Extract(carrier);
+    REQUIRE(span_context_maybe);
+    auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
+    const ot::FinishSpanOptions finish_options;
+    span->FinishWithOptions(finish_options);
+    auto& result = buffer->traces[69].finished_spans->at(0);
+    REQUIRE(result->span_id == 100);
+    REQUIRE(result->trace_id == 69);
+    REQUIRE(result->parent_id == 420);
+  }
+
+  SECTION("empty span context starts new root span") {
+    MockTextMapCarrier carrier;
+    auto span_context_maybe = tracer->Extract(carrier);
+    auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
+    const ot::FinishSpanOptions finish_options;
+    span->FinishWithOptions(finish_options);
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->span_id == 100);
+    REQUIRE(result->trace_id == 100);
+    REQUIRE(result->parent_id == 0);
+  }
 }

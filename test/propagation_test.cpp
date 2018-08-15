@@ -10,40 +10,6 @@ namespace ot = opentracing;
 
 using dict = std::unordered_map<std::string, std::string>;
 
-// A Mock TextMapReader and TextMapWriter.
-// Not in mocks.h since we only need it here for now.
-struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
-  MockTextMapCarrier() {}
-
-  ot::expected<void> Set(ot::string_view key, ot::string_view value) const override {
-    if (set_fails_after == 0) {
-      return ot::make_unexpected(std::error_code(6, ot::propagation_error_category()));
-    } else if (set_fails_after > 0) {
-      set_fails_after--;
-    }
-    text_map[key] = value;
-    return {};
-  }
-
-  ot::expected<ot::string_view> LookupKey(ot::string_view key) const override {
-    return ot::make_unexpected(ot::lookup_key_not_supported_error);
-  }
-
-  ot::expected<void> ForeachKey(
-      std::function<ot::expected<void>(ot::string_view key, ot::string_view value)> f)
-      const override {
-    for (const auto& key_value : text_map) {
-      auto result = f(key_value.first, key_value.second);
-      if (!result) return result;
-    }
-    return {};
-  }
-
-  mutable dict text_map;
-  // Count-down to method failing. Negative means no failures.
-  mutable int set_fails_after = -1;
-};
-
 dict getBaggage(SpanContext* ctx) {
   dict baggage;
   ctx->ForeachBaggageItem([&baggage](const std::string& key, const std::string& value) -> bool {

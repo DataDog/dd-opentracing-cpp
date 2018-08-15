@@ -102,3 +102,24 @@ then
 fi
 
 kill_nginx
+# TEST 3: Check that creating a root span doesn't produce an error
+NGINX_ERROR_LOG=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--error-log-path=\([^ ]*\).*/\1/p')
+echo "" > ${NGINX_ERROR_LOG}
+run_nginx
+curl -s localhost?[1-5] 1> /dev/null
+
+if [ "$(cat ${NGINX_ERROR_LOG} | grep 'failed to extract an opentracing span context' | wc -l)" != "0" ]
+then
+  echo "Extraction errors in nginx log file:"
+  cat ${NGINX_ERROR_LOG}
+  echo ""
+  exit 1
+elif [ "$(cat ${NGINX_ERROR_LOG})" != "" ]
+then
+  echo "Other errors in nginx log file:"
+  cat ${NGINX_ERROR_LOG}
+  echo ""
+  exit 1
+fi
+
+kill_nginx
