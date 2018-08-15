@@ -120,14 +120,29 @@ jobs:
             # Run the tests.
             ./nginx_integration_test.sh
 
+_workflow_filters:
+  _version_tag: &version_tag
+    # Allows semver or "test" tags, with any suffix.
+    # eg v1.2.3 v0.1.1 v1.2.3-ayy-lmao test test-ayy-lmao
+    # "test" is useful if you want to ensure all workflows run without creating a version.
+    only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*+/
+
+  _run_on_release_tag: &run_on_release_tag
+    filters:
+      tags:
+        <<: *version_tag
 
 workflows:
   version: 2
   build_test_deploy:
     jobs:
-      - build
-      - test_tsan
-      - test_asan
+      - build:
+          <<: *run_on_release_tag
+      - test_tsan:
+          <<: *run_on_release_tag
+      - test_asan:
+          <<: *run_on_release_tag
       - integration_test_nginx:
+          <<: *run_on_release_tag
           requires:
             - build
