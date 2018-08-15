@@ -274,6 +274,35 @@ TEST_CASE("span") {
     REQUIRE(result->type == "original type");
   }
 
+  SECTION("special resource tag has priority over operation name override") {
+    auto span_id = get_id();
+    Span span{nullptr,
+              std::shared_ptr<SpanBuffer>{buffer},
+              get_time,
+              span_id,
+              span_id,
+              0,
+              std::move(SpanContext{span_id, span_id, {}}),
+              get_time(),
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              "overridden operation name"};
+
+    span.SetTag("resource.name", "new resource");
+    const ot::FinishSpanOptions finish_options;
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(result->meta ==
+            std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
+    REQUIRE(result->name == "overridden operation name");
+    REQUIRE(result->resource == "new resource");
+    REQUIRE(result->service == "original service");
+    REQUIRE(result->type == "original type");
+  }
+
   SECTION("OpenTracing operation name works") {
     auto span_id = get_id();
     Span span{nullptr,

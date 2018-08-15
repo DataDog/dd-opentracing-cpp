@@ -42,7 +42,7 @@ cd curl-${CURL_VERSION}
             --disable-crypto-auth \
             --without-axtls \
             --disable-rtsp \
-            --enable-shared=yes \
+            --enable-shared=no \
             --enable-static=yes \
             --with-pic
 make && make install
