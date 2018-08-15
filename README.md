@@ -5,12 +5,10 @@
 **Notice: This project is still in beta, under active development. Features and compatibility may change.**
 
 * [Usage](#usage)
-   * [Tracing nginx](#nginx)
-      * [Quick start/Example](#example)
+   * [Tracing nginx](#tracing-nginx)
+      * [Quick start/Example](#quick-start-with-docker-example)
       * [Guide](#guide)
 * [Development](#building)
-
-<a name="usage"/>
 
 ## Usage
 
@@ -18,13 +16,9 @@
 
 Support coming soon.
 
-<a name="nginx"/>
-
 ### Tracing Nginx
 
 Nginx can be traced using the nginx-opentracing module along with this library.
-
-<a name="example"/>
 
 #### Quick-start with Docker example
 
@@ -33,8 +27,6 @@ Nginx can be traced using the nginx-opentracing module along with this library.
 3. `docker-compose up --build`
 4. Visit http://localhost:8080
 5. Observe traces in Datadog APM under service name "nginx".
-
-<a name="guide"/>
 
 #### Guide
 
@@ -126,8 +118,6 @@ You also need to provide a JSON-formatted text config file that sets options for
 ### Tracing Envoy & Istio
 
 Coming soon!
-
-<a name="building"/>
 
 ## Building
 
