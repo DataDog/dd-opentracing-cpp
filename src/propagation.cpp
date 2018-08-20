@@ -139,10 +139,14 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
         }
         return {};
       });
-  if (!result) {  // "if unexpected", hence "{}" from above is fine.
+  if (!result) {  // "if unexpected", hence "return {}" from above is fine.
     return ot::make_unexpected(result.error());
   }
+  if (!trace_id_set && !parent_id_set) {
+    return {};  // Empty context/no context provided.
+  }
   if (!trace_id_set || !parent_id_set) {
+    // Partial context, this shouldn't happen.
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
   return std::move(
