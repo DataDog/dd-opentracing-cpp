@@ -27,18 +27,6 @@ do
   shift
 done
 
-# Msgpack
-if [ "$BUILD_MSGPACK" -eq "1" ]; then
-  wget https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz -O msgpack.tar.gz
-  tar zxvf msgpack.tar.gz
-  mkdir msgpack-${MSGPACK_VERSION}/.build
-  cd msgpack-${MSGPACK_VERSION}/.build
-  cmake ..
-  make
-  make install
-  cd ../..
-fi
-
 # OpenTracing
 if [ "$BUILD_OPENTRACING" -eq "1" ]; then
   wget https://github.com/opentracing/opentracing-cpp/archive/v${OPENTRACING_VERSION}.tar.gz -O opentracing-cpp.tar.gz
@@ -51,6 +39,18 @@ if [ "$BUILD_OPENTRACING" -eq "1" ]; then
         -DBUILD_TESTING=OFF \
         -DBUILD_MOCKTRACER=OFF \
         ..
+  make
+  make install
+  cd ../..
+fi
+
+# Msgpack
+if [ "$BUILD_MSGPACK" -eq "1" ]; then
+  wget https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz -O msgpack.tar.gz
+  tar zxvf msgpack.tar.gz
+  mkdir msgpack-${MSGPACK_VERSION}/.build
+  cd msgpack-${MSGPACK_VERSION}/.build
+  cmake ..
   make
   make install
   cd ../..
