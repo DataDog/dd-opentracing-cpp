@@ -7,6 +7,7 @@
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
+#include "writer.h"
 
 #include <functional>
 #include <random>
@@ -16,8 +17,6 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-class Writer;
-class SpanData;
 class SpanBuffer;
 
 // The interface for providing IDs to spans and traces.

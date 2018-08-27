@@ -14,9 +14,6 @@
 namespace datadog {
 namespace opentracing {
 
-class SpanData;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
-
 // A Writer that sends Traces (collections of Spans) to a Datadog agent.
 class AgentWriter : public Writer {
  public:

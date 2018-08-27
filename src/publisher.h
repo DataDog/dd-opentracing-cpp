@@ -8,7 +8,7 @@
 namespace datadog {
 namespace opentracing {
 
-class SpanData;
+struct SpanData;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 class AgentHttpPublisher : public TracePublisher {

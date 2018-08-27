@@ -20,7 +20,7 @@ class NoopSpan : public ot::Span {
            uint64_t parent_id, SpanContext context, const ot::StartSpanOptions &options);
   NoopSpan() = delete;
   NoopSpan(NoopSpan &&other);
-  ~NoopSpan() = default;
+  ~NoopSpan() override = default;
 
   void FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept override;
   void SetOperationName(ot::string_view name) noexcept override;
