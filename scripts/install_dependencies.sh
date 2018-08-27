@@ -1,13 +1,16 @@
 #!/bin/bash
 set -eo pipefail
 
+OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.4.0}
+CURL_VERSION=${CURL_VERSION:-7.60.0}
+MSGPACK_VERSION=${MSGPACK_VERSION:-3.0.1}
+
+# Allow specifying dependencies not to install. By default we want to compile
+# our own versions, but under some circumstances (eg building opentracing-nginx
+# docker images) some of these dependencies are already provided.
 BUILD_OPENTRACING=1
 BUILD_CURL=1
 BUILD_MSGPACK=1
-
-OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.4.0}
-CURL_VERSION=${CURL_VERSION:-7.60}
-MSGPACK_VERSION=${MSGPACK_VERSION:-3.0.1}
 
 while test $# -gt 0
 do
@@ -18,7 +21,7 @@ do
       ;;
     not-curl) BUILD_CURL=0
       ;;
-    *) echo "unknown dependency: $1"
+    *) echo "unknown dependency: $1" && exit 1
       ;;
   esac
   shift
