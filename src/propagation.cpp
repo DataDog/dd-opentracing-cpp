@@ -149,8 +149,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     // Partial context, this shouldn't happen.
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
-  return std::unique_ptr<ot::SpanContext>{
-      new SpanContext{parent_id, trace_id, std::move(baggage)}};
+  return std::unique_ptr<ot::SpanContext>(
+      std::make_unique<SpanContext>(parent_id, trace_id, std::move(baggage)));
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
