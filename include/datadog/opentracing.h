@@ -46,11 +46,19 @@ class TracePublisher {
   virtual const std::string path() = 0;
   virtual std::size_t pendingTraces() = 0;
   virtual void clearTraces() = 0;
+  // Returns the HTTP headers that are required for the collection of traces.
   virtual const std::map<std::string, std::string> headers() = 0;
+  // Returns the encoded payload from the collection of traces.
   virtual const std::string payload() = 0;
 };
 
+// makeTracer returns an opentracing::Tracer that submits traces to the Datadog Agent.
+// This should be used when control over the HTTP requests to the Datadog Agent is not required.
 std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
+// makeTracerAndPublisher initializes an opentracing::Tracer and provides a publisher
+// to use when submitting traces to the Datadog Agent.
+// This should be used in applications that need to also control the HTTP requests to the Datadog
+// Agent.
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TracePublisher>> makeTracerAndPublisher(
     const TracerOptions &options);
 

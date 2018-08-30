@@ -1,3 +1,10 @@
+// Implementation of the exposed makeTracerAndPublisher function.
+// This is intentionally kept separate from the makeTracer function, which has additional
+// dependencies. It allows the library to be used with an external HTTP implementation for sending
+// traces to the Datadog Agent.
+//
+// See BAZEL.build for the files required to build this library using makeTracerAndPublisher.
+
 #include <datadog/opentracing.h>
 #include "tracer.h"
 #include "writer.h"

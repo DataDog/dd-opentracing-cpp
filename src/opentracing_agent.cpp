@@ -1,3 +1,8 @@
+// Implementation of the exposed makeTracer function.
+// This is kept separately to isolate the AgentWriter and its cURL dependency.
+// Users of the library that do not use this tracer are able to avoid the
+// additional dependency and implementation details.
+
 #include <datadog/opentracing.h>
 #include "agent_writer.h"
 #include "tracer.h"
