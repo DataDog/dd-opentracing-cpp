@@ -1,14 +1,14 @@
 #include "writer.h"
 #include <iostream>
-#include "publisher.h"
+#include "encoder.h"
 #include "version_number.h"
 
 namespace datadog {
 namespace opentracing {
 
-Writer::Writer() : trace_publisher_(std::make_shared<AgentHttpPublisher>()) {}
+Writer::Writer() : trace_encoder_(std::make_shared<AgentHttpEncoder>()) {}
 
-void ExternalWriter::write(Trace trace) { trace_publisher_->addTrace(std::move(trace)); }
+void ExternalWriter::write(Trace trace) { trace_encoder_->addTrace(std::move(trace)); }
 
 }  // namespace opentracing
 }  // namespace datadog

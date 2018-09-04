@@ -3,7 +3,7 @@
 
 #include <datadog/opentracing.h>
 #include "clock.h"
-#include "publisher.h"
+#include "encoder.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
@@ -31,8 +31,9 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
          IdProvider get_id, SampleProvider sample);
 
   // Creates a Tracer by copying the given options and using the preconfigured writer.
-  // The writer is either an AgentWriter that publishes directly to the Datadog Agent, or
-  // an ExternalWriter that requires an external HTTP client to publish to the Datadog Agent.
+  // The writer is either an AgentWriter that sends trace data directly to the Datadog Agent, or
+  // an ExternalWriter that requires an external HTTP client to encode and submit to the Datadog
+  // Agent.
   Tracer(TracerOptions options, std::shared_ptr<Writer> &writer);
 
   Tracer() = delete;

@@ -7,7 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
-#include "publisher.h"
+#include "encoder.h"
 #include "span.h"
 #include "transport.h"
 

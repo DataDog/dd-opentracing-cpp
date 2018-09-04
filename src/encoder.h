@@ -1,5 +1,5 @@
-#ifndef DD_OPENTRACING_PUBLISHER_H
-#define DD_OPENTRACING_PUBLISHER_H
+#ifndef DD_OPENTRACING_ENCODER_H
+#define DD_OPENTRACING_ENCODER_H
 
 #include <datadog/opentracing.h>
 
@@ -11,10 +11,10 @@ namespace opentracing {
 struct SpanData;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
-class AgentHttpPublisher : public TracePublisher {
+class AgentHttpEncoder : public TraceEncoder {
  public:
-  AgentHttpPublisher();
-  ~AgentHttpPublisher() override {}
+  AgentHttpEncoder();
+  ~AgentHttpEncoder() override {}
 
   // Returns the path that is used to submit HTTP requests to the agent.
   const std::string path() override;
@@ -36,4 +36,4 @@ class AgentHttpPublisher : public TracePublisher {
 }  // namespace opentracing
 }  // namespace datadog
 
-#endif  // DD_OPENTRACING_PUBLISHER_H
+#endif  // DD_OPENTRACING_ENCODER_H

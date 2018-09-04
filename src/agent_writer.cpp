@@ -1,6 +1,6 @@
 #include "agent_writer.h"
 #include <iostream>
-#include "publisher.h"
+#include "encoder.h"
 #include "version_number.h"
 
 namespace datadog {
@@ -37,7 +37,7 @@ void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
-  agent_uri << agent_protocol << host << ":" << std::to_string(port) << trace_publisher_->path();
+  agent_uri << agent_protocol << host << ":" << std::to_string(port) << trace_encoder_->path();
   auto rcode = handle->setopt(CURLOPT_URL, agent_uri.str().c_str());
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent URL: ") + curl_easy_strerror(rcode));
@@ -68,10 +68,10 @@ void AgentWriter::write(Trace trace) {
   if (stop_writing_) {
     return;
   }
-  if (trace_publisher_->pendingTraces() >= max_queued_traces_) {
+  if (trace_encoder_->pendingTraces() >= max_queued_traces_) {
     return;
   }
-  trace_publisher_->addTrace(std::move(trace));
+  trace_encoder_->addTrace(std::move(trace));
 };
 
 void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
@@ -92,13 +92,13 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
             if (stop_writing_) {
               return;  // Stop the thread.
             }
-            num_traces = trace_publisher_->pendingTraces();
+            num_traces = trace_encoder_->pendingTraces();
             if (num_traces == 0) {
               continue;
             }
-            headers = trace_publisher_->headers();
-            payload = trace_publisher_->payload();
-            trace_publisher_->clearTraces();
+            headers = trace_encoder_->headers();
+            payload = trace_encoder_->payload();
+            trace_encoder_->clearTraces();
           }  // lock on mutex_ ends.
           // Send spans, not in critical period.
           retryFiniteOnFail([&]() { return AgentWriter::postTraces(handle, headers, payload); });

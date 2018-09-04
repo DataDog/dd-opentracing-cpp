@@ -7,7 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
-#include "publisher.h"
+#include "encoder.h"
 #include "span.h"
 #include "transport.h"
 
@@ -25,7 +25,7 @@ class Writer {
   virtual void write(Trace trace) = 0;
 
  protected:
-  std::shared_ptr<AgentHttpPublisher> trace_publisher_;
+  std::shared_ptr<AgentHttpEncoder> trace_encoder_;
 };
 
 // A writer that collects trace data but uses an external mechanism to transmit the data
@@ -38,7 +38,7 @@ class ExternalWriter : public Writer {
   // Implements Writer methods.
   void write(Trace trace) override;
 
-  std::shared_ptr<TracePublisher> publisher() { return trace_publisher_; }
+  std::shared_ptr<TraceEncoder> encoder() { return trace_encoder_; }
 };
 
 }  // namespace opentracing

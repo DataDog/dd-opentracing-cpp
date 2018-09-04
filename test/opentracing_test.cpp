@@ -11,10 +11,10 @@ TEST_CASE("tracer") {
     REQUIRE(tracer);
   }
   SECTION("can be created with external Writer implementation") {
-    auto tp = makeTracerAndPublisher(TracerOptions{});
+    auto tp = makeTracerAndEncoder(TracerOptions{});
     auto tracer = std::get<0>(tp);
-    auto publisher = std::get<1>(tp);
+    auto encoder = std::get<1>(tp);
     REQUIRE(tracer);
-    REQUIRE(publisher);
+    REQUIRE(encoder);
   }
 }
