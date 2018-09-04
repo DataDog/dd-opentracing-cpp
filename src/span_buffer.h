@@ -10,9 +10,7 @@
 namespace datadog {
 namespace opentracing {
 
-class SpanData;
 class Writer;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 struct PendingTrace {
   PendingTrace()

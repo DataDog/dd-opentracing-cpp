@@ -12,7 +12,7 @@ using namespace datadog::opentracing;
 struct MockTracer : public ot::Tracer {
   TracerOptions opts;
 
-  MockTracer(TracerOptions opts_) : opts(opts_) {}
+  MockTracer(TracerOptions opts_, std::shared_ptr<Writer> &writer) : opts(opts_) {}
 
   std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view operation_name,
                                                  const ot::StartSpanOptions &options) const
