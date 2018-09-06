@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 
 ARG NGINX_VERSION=1.14.0
 ARG NGINX_OPENTRACING_VERSION=0.6.0
-ARG DATADOG_PLUGIN_VERSION=0.2.1
+ARG DATADOG_PLUGIN_VERSION=0.2.3
 
 RUN apt-get update && \
     apt-get install -y git gnupg wget tar
@@ -25,8 +25,8 @@ COPY ./examples/nginx-tracing/index.html /var/www/index.html
 ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_OPENTRACING_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
 RUN tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 # And Datadog OT
-ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/libdd_opentracing_plugin.so.gz libdd_opentracing_plugin.so.gz
-RUN gunzip libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
+ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
+RUN gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 
 # Test nginx config.
 RUN nginx -t
