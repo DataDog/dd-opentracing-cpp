@@ -1,5 +1,7 @@
 #include <datadog/opentracing.h>
+#include <pthread.h>
 #include <cstdlib>
+#include <random>
 
 #include "noopspan.h"
 #include "span.h"
@@ -10,10 +12,31 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+// Wrapper for a seeded random number generator that works with forking.
+//
+// See https://stackoverflow.com/q/51882689/4447365 and
+//     https://github.com/opentracing-contrib/nginx-opentracing/issues/52
+namespace {
+class TlsRandomNumberGenerator {
+ public:
+  TlsRandomNumberGenerator() { pthread_atfork(nullptr, nullptr, onFork); }
+
+  static std::mt19937_64 &generator() { return random_number_generator_; }
+
+ private:
+  static thread_local std::mt19937_64 random_number_generator_;
+
+  static void onFork() { random_number_generator_.seed(std::random_device{}()); }
+};
+}  // namespace
+
+thread_local std::mt19937_64 TlsRandomNumberGenerator::random_number_generator_{
+    std::random_device{}()};
+
 uint64_t getId() {
-  static thread_local std::mt19937_64 source{std::random_device{}()};
+  static TlsRandomNumberGenerator rng;
   static thread_local std::uniform_int_distribution<uint64_t> distribution;
-  return distribution(source);
+  return distribution(TlsRandomNumberGenerator::generator());
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
