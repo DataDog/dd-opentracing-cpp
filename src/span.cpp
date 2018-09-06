@@ -38,7 +38,7 @@ uint64_t SpanData::spanId() const { return span_id; }
 
 std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
                                        ot::string_view resource, std::string name,
-                                       uint64_t trace_id, int64_t span_id, uint64_t parent_id,
+                                       uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
                                        int64_t start) {
   return std::unique_ptr<SpanData>{
       new SpanData(type, service, resource, name, trace_id, span_id, parent_id, start, 0, 0)};

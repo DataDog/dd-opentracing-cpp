@@ -12,10 +12,7 @@ namespace opentracing {
 
 class Tracer;
 class SpanBuffer;
-class SpanData;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
-
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 // Contains data that describes a Span.
 struct SpanData {
@@ -23,7 +20,7 @@ struct SpanData {
 
   friend std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
                                                 ot::string_view resource, std::string name,
-                                                uint64_t trace_id, int64_t span_id,
+                                                uint64_t trace_id, uint64_t span_id,
                                                 uint64_t parent_id, int64_t start);
 
   friend std::unique_ptr<SpanData> stubSpanData();
@@ -55,8 +52,10 @@ struct SpanData {
   uint64_t spanId() const;
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
-                     parent_id, error);
+                     parent_id, error)
 };
+
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {

@@ -1,6 +1,7 @@
-#include "../src/writer.h"
-#include "../src/writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
+#include "../src/agent_writer.h"
+#include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
 #include "mocks.h"
+#include "version_number.h"
 
 #include <ctime>
 
@@ -26,7 +27,6 @@ TEST_CASE("writer") {
   size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
   AgentWriter writer{std::move(handle_ptr),
-                     "v0.1.0",
                      only_send_traces_when_we_flush,
                      max_queued_traces,
                      disable_retry,
@@ -37,10 +37,6 @@ TEST_CASE("writer") {
     REQUIRE(handle->options ==
             std::unordered_map<CURLoption, std::string, EnumClassHash>{
                 {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
-    REQUIRE(handle->headers ==
-            std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
-                                               {"Datadog-Meta-Lang", "cpp"},
-                                               {"Datadog-Meta-Tracer-Version", "v0.1.0"}});
   }
 
   SECTION("traces can be sent") {
@@ -69,11 +65,11 @@ TEST_CASE("writer") {
                                    {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
                                    {CURLOPT_TIMEOUT_MS, "2000"},
                                    {CURLOPT_POSTFIELDSIZE, "126"}});
-    REQUIRE(handle->headers ==
-            std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
-                                               {"Datadog-Meta-Lang", "cpp"},
-                                               {"Datadog-Meta-Tracer-Version", "v0.1.0"},
-                                               {"X-Datadog-Trace-Count", "1"}});
+    REQUIRE(handle->headers == std::map<std::string, std::string>{
+                                   {"Content-Type", "application/msgpack"},
+                                   {"Datadog-Meta-Lang", "cpp"},
+                                   {"Datadog-Meta-Tracer-Version", config::tracer_version},
+                                   {"X-Datadog-Trace-Count", "1"}});
   }
 
   SECTION("queue does not grow indefinitely") {
@@ -89,7 +85,7 @@ TEST_CASE("writer") {
   SECTION("bad handle causes constructor to fail") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
-    REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), "v0.1.0", only_send_traces_when_we_flush,
+    REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
                                max_queued_traces, disable_retry, "hostname", 6319});
   }
 
@@ -184,13 +180,8 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
     auto write_interval = std::chrono::seconds(2);
-    AgentWriter writer{std::move(handle_ptr),
-                       "v0.1.0",
-                       write_interval,
-                       max_queued_traces,
-                       disable_retry,
-                       "hostname",
-                       6319};
+    AgentWriter writer{std::move(handle_ptr), write_interval, max_queued_traces,
+                       disable_retry,         "hostname",     6319};
     // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
     // different writes. We don't count the number of writes because that could flake, but we do
     // check that all 7 traces are written, implicitly testing that multiple writes happen.
@@ -223,7 +214,6 @@ TEST_CASE("writer") {
     std::vector<std::chrono::milliseconds> retry_periods{std::chrono::milliseconds(500),
                                                          std::chrono::milliseconds(2500)};
     AgentWriter writer{std::move(handle_ptr),
-                       "v0.1.0",
                        only_send_traces_when_we_flush,
                        max_queued_traces,
                        retry_periods,
@@ -262,11 +252,11 @@ TEST_CASE("writer") {
       writer.write(make_trace(
           {TestSpanData{"web", "service", "resource", "service.name", 3, 1, 1, 69, 420, 0}}));
       writer.flush();
-      REQUIRE(handle->headers ==
-              std::map<std::string, std::string>{{"Content-Type", "application/msgpack"},
-                                                 {"Datadog-Meta-Lang", "cpp"},
-                                                 {"Datadog-Meta-Tracer-Version", "v0.1.0"},
-                                                 {"X-Datadog-Trace-Count", "3"}});
+      REQUIRE(handle->headers == std::map<std::string, std::string>{
+                                     {"Content-Type", "application/msgpack"},
+                                     {"Datadog-Meta-Lang", "cpp"},
+                                     {"Datadog-Meta-Tracer-Version", config::tracer_version},
+                                     {"X-Datadog-Trace-Count", "3"}});
     }
   }
 }

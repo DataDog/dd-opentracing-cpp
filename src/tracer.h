@@ -3,6 +3,7 @@
 
 #include <datadog/opentracing.h>
 #include "clock.h"
+#include "encoder.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
@@ -16,8 +17,6 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-class Writer;
-class SpanData;
 class SpanBuffer;
 
 // The interface for providing IDs to spans and traces.
@@ -27,12 +26,15 @@ uint64_t getId();
 
 class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:
-  // Creates a Tracer by copying the given options.
-  Tracer(TracerOptions options);
-
   // Creates a Tracer by copying the given options and injecting the given dependencies.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id, SampleProvider sample);
+
+  // Creates a Tracer by copying the given options and using the preconfigured writer.
+  // The writer is either an AgentWriter that sends trace data directly to the Datadog Agent, or
+  // an ExternalWriter that requires an external HTTP client to encode and submit to the Datadog
+  // Agent.
+  Tracer(TracerOptions options, std::shared_ptr<Writer> &writer);
 
   Tracer() = delete;
 

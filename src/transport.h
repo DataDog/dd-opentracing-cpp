@@ -11,8 +11,8 @@ namespace opentracing {
 // An interface to a CURL handle. This interface exists to make testing Recorder easier.
 class Handle {
  public:
-  Handle(){};
-  virtual ~Handle(){};
+  Handle() {}
+  virtual ~Handle() {}
   virtual CURLcode setopt(CURLoption key, const char* value) = 0;
   virtual CURLcode setopt(CURLoption key, long value) = 0;
   virtual void setHeaders(std::map<std::string, std::string> headers) = 0;

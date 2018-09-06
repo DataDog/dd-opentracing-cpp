@@ -16,13 +16,6 @@ uint64_t getId() {
   return distribution(source);
 }
 
-Tracer::Tracer(TracerOptions options)
-    : Tracer(options,
-             std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{std::make_shared<AgentWriter>(
-                 options.agent_host, options.agent_port,
-                 std::chrono::milliseconds(llabs(options.write_period_ms)))}},
-             getRealTime, getId, ConstantRateSampler(options.sample_rate)) {}
-
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id, SampleProvider sampler)
     : opts_(options),
@@ -30,6 +23,14 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimePr
       get_time_(get_time),
       get_id_(get_id),
       sampler_(sampler) {}
+
+Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer)
+    : opts_(options),
+      get_time_(getRealTime),
+      get_id_(getId),
+      sampler_(ConstantRateSampler(options.sample_rate)) {
+  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{writer}};
+}
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
@@ -57,10 +58,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
                  std::move(span_context), get_time_(), opts_.service, opts_.type, operation_name,
                  operation_name, opts_.operation_name_override}};
     sampler_.tag(span);
-    return std::move(span);
+    return span;
   } else {
-    return std::move(std::unique_ptr<ot::Span>{new NoopSpan{
-        shared_from_this(), span_id, trace_id, parent_id, std::move(span_context), options}});
+    return std::unique_ptr<ot::Span>{new NoopSpan{shared_from_this(), span_id, trace_id, parent_id,
+                                                  std::move(span_context), options}};
   }
 } catch (const std::bad_alloc &) {
   // At least don't crash.
