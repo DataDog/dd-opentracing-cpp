@@ -1,10 +1,5 @@
 version: 2
 
-source_dependency_versions: &source_dependency_versions
-  MSGPACK_VERSION: 3.0.1
-  OPENTRACING_VERSION: 1.4.0
-  CURL_VERSION: 7.60.0
-
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
@@ -14,7 +9,6 @@ jobs:
   build:
     <<: *defaults
     environment:
-      <<: *source_dependency_versions
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_SHARED=OFF
     steps:
       - checkout
@@ -72,13 +66,11 @@ jobs:
   test_tsan:
     <<: *test_sanitizer_base
     environment:
-      <<: *source_dependency_versions
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
-      <<: *source_dependency_versions
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
 
   integration_test_nginx:
