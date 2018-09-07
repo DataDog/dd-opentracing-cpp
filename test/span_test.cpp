@@ -96,6 +96,8 @@ TEST_CASE("span") {
         {"/search?", "/search?"},
         {"/search?id=100&private=true", "/search?"},
         {"/search?id=100&private=true?", "/search?"},
+        {"http://i-012a3b45c6d78901e//api/v1/check_run?api_key=0abcdef1a23b4c5d67ef8a90b1cde234",
+         "http://?//api/v1/check_run?"},
         // Should replace all digits
         {"/1", "/?"},
         {"/9999", "/?"},
