@@ -7,6 +7,7 @@
 #include <map>
 #include <sstream>
 #include <unordered_map>
+#include "../src/transport.h"
 #include "../src/writer.h"
 
 namespace datadog {

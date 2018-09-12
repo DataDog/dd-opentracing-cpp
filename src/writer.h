@@ -1,7 +1,6 @@
 #ifndef DD_OPENTRACING_WRITER_H
 #define DD_OPENTRACING_WRITER_H
 
-#include <curl/curl.h>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -9,7 +8,6 @@
 #include <thread>
 #include "encoder.h"
 #include "span.h"
-#include "transport.h"
 
 namespace datadog {
 namespace opentracing {
