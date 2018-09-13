@@ -5,26 +5,6 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
-# Command to run nginx
-if which nginx >/dev/null
-then # Running in CI (with nginx from repo)
-  service nginx stop
-  NGINX='nginx'
-else # Running locally/in Dockerfile (with source-compiled nginx)
-  NGINX='/usr/local/nginx/sbin/nginx'
-fi
-function run_nginx() {
-  eval "$NGINX -g \"daemon off;\" 1>/tmp/nginx_log.txt &"
-  NGINX_PID=$!
-  sleep 3 # Wait for nginx to start
-}
-function kill_nginx() {
-  kill $NGINX_PID
-  wait $NGINX_PID
-}
-
-# TEST 1: Ensure the right traces sent to the agent.
-
 # Get msgpack command-line interface
 go get github.com/jakm/msgpack-cli
 
@@ -35,9 +15,54 @@ then
   printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 fi
+
+NGINX_CONF_PATH=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
+NGINX_CONF=$(cat ${NGINX_CONF_PATH})
+TRACER_CONF_PATH=/etc/dd-config.json
+TRACER_CONF=$(cat ${TRACER_CONF_PATH})
+
+function run_nginx() {
+  eval "nginx -g \"daemon off;\" 1>/tmp/nginx_log.txt &"
+  NGINX_PID=$!
+  sleep 3 # Wait for nginx to start
+}
+
+function reset_test() {
+  kill $NGINX_PID
+  wait $NGINX_PID
+  pkill -x java # Kill wiremock
+  echo ${NGINX_CONF} > ${NGINX_CONF_PATH}
+  echo ${TRACER_CONF} > ${TRACER_CONF_PATH}
+  echo "" > /tmp/curl_log.txt
+  echo "" > /tmp/nginx_log.txt
+}
+
+function get_n_traces() {
+  # Read out the traces sent to the agent.
+  NUM_TRACES_EXPECTED=${1:0}
+  I=0
+  echo "" > ~/got.json
+  while ((I++ < 15)) && [[ $(jq 'length' ~/got.json) != "${NUM_TRACES_EXPECTED}" ]]
+  do
+    sleep 1
+    echo "" > ~/requests.json
+    REQUESTS=$(curl -s http://localhost:8126/__admin/requests)
+    echo "${REQUESTS}" | jq -r '.requests[].request.bodyAsBase64' | while read line; 
+    do 
+      echo $line | base64 -d > ~/requests.bin; /root/go/bin/msgpack-cli decode ~/requests.bin | jq . >> ~/requests.json;
+    done;
+    # Merge 1 or more agent requests back into a single list of traces.
+    jq -s 'add' ~/requests.json > ~/got.json
+  done
+
+  # Strip out data that changes (randomly generated ids, times, durations)
+  STRIP_QUERY='del(.[] | .[] | .start, .duration, .span_id, .trace_id, .parent_id) | del(.[] | .[] | .meta | ."http_user_agent", ."peer.address", ."nginx.worker_pid", ."http.host")'
+  cat ~/got.json | jq -rS "${STRIP_QUERY}"
+}
+
+# TEST 1: Ensure the right traces sent to the agent.
 # Start wiremock in background
-wiremock --port 8126 &
-WIREMOCK_PID=$!
+wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
 sleep 5 
 # Set wiremock to respond to trace requests
@@ -50,27 +75,7 @@ curl -s localhost 1> /tmp/curl_log.txt
 curl -s localhost 1> /tmp/curl_log.txt
 curl -s localhost 1> /tmp/curl_log.txt
 
-# Read out the traces sent to the agent.
-I=0
-touch ~/got.json
-while ((I++ < 15)) && [[ $(jq 'length' ~/got.json) != "3" ]]
-do
-  sleep 1
-  echo "" > ~/requests.json
-  REQUESTS=$(curl -s http://localhost:8126/__admin/requests)
-  echo "${REQUESTS}" | jq -r '.requests[].request.bodyAsBase64' | while read line; 
-  do 
-    echo $line | base64 -d > ~/requests.bin; /root/go/bin/msgpack-cli decode ~/requests.bin | jq . >> ~/requests.json;
-  done;
-  # Merge 1 or more agent requests back into a single list of traces.
-  jq -s 'add' ~/requests.json > ~/got.json
-done
-
-# Compare what we got (got.json) to what we expect (expected.json).
-
-# Do a comparison that strips out data that changes (randomly generated ids, times, durations)
-STRIP_QUERY='del(.[] | .[] | .start, .duration, .span_id, .trace_id, .parent_id) | del(.[] | .[] | .meta | ."http_user_agent", ."peer.address", ."nginx.worker_pid", ."http.host")'
-GOT=$(cat ~/got.json | jq -rS "${STRIP_QUERY}")
+GOT=$(get_n_traces 3)
 EXPECTED=$(cat expected.json | jq -rS "${STRIP_QUERY}")
 DIFF=$(diff <(echo "$GOT") <(echo "$EXPECTED"))
 
@@ -86,12 +91,10 @@ then
   exit 1
 fi
 
-kill_nginx
-pkill -P $WIREMOCK_PID
+reset_test
 # TEST 2: Check that libcurl isn't writing to stdout
-rm /tmp/nginx_log.txt
 run_nginx
-curl -s localhost?[1-10000] 1> /dev/null
+curl -s localhost?[1-10000] 1> /tmp/curl_log.txt
 
 if [ "$(cat /tmp/nginx_log.txt)" != "" ]
 then
@@ -101,12 +104,12 @@ then
   exit 1
 fi
 
-kill_nginx
+reset_test
 # TEST 3: Check that creating a root span doesn't produce an error
 NGINX_ERROR_LOG=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--error-log-path=\([^ ]*\).*/\1/p')
 echo "" > ${NGINX_ERROR_LOG}
 run_nginx
-curl -s localhost?[1-5] 1> /dev/null
+curl -s localhost?[1-5] 1> /tmp/curl_log.txt
 
 if [ "$(cat ${NGINX_ERROR_LOG} | grep 'failed to extract an opentracing span context' | wc -l)" != "0" ]
 then
@@ -122,4 +125,34 @@ then
   exit 1
 fi
 
-kill_nginx
+reset_test
+# Test 4: Check that priority sampling works.
+wiremock --port 8126 >/dev/null 2>&1 & sleep 5
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "{\"rate_by_service\":{\"service:nginx,env:prod\":0.5, \"service:nginx,env:\":0.2, \"service:wrong,env:\":0.1, \"service:nginx,env:wrong\":0.9}}" }}' http://localhost:8126/__admin/mappings/new
+echo '{
+  "service": "nginx",
+  "operation_name_override": "nginx.handle",
+  "agent_host": "localhost",
+  "agent_port": 8126,
+  "dd.priority.sampling": true,
+  "environment": "prod"
+}' > ${TRACER_CONF_PATH}
+
+run_nginx
+
+# Let the tracer make a first request with spans to the agent, this will allow the agent to return
+# the priority sampling config.
+curl -s localhost 1> /tmp/curl_log.txt
+
+get_n_traces 1 >/dev/null
+curl -X POST -s http://localhost:8126/__admin/requests/reset
+
+curl -s localhost?[1-1000] 1> /tmp/curl_log.txt
+
+GOT=$(get_n_traces 1000)
+RATE=$(echo $GOT | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
+if [ $(echo $RATE | jq '(. > 0.45) and (. < 0.55)') != "true" ]
+then
+  echo "Test 4 failed: Sample rate should be ~0.5 but was $RATE"
+  exit 1
+fi

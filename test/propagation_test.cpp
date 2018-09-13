@@ -21,7 +21,7 @@ dict getBaggage(SpanContext* ctx) {
 
 TEST_CASE("SpanContext") {
   MockTextMapCarrier carrier{};
-  SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{420, 123, nullptr, {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier));

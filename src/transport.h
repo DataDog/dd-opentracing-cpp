@@ -3,6 +3,7 @@
 
 #include <curl/curl.h>
 #include <map>
+#include <sstream>
 #include <string>
 
 namespace datadog {
@@ -18,9 +19,10 @@ class Handle {
   virtual void setHeaders(std::map<std::string, std::string> headers) = 0;
   virtual CURLcode perform() = 0;
   virtual std::string getError() = 0;
+  virtual std::string getResponse() = 0;
 };
 
-// A Handle that uses real curl to really send things.
+// A Handle that uses real curl to really send things. Not thread-safe.
 class CurlHandle : public Handle {
  public:
   // May throw runtime_error.
@@ -31,6 +33,7 @@ class CurlHandle : public Handle {
   void setHeaders(std::map<std::string, std::string> headers) override;
   CURLcode perform() override;
   std::string getError() override;
+  std::string getResponse() override;
 
  private:
   // For things that need cleaning up if the constructor fails as well as on destruction.
@@ -41,6 +44,10 @@ class CurlHandle : public Handle {
   // easier, and the number of headers is so low that the log(n) insert doesn't matter.
   std::map<std::string, std::string> headers_;
   char curl_error_buffer_[CURL_ERROR_SIZE];
+  std::stringstream response_buffer_;  // So much more humane than a fixed sized buffer.
+
+  // Called with the response from perform().
+  friend size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata);
 };
 
 }  // namespace opentracing

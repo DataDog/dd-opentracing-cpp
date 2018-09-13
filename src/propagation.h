@@ -2,7 +2,6 @@
 #define DD_OPENTRACING_PROPAGATION_H
 
 #include <opentracing/tracer.h>
-
 #include <mutex>
 #include <unordered_map>
 
@@ -11,9 +10,21 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+enum class SamplingPriority : int {
+  UserDrop = -1,
+  SamplerDrop = 0,
+  SamplerKeep = 1,
+  UserKeep = 2,
+};
+
+// Move to std::optional in C++17 when it has better compiler support.
+using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
+
+OptionalSamplingPriority asSamplingPriority(int i);
+
 class SpanContext : public ot::SpanContext {
  public:
-  SpanContext(uint64_t id, uint64_t trace_id,
+  SpanContext(uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
               std::unordered_map<std::string, std::string> &&baggage);
 
   SpanContext(SpanContext &&other);
@@ -37,10 +48,13 @@ class SpanContext : public ot::SpanContext {
 
   uint64_t id() const;
   uint64_t trace_id() const;
+  OptionalSamplingPriority getSamplingPriority() const;
+  void setSamplingPriority(OptionalSamplingPriority p);
 
  private:
   uint64_t id_;
   uint64_t trace_id_;
+  OptionalSamplingPriority sampling_priority_;
   std::unordered_map<std::string, std::string> baggage_;
   mutable std::mutex mutex_;
 };

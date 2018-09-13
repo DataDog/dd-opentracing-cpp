@@ -1,6 +1,7 @@
 #include "span_buffer.h"
-
 #include <iostream>
+#include "span.h"
+#include "writer.h"
 
 namespace datadog {
 namespace opentracing {

@@ -4,7 +4,6 @@
 #include <random>
 
 #include "noopspan.h"
-#include "span.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -40,18 +39,16 @@ uint64_t getId() {
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id, SampleProvider sampler)
+               IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
     : opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
       sampler_(sampler) {}
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer)
-    : opts_(options),
-      get_time_(getRealTime),
-      get_id_(getId),
-      sampler_(ConstantRateSampler(options.sample_rate)) {
+Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
+               std::shared_ptr<SampleProvider> sampler)
+    : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
   buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{writer}};
 }
 
@@ -61,7 +58,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   // Get a new span id.
   auto span_id = get_id_();
 
-  auto span_context = SpanContext{span_id, span_id, {}};
+  auto span_context = SpanContext{span_id, span_id, nullptr /* No sampling_priority */, {}};
   auto trace_id = span_id;
   auto parent_id = uint64_t{0};
 
@@ -75,17 +72,21 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
-  if (sampler_.sample(span_context)) {
-    auto span = std::unique_ptr<ot::Span>{
-        new Span{shared_from_this(), buffer_, get_time_, span_id, trace_id, parent_id,
-                 std::move(span_context), get_time_(), opts_.service, opts_.type, operation_name,
-                 operation_name, opts_.operation_name_override}};
-    sampler_.tag(span);
-    return span;
-  } else {
+  // Check early if we need to discard. Check at span Finish if we need to sample (since users can
+  // set this).
+  if (sampler_->discard(span_context)) {
     return std::unique_ptr<ot::Span>{new NoopSpan{shared_from_this(), span_id, trace_id, parent_id,
                                                   std::move(span_context), options}};
   }
+  std::unique_ptr<ot::Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_,
+                                          span_id, trace_id, parent_id, std::move(span_context),
+                                          get_time_(), opts_.service, opts_.type, operation_name,
+                                          operation_name, opts_.operation_name_override}};
+  bool is_trace_root = parent_id == 0;
+  if (is_trace_root && opts_.environment != "") {
+    span->SetTag(environment_tag, opts_.environment);
+  }
+  return span;
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;

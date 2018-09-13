@@ -1,5 +1,6 @@
 #include "../src/sample.h"
 #include "../src/span.h"
+#include "../src/tracer.h"
 #include "mocks.h"
 
 #include <ctime>
@@ -20,8 +21,9 @@ TEST_CASE("sample") {
   const ot::StartSpanOptions span_options;
 
   SECTION("keep all traces") {
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
-                                              get_time, get_id, KeepAllSampler()}};
+    std::shared_ptr<Tracer> tracer{
+        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+                   std::shared_ptr<SampleProvider>{new KeepAllSampler()}}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_kept", span_options);
     const ot::FinishSpanOptions finish_options;
@@ -38,8 +40,9 @@ TEST_CASE("sample") {
   }
 
   SECTION("discard all tracer") {
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
-                                              get_time, get_id, DiscardAllSampler()}};
+    std::shared_ptr<Tracer> tracer{
+        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+                   std::shared_ptr<SampleProvider>{new DiscardAllSampler()}}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
     const ot::FinishSpanOptions finish_options;
@@ -48,13 +51,14 @@ TEST_CASE("sample") {
     REQUIRE(buffer->traces.size() == 0);
   }
 
-  SECTION("constant rate sampler") {
-    double rate = 0.25;
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer},
-                                              get_time, get_id, ConstantRateSampler(rate)}};
+  SECTION("discard rate sampler") {
+    double rate = 0.75;
+    std::shared_ptr<Tracer> tracer{
+        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
 
     for (int i = 0; i < 100; i++) {
-      auto span = tracer->StartSpanWithOptions("/constant_rate_sample", span_options);
+      auto span = tracer->StartSpanWithOptions("/discard_rate_sample", span_options);
       const ot::FinishSpanOptions finish_options;
       span->FinishWithOptions(finish_options);
     }
@@ -62,20 +66,14 @@ TEST_CASE("sample") {
     auto size = buffer->traces.size();
     // allow for a tiny bit of variance. double brackets because of macro
     REQUIRE((size >= 24 && size <= 26));
-    auto rate_string = std::to_string(rate);
-    std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
-      auto &span = trace_iter.second.finished_spans->at(0);
-      REQUIRE(span->name == "/constant_rate_sample");
-      REQUIRE(span->meta["_sample_rate"] == rate_string);
-    });
   }
 
-  SECTION("constant rate sampler applied to child spans within same trace") {
-    double rate = 1.0;
-    std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
-                                                  std::shared_ptr<SpanBuffer>{buffer}, get_time,
-                                                  get_id, ConstantRateSampler(rate)}};
-    auto ot_root_span = tracer->StartSpan("/constant_rate_sample");
+  SECTION("discard rate sampler applied to child spans within same trace") {
+    double rate = 0;
+    std::shared_ptr<ot::Tracer> tracer{
+        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
+    auto ot_root_span = tracer->StartSpan("/discard_rate_sample");
     uint64_t trace_id = (dynamic_cast<const Span *>(ot_root_span.get()))->traceId();
     auto ot_child_span =
         tracer->StartSpan("/child_span", {opentracing::ChildOf(&ot_root_span->context())});
@@ -95,30 +93,5 @@ TEST_CASE("sample") {
     REQUIRE(root_span->traceId() == child_span->traceId());
     // The span id should be different.
     REQUIRE(root_span->spanId() != child_span->spanId());
-  }
-
-  SECTION("constant rate sampler applied to child spans from upstream") {
-    double rate = 0.25;
-    std::shared_ptr<ot::Tracer> tracer{new Tracer{tracer_options,
-                                                  std::shared_ptr<SpanBuffer>{buffer}, get_time,
-                                                  get_id, ConstantRateSampler(rate)}};
-    for (int i = 0; i < 100; i++) {
-      // Each trace requires a unique span context (trace id) to represent an extracted context
-      // from upstream.
-      SpanContext span_context{uint64_t(100 + i), uint64_t(200 + i), {}};
-      auto span = tracer->StartSpan("/child_span", {opentracing::ChildOf(&span_context)});
-      const ot::FinishSpanOptions finish_options;
-      span->FinishWithOptions(finish_options);
-    }
-
-    auto size = buffer->traces.size();
-    // allow for a tiny bit of variance. double brackets because of macro
-    REQUIRE((size >= 24 && size <= 26));
-    auto rate_string = std::to_string(rate);
-    std::for_each(buffer->traces.begin(), buffer->traces.end(), [&](auto &trace_iter) {
-      auto &span = trace_iter.second.finished_spans->at(0);
-      REQUIRE(span->name == "/child_span");
-      REQUIRE(span->meta["_sample_rate"] == rate_string);
-    });
   }
 }

@@ -1,6 +1,5 @@
-#include <stdexcept>
-
 #include "version_check.h"
+#include <stdexcept>
 
 namespace datadog {
 namespace opentracing {

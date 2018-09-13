@@ -7,6 +7,9 @@
 #include <map>
 #include <sstream>
 #include <unordered_map>
+#include "../src/span.h"
+#include "../src/span_buffer.h"
+#include "../src/transport.h"
 #include "../src/writer.h"
 
 namespace datadog {
@@ -54,7 +57,7 @@ struct MockBuffer : public SpanBuffer {
 
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter() {}
+  MockWriter(std::shared_ptr<SampleProvider> sampler) : Writer(sampler) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {
@@ -142,6 +145,11 @@ struct MockHandle : public Handle {
     return error;
   }
 
+  std::string getResponse() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    return response;
+  }
+
   // Note, this returns any traces that have been added to the request - NOT traces that have been
   // successfully posted.
   std::unique_ptr<std::vector<std::vector<TestSpanData>>> getTraces() {
@@ -161,6 +169,7 @@ struct MockHandle : public Handle {
   std::unordered_map<CURLoption, std::string, EnumClassHash> options;
   std::map<std::string, std::string> headers;
   std::string error = "";
+  std::string response = "";
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
   // Each time an perform is called, the next perform_result is used to determine if it

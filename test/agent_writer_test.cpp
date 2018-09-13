@@ -31,12 +31,13 @@ TEST_CASE("writer") {
                      max_queued_traces,
                      disable_retry,
                      "hostname",
-                     6319};
+                     6319,
+                     std::make_shared<KeepAllSampler>()};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options ==
             std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                {CURLOPT_URL, "http://hostname:6319/v0.3/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
+                {CURLOPT_URL, "http://hostname:6319/v0.4/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
   }
 
   SECTION("traces can be sent") {
@@ -62,9 +63,9 @@ TEST_CASE("writer") {
     // Remove postdata first, since it's ugly to print and we just tested it above.
     handle->options.erase(CURLOPT_POSTFIELDS);
     REQUIRE(handle->options == std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                                   {CURLOPT_URL, "http://hostname:6319/v0.3/traces"},
+                                   {CURLOPT_URL, "http://hostname:6319/v0.4/traces"},
                                    {CURLOPT_TIMEOUT_MS, "2000"},
-                                   {CURLOPT_POSTFIELDSIZE, "126"}});
+                                   {CURLOPT_POSTFIELDSIZE, "135"}});
     REQUIRE(handle->headers == std::map<std::string, std::string>{
                                    {"Content-Type", "application/msgpack"},
                                    {"Datadog-Meta-Lang", "cpp"},
@@ -86,7 +87,8 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
-                               max_queued_traces, disable_retry, "hostname", 6319});
+                               max_queued_traces, disable_retry, "hostname", 6319,
+                               std::make_shared<KeepAllSampler>()});
   }
 
   SECTION("handle failure during post") {
@@ -180,8 +182,13 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
     auto write_interval = std::chrono::seconds(2);
-    AgentWriter writer{std::move(handle_ptr), write_interval, max_queued_traces,
-                       disable_retry,         "hostname",     6319};
+    AgentWriter writer{std::move(handle_ptr),
+                       write_interval,
+                       max_queued_traces,
+                       disable_retry,
+                       "hostname",
+                       6319,
+                       std::make_shared<KeepAllSampler>()};
     // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
     // different writes. We don't count the number of writes because that could flake, but we do
     // check that all 7 traces are written, implicitly testing that multiple writes happen.
@@ -218,7 +225,8 @@ TEST_CASE("writer") {
                        max_queued_traces,
                        retry_periods,
                        "hostname",
-                       6319};
+                       6319,
+                       std::make_shared<KeepAllSampler>()};
     // Redirect cerr, so the the terminal output doesn't imply failure.
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
