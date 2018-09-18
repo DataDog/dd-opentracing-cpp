@@ -5,8 +5,10 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <unordered_map>
+#include "../src/sample.h"
 #include "../src/span.h"
 #include "../src/span_buffer.h"
 #include "../src/transport.h"
@@ -26,8 +28,8 @@ struct TestSpanData : public SpanData {
                  error) {}
   TestSpanData(const TestSpanData& other) : SpanData(other) {}
 
-  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
-                     parent_id, error);
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
+                     trace_id, parent_id, error);
 };
 
 struct MockBuffer : public SpanBuffer {
@@ -53,6 +55,24 @@ struct MockBuffer : public SpanBuffer {
   }
 
   std::unordered_map<uint64_t, PendingTrace> traces;
+};
+
+struct MockSampler : public PrioritySampler {
+  MockSampler() {}
+
+  bool discard(const SpanContext& context) const override { return discard_spans; }
+  OptionalSamplingPriority sample(const std::string& environment, const std::string& service,
+                                  uint64_t trace_id) const override {
+    if (sampling_priority == nullptr) {
+      return nullptr;
+    }
+    return std::make_unique<SamplingPriority>(*sampling_priority);
+  }
+  void configure(json new_config) override { config = new_config.dump(); }
+
+  bool discard_spans = false;
+  OptionalSamplingPriority sampling_priority = nullptr;
+  std::string config;
 };
 
 // A Writer implementation that allows access to the Spans recorded.

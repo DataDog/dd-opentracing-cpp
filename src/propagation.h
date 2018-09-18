@@ -27,6 +27,11 @@ class SpanContext : public ot::SpanContext {
   SpanContext(uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
               std::unordered_map<std::string, std::string> &&baggage);
 
+  // Enables a hack, see the comment below on nginx_opentracing_compatibility_hack_.
+  static SpanContext NginxOpenTracingCompatibilityHackSpanContext(
+      uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
+      std::unordered_map<std::string, std::string> &&baggage);
+
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
 
@@ -52,6 +57,24 @@ class SpanContext : public ot::SpanContext {
   void setSamplingPriority(OptionalSamplingPriority p);
 
  private:
+  // Terrible, terrible hack; to get around:
+  // https://github.com/opentracing-contrib/nginx-opentracing/blob/master/opentracing/src/discover_span_context_keys.cpp#L49-L50
+  // nginx-opentracing needs to know in-advance the headers that may propagate from a tracer. It
+  // does this by creating a dummy span, reading the header names from that span, and creating a
+  // whitelist from them. This causes a problem, since some headers (eg
+  // "x-datadog-sampling-priority") are not sent for every span and therefore aren't added to the
+  // whitelist.
+  // So we must detect when this dummy span is being asked for, and manually override the
+  // serialization of the SpanContext to ensure that every header is present. This bool enables
+  // that manual override. The bool is checked in the serialize(...) method, and set when a
+  // SpanContext is created not from the constructor but via the static method
+  // NginxOpenTracingCompatibilityHackSpanContext.
+  // The detection of the dummy span condition happens in tracer.cpp, we look for the operation
+  // name "dummySpan".
+  // I use a bool and not polymorphism because the move constructor/assignments
+  // make it more of a pain to do and less obvious what's happening.
+  bool nginx_opentracing_compatibility_hack_ = false;
+
   uint64_t id_;
   uint64_t trace_id_;
   OptionalSamplingPriority sampling_priority_;

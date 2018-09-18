@@ -120,12 +120,8 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
     span_->name = operation_name_override_;
     span_->resource = operation_name_override_;
   }
-  // Apply sampling.
-  bool is_root_span = span_->parent_id == 0;
-  bool sampling_priority_unset = context_.getSamplingPriority() == nullptr;
-  if (is_root_span && sampling_priority_unset) {
-    context_.setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
-  }
+  // Check for sampling.
+  assignSamplingPriority();
   OptionalSamplingPriority sampling_priority = context_.getSamplingPriority();
   if (sampling_priority != nullptr) {
     span_->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
@@ -292,7 +288,27 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
-const ot::SpanContext &Span::context() const noexcept { return context_; }
+void Span::assignSamplingPriority() const {
+  bool is_root_span = span_->parent_id == 0;
+  bool sampling_priority_unset = context_.getSamplingPriority() == nullptr;
+  if (is_root_span && sampling_priority_unset) {
+    context_.setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
+  }
+}
+
+const ot::SpanContext &Span::context() const noexcept {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  // First apply sampling. This concern sits more reasonably upon the destructor/Finish method - to
+  // ensure that users have every chance to apply their own SamplingPriority before one is decided.
+  // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
+  // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
+  // here, when the context is fetched before being serialized. The negative side-effect is that if
+  // anything else happens to want to get and/or serialize a SpanContext, that will end up having
+  // this spooky action at a distance of assigning a SamplingPriority.
+  // For this reason this method can't be const unless context_ is mutable.
+  assignSamplingPriority();
+  return context_;
+}
 
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 

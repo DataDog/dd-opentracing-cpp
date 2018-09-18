@@ -56,10 +56,11 @@ class PrioritySampler : public SampleProvider {
   PrioritySampler() {}
   ~PrioritySampler() override {}
 
-  bool discard(const SpanContext& context) const override;
-  OptionalSamplingPriority sample(const std::string& environment, const std::string& service,
-                                  uint64_t trace_id) const override;
-  void configure(json config);
+  virtual bool discard(const SpanContext& context) const override;
+  virtual OptionalSamplingPriority sample(const std::string& environment,
+                                          const std::string& service,
+                                          uint64_t trace_id) const override;
+  virtual void configure(json config);
 
  private:
   std::map<std::string, uint64_t> max_hash_by_service_env_;

@@ -94,7 +94,9 @@ class Span : public ot::Span {
   uint64_t spanId() const;
 
  private:
-  std::mutex mutex_;
+  void assignSamplingPriority() const;  // Sooo not const. See definition of method Span::context.
+
+  mutable std::mutex mutex_;
   std::atomic<bool> is_finished_{false};
 
   // Set in constructor initializer:
@@ -102,7 +104,7 @@ class Span : public ot::Span {
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   std::shared_ptr<SampleProvider> sampler_;
-  SpanContext context_;
+  mutable SpanContext context_;  // Mutable as a hack. See definition of method Span::context.
   TimePoint start_time_;
   std::string operation_name_override_;
 

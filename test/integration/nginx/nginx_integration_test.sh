@@ -58,6 +58,8 @@ function get_n_traces() {
   # Strip out data that changes (randomly generated ids, times, durations)
   STRIP_QUERY='del(.[] | .[] | .start, .duration, .span_id, .trace_id, .parent_id) | del(.[] | .[] | .meta | ."http_user_agent", ."peer.address", ."nginx.worker_pid", ."http.host")'
   cat ~/got.json | jq -rS "${STRIP_QUERY}"
+  # Reset request log.
+  curl -X POST -s http://localhost:8126/__admin/requests/reset > /dev/null
 }
 
 # TEST 1: Ensure the right traces sent to the agent.
@@ -127,8 +129,13 @@ fi
 
 reset_test
 # Test 4: Check that priority sampling works.
+# Start the mock agent
 wiremock --port 8126 >/dev/null 2>&1 & sleep 5
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "{\"rate_by_service\":{\"service:nginx,env:prod\":0.5, \"service:nginx,env:\":0.2, \"service:wrong,env:\":0.1, \"service:nginx,env:wrong\":0.9}}" }}' http://localhost:8126/__admin/mappings/new
+# Start a HTTP server to receive distributed traces.
+wiremock --port 8080 >/dev/null 2>&1 & sleep 5
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "Hello World" }}' http://localhost:8080/__admin/mappings/new
+
 echo '{
   "service": "nginx",
   "operation_name_override": "nginx.handle",
@@ -143,16 +150,24 @@ run_nginx
 # Let the tracer make a first request with spans to the agent, this will allow the agent to return
 # the priority sampling config.
 curl -s localhost 1> /tmp/curl_log.txt
-
 get_n_traces 1 >/dev/null
-curl -X POST -s http://localhost:8126/__admin/requests/reset
 
-curl -s localhost?[1-1000] 1> /tmp/curl_log.txt
+# Sample a bunch of requests.
+curl -s localhost/proxy/?[1-1000] 1> /tmp/curl_log.txt
 
+# Check the traces the agent got.
 GOT=$(get_n_traces 1000)
 RATE=$(echo $GOT | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
 if [ $(echo $RATE | jq '(. > 0.45) and (. < 0.55)') != "true" ]
 then
   echo "Test 4 failed: Sample rate should be ~0.5 but was $RATE"
+  exit 1
+fi
+
+# Check the priority sampling was propagated for distributed traces.
+PROP_RATE=$(curl -s http://localhost:8080/__admin/requests | jq -r '[.requests[].request.headers."x-datadog-sampling-priority" | tonumber] | add/length')
+if [ $RATE != $PROP_RATE ]
+then
+  echo "Test 4 failed: propagated sample rate should be $RATE but was $PROP_RATE"
   exit 1
 fi

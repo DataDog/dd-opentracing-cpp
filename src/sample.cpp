@@ -32,7 +32,7 @@ DiscardRateSampler::DiscardRateSampler(double rate)
 bool DiscardRateSampler::discard(const SpanContext& context) const {
   // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
   // rather than generating a new random number here. It's a bit faster, and more importantly it's
-  // cargo-culted from the agent. However it does still seem a little strange, and makes testing a
+  // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
   // bit awkward.
   uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
   if (hashed_id < max_trace_id_) {
@@ -65,7 +65,7 @@ OptionalSamplingPriority PrioritySampler::sample(const std::string& environment,
   }
   // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
   // rather than generating a new random number here. It's a bit faster, and more importantly it's
-  // cargo-culted from the agent. However it does still seem a little strange, and makes testing a
+  // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
   // bit awkward.
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
   if (hashed_id >= max_hash) {

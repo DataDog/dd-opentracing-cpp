@@ -1,4 +1,5 @@
 #include "../src/sample.h"
+#include "../src/agent_writer.h"
 #include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
@@ -93,5 +94,137 @@ TEST_CASE("sample") {
     REQUIRE(root_span->traceId() == child_span->traceId());
     // The span id should be different.
     REQUIRE(root_span->spanId() != child_span->spanId());
+  }
+}
+
+TEST_CASE("priority sampler unit test") {
+  PrioritySampler sampler;
+
+  SECTION("doesn't discard") {
+    for (const SpanContext &ctx :
+         {SpanContext{1, 1, nullptr, {}}, SpanContext{1, 2, asSamplingPriority(-1), {}},
+          SpanContext{1, 2, asSamplingPriority(0), {}},
+          SpanContext{1, 2, asSamplingPriority(1), {}},
+          SpanContext{1, 2, asSamplingPriority(2), {}}}) {
+      REQUIRE(!sampler.discard(ctx));
+    }
+  }
+
+  SECTION("default unconfigured sampling behaviour is to not apply any priority sampling") {
+    REQUIRE(sampler.sample("", "", 0) == nullptr);
+    REQUIRE(sampler.sample("env", "service", 1) == nullptr);
+  }
+
+  SECTION("configured") {
+    sampler.configure("{ \"service:nginx,env:\": 0.8, \"service:nginx,env:prod\": 0.2 }"_json);
+
+    SECTION("spans that don't match a rule are not given a sampling priority") {
+      REQUIRE(sampler.sample("different env", "different service", 1) == nullptr);
+    }
+
+    SECTION("spans can be sampled") {
+      // Case 1, service:nginx,env: => 0.8
+      int count_sampled = 0;
+      int total = 10000;
+      for (int i = 0; i < total; i++) {
+        auto p = sampler.sample("", "nginx", getId());
+        REQUIRE(p != nullptr);
+        REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
+        count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
+      }
+      double sample_rate = count_sampled / (double)total;
+      REQUIRE((sample_rate < 0.85 && sample_rate > 0.75));
+      // Case 2, service:nginx,env:prod => 0.2
+      count_sampled = 0;
+      total = 10000;
+      for (int i = 0; i < total; i++) {
+        auto p = sampler.sample("", "nginx", getId());
+        REQUIRE(p != nullptr);
+        REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
+        count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
+      }
+      sample_rate = count_sampled / (double)total;
+      REQUIRE((sample_rate < 0.85 && sample_rate > 0.75));
+    }
+  }
+}
+
+TEST_CASE("correct sampler is used") {
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
+
+  SECTION("rate sampler") {
+    tracer_options.sample_rate = 0.4;
+    auto sampler = sampleProviderFromOptions(tracer_options);
+    REQUIRE(std::dynamic_pointer_cast<DiscardRateSampler>(sampler));
+  }
+
+  SECTION("priority sampler") {
+    tracer_options.priority_sampling = true;
+    auto sampler = sampleProviderFromOptions(tracer_options);
+    REQUIRE(std::dynamic_pointer_cast<PrioritySampler>(sampler));
+  }
+}
+
+TEST_CASE("priority sampler \"integration\" test") {
+  // There's a real integration test! It's in ./integration/nginx
+  // This tests the interaction between Span and the sampler. It's a bit of an overlap with the
+  // tests in span_test.cpp.
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
+  tracer_options.environment = "threatened by climate change";
+  tracer_options.priority_sampling = true;
+  auto sampler = sampleProviderFromOptions(tracer_options);
+  REQUIRE(std::dynamic_pointer_cast<PrioritySampler>(sampler));
+
+  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+  MockHandle *handle = handle_ptr.get();
+  auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
+  auto writer = std::make_shared<AgentWriter>(
+      std::move(handle_ptr), only_send_traces_when_we_flush, 11000 /* max queued traces */,
+      std::vector<std::chrono::milliseconds>{}, "hostname", 6319, sampler);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer);
+
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  const ot::StartSpanOptions span_options;
+  const ot::FinishSpanOptions finish_options;
+
+  // First, configure the PrioritySampler. Send a trace to the agent, and have the agent reply with
+  // the config.
+  handle->response = R"( {
+    "rate_by_service": {
+      "service:service_name,env:threatened by climate change": 0.3,
+      "service:wrong,env:threatened by climate change": 0.1,
+      "service:service_name,env:wrong": 0.5
+    }
+  } )";
+
+  auto span = tracer->StartSpanWithOptions("operation_name", span_options);
+  span->FinishWithOptions(finish_options);
+  writer->flush();
+  handle->response = "";
+
+  SECTION("sampling rate is applied") {
+    // Start a heap of spans.
+    int total = 10000;
+    int count_sampled = 0;
+    for (int i = 0; i < total; i++) {
+      auto span = tracer->StartSpanWithOptions("operation_name", span_options);
+      span->FinishWithOptions(finish_options);
+    }
+    writer->flush();
+    // Check the spans, and the rate at which they were sampled.
+    auto traces = handle->getTraces();
+    REQUIRE(traces->size() == total);
+    for (const auto &trace : *traces) {
+      REQUIRE(trace.size() == 1);
+      std::cout << json(trace[0].metrics).dump() << std::endl;
+      REQUIRE(trace[0].metrics.find("_sampling_priority_v1") != trace[0].metrics.end());
+      OptionalSamplingPriority p =
+          asSamplingPriority(trace[0].metrics.find("_sampling_priority_v1")->second);
+      REQUIRE(p != nullptr);
+      REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
+      count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
+    }
+    double sample_rate = count_sampled / (double)total;
+    REQUIRE((sample_rate < 0.35 && sample_rate > 0.25));
   }
 }

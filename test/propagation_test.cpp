@@ -21,7 +21,10 @@ dict getBaggage(SpanContext* ctx) {
 
 TEST_CASE("SpanContext") {
   MockTextMapCarrier carrier{};
-  SpanContext context{420, 123, nullptr, {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{420,
+                      123,
+                      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep),
+                      {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier));
@@ -32,6 +35,8 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->trace_id() == 123);
+      REQUIRE(received_context->getSamplingPriority() != nullptr);
+      REQUIRE(*received_context->getSamplingPriority() == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
@@ -74,6 +79,13 @@ TEST_CASE("SpanContext") {
     SECTION("when there are formatted keys") {
       carrier.Set("x-datadog-trace-id", "The madman! This isn't even a number!");
       carrier.Set("x-datadog-parent-id", "420");
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == ot::span_context_corrupted_error);
+    }
+
+    SECTION("when the sampling priority is whack") {
+      carrier.Set("x-datadog-sampling-priority", "420");
       auto err = SpanContext::deserialize(carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);

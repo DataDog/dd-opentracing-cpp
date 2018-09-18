@@ -21,6 +21,7 @@ TEST_CASE("writer") {
   std::atomic<bool> handle_destructed{false};
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
   MockHandle* handle = handle_ptr.get();
+  auto sampler = std::make_shared<MockSampler>();
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
   auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
@@ -32,7 +33,7 @@ TEST_CASE("writer") {
                      disable_retry,
                      "hostname",
                      6319,
-                     std::make_shared<KeepAllSampler>()};
+                     sampler};
 
   SECTION("initilises handle correctly") {
     REQUIRE(handle->options ==
@@ -73,6 +74,29 @@ TEST_CASE("writer") {
                                    {"X-Datadog-Trace-Count", "1"}});
   }
 
+  SECTION("responses are sent to sampler") {
+    handle->response = "{\"rate_by_service\": {\"service:nginx,env:\": 0.5}}";
+    writer.write(make_trace(
+        {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
+    writer.flush();
+
+    REQUIRE(sampler->config == "{\"service:nginx,env:\":0.5}");
+  }
+
+  SECTION("handle dodgy responses") {
+    handle->response =
+        "// What?! This isn't JSON! Everyone knows real JSON doesn't have comments...";
+    writer.write(make_trace(
+        {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
+
+    std::stringstream error_message;
+    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+    writer.flush();
+    REQUIRE(error_message.str() == "Unable to parse response from agent\n");
+    std::cerr.rdbuf(stderr);  // Restore stderr.
+    REQUIRE(sampler->config == "");
+  }
+
   SECTION("queue does not grow indefinitely") {
     for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
       writer.write(make_trace(
@@ -107,7 +131,7 @@ TEST_CASE("writer") {
   }
 
   SECTION("handle failure during perform") {
-    handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT};
+    handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
     handle->error = "error from libcurl";
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
@@ -117,6 +141,16 @@ TEST_CASE("writer") {
     REQUIRE(error_message.str() ==
             "Error sending traces to agent: Timeout was reached\nerror from libcurl\n");
     std::cerr.rdbuf(stderr);  // Restore stderr.
+  }
+
+  SECTION("responses are not sent to sampler if the conenction fails") {
+    handle->response = "{\"rate_by_service\": {\"service:nginx,env:\": 0.5}}";
+    handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
+    writer.write(make_trace(
+        {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
+    writer.flush();
+
+    REQUIRE(sampler->config == "");
   }
 
   SECTION("destructed/stopped writer does nothing when written to") {
@@ -235,13 +269,13 @@ TEST_CASE("writer") {
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
 
     SECTION("will retry") {
-      handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT, CURLE_OK};
+      handle->perform_result = {CURLE_OPERATION_TIMEDOUT, CURLE_OK};
       writer.flush();
       REQUIRE(handle->perform_call_count == 2);
     }
 
     SECTION("will eventually give up") {
-      handle->perform_result = std::vector<CURLcode>{CURLE_OPERATION_TIMEDOUT};
+      handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
       writer.flush();
       REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
     }

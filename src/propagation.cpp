@@ -1,5 +1,6 @@
 #include "propagation.h"
 #include <algorithm>
+#include <iostream>
 
 namespace ot = opentracing;
 
@@ -50,11 +51,20 @@ SpanContext::SpanContext(uint64_t id, uint64_t trace_id,
       sampling_priority_(std::move(sampling_priority)),
       baggage_(std::move(baggage)) {}
 
+SpanContext SpanContext::NginxOpenTracingCompatibilityHackSpanContext(
+    uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
+    std::unordered_map<std::string, std::string> &&baggage) {
+  SpanContext c = SpanContext(id, trace_id, std::move(sampling_priority), std::move(baggage));
+  c.nginx_opentracing_compatibility_hack_ = true;
+  return c;
+}
+
 SpanContext::SpanContext(SpanContext &&other)
     : id_(other.id_),
       trace_id_(other.trace_id_),
       sampling_priority_(std::move(other.sampling_priority_)),
-      baggage_(std::move(other.baggage_)) {}
+      baggage_(std::move(other.baggage_)),
+      nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_) {}
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
@@ -62,11 +72,13 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
   trace_id_ = other.trace_id_;
   sampling_priority_ = std::move(other.sampling_priority_);
   baggage_ = std::move(other.baggage_);
+  nginx_opentracing_compatibility_hack_ = other.nginx_opentracing_compatibility_hack_;
   return *this;
 }
 
 void SpanContext::ForeachBaggageItem(
     std::function<bool(const std::string &, const std::string &)> f) const {
+  std::lock_guard<std::mutex> lock{mutex_};
   for (const auto &baggage_item : baggage_) {
     if (!f(baggage_item.first, baggage_item.second)) {
       return;
@@ -146,6 +158,12 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
     if (!result) {
       return result;
     }
+  } else if (nginx_opentracing_compatibility_hack_) {
+    // See the comment in the header file on nginx_opentracing_compatibility_hack_.
+    result = writer.Set(sampling_priority_header, "1");
+    if (!result) {
+      return result;
+    }
   }
 
   for (auto baggage_item : baggage_) {
@@ -176,6 +194,12 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             parent_id_set = true;
           } else if (equals_ignore_case(key, sampling_priority_header)) {
             sampling_priority = asSamplingPriority(std::stoi(value));
+            if (sampling_priority == nullptr) {
+              // The sampling_priority key was present, but the value makes no sense.
+              std::cerr << "Invalid sampling_priority valule in serialized SpanContext"
+                        << std::endl;
+              return ot::make_unexpected(ot::span_context_corrupted_error);
+            }
           } else if (has_prefix(key, baggage_prefix)) {
             baggage.emplace(std::string{std::begin(key) + baggage_prefix.size(), std::end(key)},
                             value);
