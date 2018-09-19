@@ -71,6 +71,7 @@ TEST_CASE("writer") {
                                    {"Content-Type", "application/msgpack"},
                                    {"Datadog-Meta-Lang", "cpp"},
                                    {"Datadog-Meta-Tracer-Version", config::tracer_version},
+                                   {"Datadog-Meta-Lang-Version", config::cpp_version},
                                    {"X-Datadog-Trace-Count", "1"}});
   }
 
@@ -298,6 +299,7 @@ TEST_CASE("writer") {
                                      {"Content-Type", "application/msgpack"},
                                      {"Datadog-Meta-Lang", "cpp"},
                                      {"Datadog-Meta-Tracer-Version", config::tracer_version},
+                                     {"Datadog-Meta-Lang-Version", config::cpp_version},
                                      {"X-Datadog-Trace-Count", "3"}});
     }
   }
