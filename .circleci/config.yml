@@ -117,7 +117,7 @@ _workflow_filters:
     # Allows semver or "test" tags, with any suffix.
     # eg v1.2.3 v0.1.1 v1.2.3-ayy-lmao test test-ayy-lmao
     # "test" is useful if you want to ensure all workflows run without creating a version.
-    only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*+/
+    only: /(v[0-9]+\.[0-9]+\.[0-9]|test).*/
 
   _run_on_release_tag: &run_on_release_tag
     filters:
