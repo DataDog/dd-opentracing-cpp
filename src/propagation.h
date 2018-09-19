@@ -46,11 +46,13 @@ class SpanContext : public ot::SpanContext {
   std::string baggageItem(ot::string_view key) const;
 
   // Serializes the context into the given writer.
+  ot::expected<void> serialize(std::ostream &writer) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer) const;
 
   SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
+  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
       const ot::TextMapReader &reader);
 

@@ -1,8 +1,10 @@
 #include "propagation.h"
 #include <algorithm>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace ot = opentracing;
+using json = nlohmann::json;
 
 namespace datadog {
 namespace opentracing {
@@ -16,6 +18,12 @@ const std::string sampling_priority_header = "x-datadog-sampling-priority";
 // Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
 // interop.
 const ot::string_view baggage_prefix = "ot-baggage-";
+
+// Key names for binary serialization in JSON
+const std::string json_trace_id_key = "trace_id";
+const std::string json_parent_id_key = "parent_id";
+const std::string json_sampling_priority_key = "sampling_priority";
+const std::string json_baggage_key = "baggage";
 
 // Does what it says on the tin. Just looks at each char, so don't try and use this on
 // unicode strings, only used for comparing HTTP header names.
@@ -139,6 +147,19 @@ SpanContext SpanContext::withId(uint64_t id) const {
   return SpanContext{id, trace_id_, std::move(p), std::move(baggage)};
 }
 
+ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
+  json j;
+  // JSON numbers only support 64bit IEEE 754, so we encode these as strings.
+  j[json_trace_id_key] = std::to_string(trace_id_);
+  j[json_parent_id_key] = std::to_string(id_);
+  if (sampling_priority_ != nullptr) {
+    j[json_sampling_priority_key] = static_cast<int>(*sampling_priority_);
+  }
+  j[json_baggage_key] = baggage_;
+  writer << j.dump();
+  return {};
+}
+
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const {
   std::lock_guard<std::mutex> lock{mutex_};
   auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
@@ -174,6 +195,54 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
     }
   }
   return result;
+}
+
+ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::istream &reader) try {
+  // check istream state
+  if (!reader.good()) {
+    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+  }
+
+  // Check for the case when no span is encoded.
+  if (reader.eof()) {
+    return {};
+  }
+
+  uint64_t trace_id, parent_id;
+  OptionalSamplingPriority sampling_priority = nullptr;
+  std::unordered_map<std::string, std::string> baggage;
+  json j;
+  reader >> j;
+  std::string trace_id_str = j[json_trace_id_key];
+  std::string parent_id_str = j[json_parent_id_key];
+
+  if (trace_id_str.empty() && parent_id_str.empty()) {
+    // both ids empty, return empty context
+    return {};
+  }
+  if (trace_id_str.empty() || parent_id_str.empty()) {
+    // missing one id, return unexpected error
+    return ot::make_unexpected(ot::span_context_corrupted_error);
+  }
+
+  trace_id = std::stoull(trace_id_str);
+  parent_id = std::stoull(parent_id_str);
+  if (j.find(json_sampling_priority_key) != j.end()) {
+    sampling_priority = asSamplingPriority(j[json_sampling_priority_key]);
+    if (sampling_priority == nullptr) {
+      // sampling priority value not valid, return unexpected error
+      return ot::make_unexpected(ot::span_context_corrupted_error);
+    }
+  }
+  baggage = j[json_baggage_key].get<std::unordered_map<std::string, std::string>>();
+
+  return std::unique_ptr<ot::SpanContext>(std::make_unique<SpanContext>(
+      parent_id, trace_id, std::move(sampling_priority), std::move(baggage)));
+
+} catch (const std::invalid_argument &ia) {
+  return ot::make_unexpected(ot::span_context_corrupted_error);
+} catch (const std::bad_alloc &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(

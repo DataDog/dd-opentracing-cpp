@@ -92,3 +92,26 @@ TEST_CASE("SpanContext") {
     }
   }
 }
+
+TEST_CASE("Binary Span Context") {
+  std::stringstream carrier{};
+  SpanContext context{420,
+                      123,
+                      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep),
+                      {{"ayy", "lmao"}, {"hi", "haha"}}};
+
+  SECTION("can be serialized") {
+    REQUIRE(context.serialize(carrier));
+
+    SECTION("can be deserialized") {
+      auto sc = SpanContext::deserialize(carrier);
+      auto received_context = dynamic_cast<SpanContext*>(sc->get());
+      REQUIRE(received_context);
+      REQUIRE(received_context->id() == 420);
+      REQUIRE(received_context->trace_id() == 123);
+      REQUIRE(received_context->getSamplingPriority() != nullptr);
+      REQUIRE(*received_context->getSamplingPriority() == SamplingPriority::SamplerKeep);
+      REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
+    }
+  }
+}
