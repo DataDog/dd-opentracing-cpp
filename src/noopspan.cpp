@@ -1,4 +1,5 @@
 #include "noopspan.h"
+#include "tracer.h"
 
 namespace ot = opentracing;
 

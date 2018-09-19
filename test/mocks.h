@@ -5,8 +5,12 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <unordered_map>
+#include "../src/sample.h"
+#include "../src/span.h"
+#include "../src/span_buffer.h"
 #include "../src/transport.h"
 #include "../src/writer.h"
 
@@ -24,8 +28,8 @@ struct TestSpanData : public SpanData {
                  error) {}
   TestSpanData(const TestSpanData& other) : SpanData(other) {}
 
-  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
-                     parent_id, error);
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
+                     trace_id, parent_id, error);
 };
 
 struct MockBuffer : public SpanBuffer {
@@ -53,9 +57,27 @@ struct MockBuffer : public SpanBuffer {
   std::unordered_map<uint64_t, PendingTrace> traces;
 };
 
+struct MockSampler : public PrioritySampler {
+  MockSampler() {}
+
+  bool discard(const SpanContext& context) const override { return discard_spans; }
+  OptionalSamplingPriority sample(const std::string& environment, const std::string& service,
+                                  uint64_t trace_id) const override {
+    if (sampling_priority == nullptr) {
+      return nullptr;
+    }
+    return std::make_unique<SamplingPriority>(*sampling_priority);
+  }
+  void configure(json new_config) override { config = new_config.dump(); }
+
+  bool discard_spans = false;
+  OptionalSamplingPriority sampling_priority = nullptr;
+  std::string config;
+};
+
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter() {}
+  MockWriter(std::shared_ptr<SampleProvider> sampler) : Writer(sampler) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {
@@ -143,6 +165,11 @@ struct MockHandle : public Handle {
     return error;
   }
 
+  std::string getResponse() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    return response;
+  }
+
   // Note, this returns any traces that have been added to the request - NOT traces that have been
   // successfully posted.
   std::unique_ptr<std::vector<std::vector<TestSpanData>>> getTraces() {
@@ -162,6 +189,7 @@ struct MockHandle : public Handle {
   std::unordered_map<CURLoption, std::string, EnumClassHash> options;
   std::map<std::string, std::string> headers;
   std::string error = "";
+  std::string response = "";
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
   // Each time an perform is called, the next perform_result is used to determine if it

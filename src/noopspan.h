@@ -2,8 +2,9 @@
 #define DD_OPENTRACING_NOOPSPAN_H
 
 #include <opentracing/span.h>
-
-#include "tracer.h"
+#include <opentracing/tracer.h>
+#include <memory>
+#include "propagation.h"
 
 namespace ot = opentracing;
 

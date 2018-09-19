@@ -30,7 +30,11 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
     message(STATUS "Git version: ${VERSION}")
   else(GIT_FOUND)
     set(VERSION "unknown")
+    message(WARNING "Git missing, version number for this build is 'unknown'")
   endif(GIT_FOUND)
+else(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+  set(VERSION "unknown")
+  message(WARNING "Not being built from git repo, version number for this build is 'unknown'")
 endif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
 
 configure_file(
