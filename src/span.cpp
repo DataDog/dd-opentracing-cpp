@@ -2,6 +2,9 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include "sample.h"
+#include "span_buffer.h"
+#include "tracer.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -15,7 +18,10 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
+const std::string sampling_priority_metric = "_sampling_priority_v1";
 }  // namespace
+
+const std::string environment_tag = "environment";
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
                    std::string name, uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
@@ -36,6 +42,14 @@ SpanData::SpanData() {}
 uint64_t SpanData::traceId() const { return trace_id; }
 uint64_t SpanData::spanId() const { return span_id; }
 
+const std::string SpanData::env() const {
+  const auto &env = meta.find(environment_tag);
+  if (env == meta.end()) {
+    return "";
+  }
+  return env->second;
+}
+
 std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
                                        ot::string_view resource, std::string name,
                                        uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
@@ -47,13 +61,14 @@ std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
 std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
 
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
-           TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
-           SpanContext context, TimePoint start_time, std::string span_service,
-           std::string span_type, std::string span_name, std::string resource,
-           std::string operation_name_override)
+           TimeProvider get_time, std::shared_ptr<SampleProvider> sampler, uint64_t span_id,
+           uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
+           std::string span_service, std::string span_type, std::string span_name,
+           std::string resource, std::string operation_name_override)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
+      sampler_(sampler),
       context_(std::move(context)),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
@@ -62,7 +77,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
                              start_time_.absolute_time.time_since_epoch())
                              .count())) {
-  buffer_->registerSpan(*span_.get());  // Doens't keep reference.
+  buffer_->registerSpan(*span_.get());  // Doesn't keep reference.
 }
 
 Span::~Span() {
@@ -104,6 +119,12 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
     span_->meta[operation_name_tag] = span_->name;
     span_->name = operation_name_override_;
     span_->resource = operation_name_override_;
+  }
+  // Check for sampling.
+  assignSamplingPriority();
+  OptionalSamplingPriority sampling_priority = context_.getSamplingPriority();
+  if (sampling_priority != nullptr) {
+    span_->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
   }
   // Apply special tags.
   // If we add any more cases; then abstract this. For now, KISS.
@@ -267,7 +288,27 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
-const ot::SpanContext &Span::context() const noexcept { return context_; }
+void Span::assignSamplingPriority() const {
+  bool is_root_span = span_->parent_id == 0;
+  bool sampling_priority_unset = context_.getSamplingPriority() == nullptr;
+  if (is_root_span && sampling_priority_unset) {
+    context_.setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
+  }
+}
+
+const ot::SpanContext &Span::context() const noexcept {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  // First apply sampling. This concern sits more reasonably upon the destructor/Finish method - to
+  // ensure that users have every chance to apply their own SamplingPriority before one is decided.
+  // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
+  // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
+  // here, when the context is fetched before being serialized. The negative side-effect is that if
+  // anything else happens to want to get and/or serialize a SpanContext, that will end up having
+  // this spooky action at a distance of assigning a SamplingPriority.
+  // For this reason this method can't be const unless context_ is mutable.
+  assignSamplingPriority();
+  return context_;
+}
 
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 

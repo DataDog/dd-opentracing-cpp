@@ -1,16 +1,18 @@
 #ifndef DD_OPENTRACING_SPAN_BUFFER_H
 #define DD_OPENTRACING_SPAN_BUFFER_H
 
-#include "span.h"
-#include "writer.h"
-
+#include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace datadog {
 namespace opentracing {
 
 class Writer;
+class SpanData;
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 struct PendingTrace {
   PendingTrace()

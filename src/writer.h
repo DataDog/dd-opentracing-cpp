@@ -7,15 +7,20 @@
 #include <sstream>
 #include <thread>
 #include "encoder.h"
-#include "span.h"
 
 namespace datadog {
 namespace opentracing {
 
+class SampleProvider;
+class AgentHttpEncoder;
+class TraceEncoder;
+struct SpanData;
+using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
+
 // A Writer is used to submit completed traces to the Datadog agent.
 class Writer {
  public:
-  Writer();
+  Writer(std::shared_ptr<SampleProvider> sampler);
 
   virtual ~Writer() {}
 
@@ -30,7 +35,7 @@ class Writer {
 // to the Datadog Agent.
 class ExternalWriter : public Writer {
  public:
-  ExternalWriter() {}
+  ExternalWriter(std::shared_ptr<SampleProvider> sampler) : Writer(sampler) {}
   ~ExternalWriter() override {}
 
   // Implements Writer methods.

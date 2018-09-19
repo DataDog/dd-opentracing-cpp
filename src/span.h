@@ -2,15 +2,18 @@
 #define DD_OPENTRACING_SPAN_H
 
 #include <msgpack.hpp>
+#include "clock.h"
 #include "propagation.h"
-#include "tracer.h"
 
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
+extern const std::string environment_tag;
+
 class Tracer;
+class SampleProvider;
 class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
@@ -47,24 +50,25 @@ struct SpanData {
   int64_t duration;
   int32_t error;
   std::unordered_map<std::string, std::string> meta;  // Aka, tags.
+  std::unordered_map<std::string, int> metrics;
 
   uint64_t traceId() const;
   uint64_t spanId() const;
+  const std::string env() const;
 
-  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, span_id, trace_id,
-                     parent_id, error)
+  MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
+                     trace_id, parent_id, error)
 };
-
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 // A Span, a component of a trace, a single instrumented event.
 class Span : public ot::Span {
  public:
   // Creates a new Span.
   Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
-       TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
-       SpanContext context, TimePoint start_time, std::string span_service, std::string span_type,
-       std::string span_name, std::string resource, std::string operation_name_override);
+       TimeProvider get_time, std::shared_ptr<SampleProvider> sampler, uint64_t span_id,
+       uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
+       std::string span_service, std::string span_type, std::string span_name,
+       std::string resource, std::string operation_name_override);
 
   Span() = delete;
   ~Span() override;
@@ -90,14 +94,17 @@ class Span : public ot::Span {
   uint64_t spanId() const;
 
  private:
-  std::mutex mutex_;
+  void assignSamplingPriority() const;  // Sooo not const. See definition of method Span::context.
+
+  mutable std::mutex mutex_;
   std::atomic<bool> is_finished_{false};
 
   // Set in constructor initializer:
   std::shared_ptr<const Tracer> tracer_;
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
-  SpanContext context_;
+  std::shared_ptr<SampleProvider> sampler_;
+  mutable SpanContext context_;  // Mutable as a hack. See definition of method Span::context.
   TimePoint start_time_;
   std::string operation_name_override_;
 

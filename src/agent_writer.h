@@ -4,26 +4,30 @@
 #include <curl/curl.h>
 #include <condition_variable>
 #include <deque>
+#include <functional>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <thread>
-#include "encoder.h"
-#include "span.h"
-#include "transport.h"
+#include <vector>
+#include "writer.h"
 
 namespace datadog {
 namespace opentracing {
+
+class Handle;
 
 // A Writer that sends Traces (collections of Spans) to a Datadog agent.
 class AgentWriter : public Writer {
  public:
   // Creates an AgentWriter that uses curl to send Traces to a Datadog agent. May throw a
   // runtime_exception.
-  AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period);
+  AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period,
+              std::shared_ptr<SampleProvider> sampler);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
               size_t max_queued_traces, std::vector<std::chrono::milliseconds> retry_periods,
-              std::string host, uint32_t port);
+              std::string host, uint32_t port, std::shared_ptr<SampleProvider> sampler);
 
   // Does not flush on destruction, buffered traces may be lost. Stops all threads.
   ~AgentWriter() override;
@@ -49,7 +53,7 @@ class AgentWriter : public Writer {
                          std::map<std::string, std::string> headers, std::string payload);
   // Retries the given function a finite number of times according to retry_periods_. Retries when
   // f() returns false.
-  void retryFiniteOnFail(std::function<bool()> f) const;
+  bool retryFiniteOnFail(std::function<bool()> f) const;
 
   // How often to send Traces.
   const std::chrono::milliseconds write_period_;

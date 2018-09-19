@@ -1,8 +1,8 @@
+#include "../src/tracer.h"
+#include <ctime>
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "mocks.h"
-
-#include <ctime>
 
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
@@ -16,7 +16,7 @@ TEST_CASE("tracer") {
   auto buffer = new MockBuffer();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  SampleProvider sampler = KeepAllSampler();
+  auto sampler = std::make_shared<KeepAllSampler>();
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{
       new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id, sampler}};
@@ -47,7 +47,7 @@ TEST_CASE("tracer") {
 
   SECTION("span context is propagated") {
     MockTextMapCarrier carrier;
-    SpanContext context{420, 69, {{"ayy", "lmao"}, {"hi", "haha"}}};
+    SpanContext context{420, 69, nullptr, {{"ayy", "lmao"}, {"hi", "haha"}}};
     auto success = tracer->Inject(context, carrier);
     REQUIRE(success);
     auto span_context_maybe = tracer->Extract(carrier);

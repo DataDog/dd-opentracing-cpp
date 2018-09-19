@@ -1,4 +1,5 @@
 #include "sample.h"
+#include <sstream>
 
 namespace datadog {
 namespace opentracing {
@@ -12,55 +13,81 @@ const uint64_t constant_rate_hash_factor = 1111111111111111111;
 
 const std::string sample_rate_metric_key = "_sample_rate";
 
-SampleProvider KeepAllSampler() {
-  return {
-      [](SpanContext& context) {
-        context.setBaggageItem(sample_type_baggage_key, "KeepAllSampler");
-        return true;
-      },
-      [](std::unique_ptr<ot::Span>&) {},
-  };
-}
-
-SampleProvider DiscardAllSampler() {
-  return {
-      [](SpanContext& context) {
-        context.setBaggageItem(sample_type_baggage_key, "DiscardAllSampler");
-        return false;
-      },
-      [](std::unique_ptr<ot::Span>&) {},
-  };
-}
-
-SampleProvider ConstantRateSampler(double rate) {
-  uint64_t max_trace_id = 0;
+namespace {
+uint64_t maxIdFromKeepRate(double rate) {
   // This check is required to avoid undefined behaviour converting the rate back from
   // double to uint64_t.
   if (rate == 1.0) {
-    max_trace_id = std::numeric_limits<uint64_t>::max();
+    return std::numeric_limits<uint64_t>::max();
   } else if (rate > 0.0) {
-    max_trace_id = uint64_t(rate * max_trace_id_double);
+    return uint64_t(rate * max_trace_id_double);
+  }
+  return 0;
+}
+}  // namespace
+
+DiscardRateSampler::DiscardRateSampler(double rate)
+    : max_trace_id_(maxIdFromKeepRate(1.0 - rate)) {}
+
+bool DiscardRateSampler::discard(const SpanContext& context) const {
+  // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
+  // rather than generating a new random number here. It's a bit faster, and more importantly it's
+  // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
+  // bit awkward.
+  uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
+  if (hashed_id < max_trace_id_) {
+    return false;
+  }
+  return true;
+}
+
+OptionalSamplingPriority DiscardRateSampler::sample(const std::string& environment,
+                                                    const std::string& service,
+                                                    uint64_t trace_id) const {
+  return nullptr;
+}
+
+bool PrioritySampler::discard(const SpanContext& context) const { return false; }
+
+OptionalSamplingPriority PrioritySampler::sample(const std::string& environment,
+                                                 const std::string& service,
+                                                 uint64_t trace_id) const {
+  uint64_t max_hash;
+  std::ostringstream key;
+  key << "service:" << service << ",env:" << environment;
+  {
+    std::lock_guard<std::mutex> lock{mutex_};
+    auto const rule = max_hash_by_service_env_.find(key.str());
+    if (rule == max_hash_by_service_env_.end()) {
+      return nullptr;
+    }
+    max_hash = rule->second;
+  }
+  // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
+  // rather than generating a new random number here. It's a bit faster, and more importantly it's
+  // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
+  // bit awkward.
+  uint64_t hashed_id = trace_id * constant_rate_hash_factor;
+  if (hashed_id >= max_hash) {
+    return std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
   }
 
-  return {
-      [=](SpanContext& context) {
-        if (context.baggageItem(sample_type_baggage_key) != std::string{}) {
-          // Context already marked as sampled, so this span should be traced.
-          return true;
-        }
+  return std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+}
 
-        // Apply the sample rate to all traces, new and existing (extracted from upstream).
-        uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
-        if (hashed_id < max_trace_id) {
-          // Chosen for sampling. Add mark to context and return.
-          context.setBaggageItem(sample_type_baggage_key, "ConstantRateSampler");
-          return true;
-        }
-        // Not chosen for sampling.
-        return false;
-      },
-      [&, rate](std::unique_ptr<ot::Span>& span) { span->SetTag(sample_rate_metric_key, rate); },
-  };
+void PrioritySampler::configure(json config) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  max_hash_by_service_env_.clear();
+  for (json::iterator it = config.begin(); it != config.end(); ++it) {
+    max_hash_by_service_env_[it.key()] = maxIdFromKeepRate(it.value());
+  }
+}
+
+std::shared_ptr<SampleProvider> sampleProviderFromOptions(const TracerOptions& options) {
+  if (options.priority_sampling) {
+    return std::shared_ptr<SampleProvider>{new PrioritySampler()};
+  }
+  return std::shared_ptr<SampleProvider>{new DiscardRateSampler(1.0 - options.sample_rate)};
 }
 
 }  // namespace opentracing

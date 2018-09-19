@@ -1,4 +1,5 @@
 #include "../src/span_buffer.h"
+#include "../src/sample.h"
 #include "mocks.h"
 
 #define CATCH_CONFIG_MAIN
@@ -6,7 +7,8 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("span buffer") {
-  auto writer_ptr = std::make_shared<MockWriter>();
+  auto sampler = std::make_shared<KeepAllSampler>();
+  auto writer_ptr = std::make_shared<MockWriter>(sampler);
   MockWriter* writer = writer_ptr.get();
   WritingSpanBuffer buffer{writer_ptr};
 
