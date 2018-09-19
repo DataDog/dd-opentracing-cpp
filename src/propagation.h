@@ -15,6 +15,9 @@ enum class SamplingPriority : int {
   SamplerDrop = 0,
   SamplerKeep = 1,
   UserKeep = 2,
+
+  MinimumValue = UserDrop,
+  MaximumValue = UserKeep,
 };
 
 // Move to std::optional in C++17 when it has better compiler support.

@@ -37,7 +37,7 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 }  // namespace
 
 OptionalSamplingPriority asSamplingPriority(int i) {
-  if (i < -1 || i > 2) {
+  if (i < (int)SamplingPriority::MinimumValue || i > (int)SamplingPriority::MaximumValue) {
     return nullptr;
   }
   return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));
@@ -196,7 +196,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             sampling_priority = asSamplingPriority(std::stoi(value));
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
-              std::cerr << "Invalid sampling_priority valule in serialized SpanContext"
+              std::cerr << "Invalid sampling_priority value in serialized SpanContext"
                         << std::endl;
               return ot::make_unexpected(ot::span_context_corrupted_error);
             }
