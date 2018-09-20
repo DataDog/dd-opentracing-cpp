@@ -36,3 +36,6 @@
 
 # Bazel
 bazel-*
+
+# IDE settings
+.vscode/

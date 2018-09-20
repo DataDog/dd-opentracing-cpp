@@ -1,9 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
-OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.4.0}
-CURL_VERSION=${CURL_VERSION:-7.60.0}
-MSGPACK_VERSION=${MSGPACK_VERSION:-3.0.1}
+OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.5.0}
+CURL_VERSION=${CURL_VERSION:-7.61.1}
+MSGPACK_VERSION=${MSGPACK_VERSION:-3.1.1}
 
 # Allow specifying dependencies not to install. By default we want to compile
 # our own versions, but under some circumstances (eg building opentracing-nginx
