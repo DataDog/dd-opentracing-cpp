@@ -26,25 +26,40 @@ then
   exit 1
 fi
 
-if [[ $(ls $GOPATH/bin/hub | wc -l) == "0" ]]
+if ! [[ -f "$GOPATH/bin/hub" ]]
 then
   echo "Installing required tool Github 'hub'"
   go get github.com/github/hub
 fi
 
-read -p "Creating a release off \"$(git branch | grep \* | cut -d ' ' -f2)\", is this correct? [Y/n] "  Y
-if [[ -n $Y && "$(echo $Y | tr '[:upper:]' '[:lower:]')" != "y" ]]
+echo "Note: Make sure that you can sign commits on this machine with your GPG key: "
+echo "https://help.github.com/articles/signing-commits/"
+echo ""
+
+read -p "Creating a release off \"$(git symbolic-ref --short HEAD)\", is this correct? [Y/n] "  Y
+if ! [[ -z $Y || $Y == "y" || $Y == "Y" ]]
 then
   exit 0
 fi
 
 read -p "Enter release version (eg v1.2.3 or test-myfeature) " VERSION
-echo "Make sure that you can sign commits on this machine with your GPG key: "
-echo "https://help.github.com/articles/signing-commits/"
-read -p "Press enter to edit git tag description " Y
-
-git tag -s $VERSION
-git push origin $VERSION
+if [[ -z $VERSION ]]
+then
+  echo "Please enter a version"
+  exit 1
+elif [[ -n $(git ls-remote --tags origin $VERSION) ]]
+then
+  Y=
+  read -p "The tag $VERSION already exists, continue with release using this tag? [Y/n] " Y
+  if ! [[ -z $Y || $Y == "y" || $Y == "Y" ]]
+  then
+    exit 0
+  fi
+else
+  read -p "Press enter to edit git tag description " Y
+  git tag -s $VERSION
+  git push origin $VERSION
+fi
 
 echo "Waiting on CircleCI build..."
 
@@ -70,6 +85,7 @@ while : ; do
   sleep 30
 done
 
+# Download artifacts
 echo "Build status \"$STATUS\", downloading artifacts..."
 ARTIFACT_URLS=$(curl -s https://circleci.com/api/v1.1/project/github/DataDog/dd-opentracing-cpp/${BUILD_NUM}/artifacts?circle-token=${CIRCLE_CI_TOKEN} | jq -r '.[] | .url')
 
@@ -82,10 +98,12 @@ echo $ARTIFACT_URLS | while read ARTIFACT_URL
     curl -s -O ${ARTIFACT_URL}
   done
 
+# Process and sign artifacts
 gzip libdd_opentracing_plugin.so
 mv libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
 gpg --armor --detach-sign linux-amd64-libdd_opentracing_plugin.so.gz
 
+# Create a github release
 PRERELEASE=$([ $IS_PRERELEASE = true ] && echo "-p" || echo "")
 $GOPATH/bin/hub release create $PRERELEASE \
   -a linux-amd64-libdd_opentracing_plugin.so.gz \
