@@ -19,6 +19,7 @@ AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<SampleProvider> sampler)
   // Set up common headers and default encoder
   common_headers_ = {{"Content-Type", "application/msgpack"},
                      {"Datadog-Meta-Lang", "cpp"},
+                     {"Datadog-Meta-Lang-Version", config::cpp_version},
                      {"Datadog-Meta-Tracer-Version", config::tracer_version}};
 }
 

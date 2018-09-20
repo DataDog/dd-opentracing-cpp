@@ -10,6 +10,7 @@ namespace opentracing {
 namespace config {
 
 const std::string tracer_version = VERSION;
+const std::string cpp_version = std::to_string(__cplusplus);
 
 }  // namespace config
 }  // namespace opentracing
