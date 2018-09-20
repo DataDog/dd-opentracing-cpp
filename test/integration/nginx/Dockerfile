@@ -28,11 +28,12 @@ RUN make install
 
 # Build nginx-opentracing ourselves
 RUN wget https://github.com/opentracing-contrib/nginx-opentracing/archive/v${NGINX_OPENTRACING_VERSION}.tar.gz -O nginx-opentracing.tar.gz && \
-  tar zxvf nginx-opentracing.tar.gz
+  mkdir nginx-opentracing && \
+  tar zxvf nginx-opentracing.tar.gz -C nginx-opentracing --strip-components=1
 RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz -O nginx-${NGINX_VERSION}.tar.gz
 RUN tar zxvf nginx-${NGINX_VERSION}.tar.gz
-# TODO(willgittoes-dd): Get these configure args automatically by installing nginx.
-RUN cd  nginx-${NGINX_VERSION} && \
+# TODO(willgittoes-dd): Get these configure args automatically by installing nginx and using `nginx -V`.
+RUN cd nginx-${NGINX_VERSION} && \
   ./configure \
   --prefix=/etc/nginx --modules-path=/usr/lib/nginx/modules \
   --user=nginx --group=nginx --with-compat --with-file-aio --with-threads \
