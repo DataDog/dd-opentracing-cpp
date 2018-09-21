@@ -4,6 +4,7 @@ set -eo pipefail
 OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.5.0}
 CURL_VERSION=${CURL_VERSION:-7.61.1}
 MSGPACK_VERSION=${MSGPACK_VERSION:-3.1.1}
+ZLIB_VERSION=${ZLIB_VERSION:-1.2.11}
 
 # Allow specifying dependencies not to install. By default we want to compile
 # our own versions, but under some circumstances (eg building opentracing-nginx
@@ -11,6 +12,7 @@ MSGPACK_VERSION=${MSGPACK_VERSION:-3.1.1}
 BUILD_OPENTRACING=1
 BUILD_CURL=1
 BUILD_MSGPACK=1
+BUILD_ZLIB=1
 
 while test $# -gt 0
 do
@@ -20,6 +22,8 @@ do
     not-opentracing) BUILD_OPENTRACING=0
       ;;
     not-curl) BUILD_CURL=0
+      ;;
+    not-zlib) BUILD_ZLIB=0
       ;;
     *) echo "unknown dependency: $1" && exit 1
       ;;
@@ -54,6 +58,16 @@ if [ "$BUILD_MSGPACK" -eq "1" ]; then
   make
   make install
   cd ../..
+fi
+
+# Zlib
+if [ "$BUILD_ZLIB" -eq "1" ]; then
+  wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+  tar zxf zlib-${ZLIB_VERSION}.tar.gz
+  cd zlib-${ZLIB_VERSION}
+  ./configure --static
+  make && make install
+  cd ..
 fi
 
 # Libcurl

@@ -3,7 +3,7 @@ version: 2
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_1
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_2
 
 jobs:
   build:
