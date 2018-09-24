@@ -16,8 +16,8 @@ int OpenTracingMakeTracerFactoryFunction(const char* opentracing_version,
   }
 
   if (std::strcmp(opentracing_abi_version, OPENTRACING_ABI_VERSION) != 0) {
-    std::cerr << "version mismatch: " << std::string(opentracing_version)
-              << " != " << std::string(OPENTRACING_VERSION) << std::endl;
+    std::cerr << "version mismatch: " << std::string(opentracing_abi_version)
+              << " != " << std::string(OPENTRACING_ABI_VERSION) << std::endl;
     *error_category = static_cast<const void*>(&opentracing::dynamic_load_error_category());
     return opentracing::incompatible_library_versions_error.value();
   }
