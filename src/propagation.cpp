@@ -148,6 +148,11 @@ SpanContext SpanContext::withId(uint64_t id) const {
 }
 
 ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
+  // check ostream state
+  if (!writer.good()) {
+    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+  }
+
   json j;
   // JSON numbers only support 64bit IEEE 754, so we encode these as strings.
   j[json_trace_id_key] = std::to_string(trace_id_);
@@ -156,7 +161,13 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
     j[json_sampling_priority_key] = static_cast<int>(*sampling_priority_);
   }
   j[json_baggage_key] = baggage_;
+
   writer << j.dump();
+  // check ostream state
+  if (!writer.good()) {
+    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+  }
+
   return {};
 }
 
@@ -212,21 +223,25 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
   OptionalSamplingPriority sampling_priority = nullptr;
   std::unordered_map<std::string, std::string> baggage;
   json j;
-  reader >> j;
-  std::string trace_id_str = j[json_trace_id_key];
-  std::string parent_id_str = j[json_parent_id_key];
 
-  if (trace_id_str.empty() && parent_id_str.empty()) {
+  reader >> j;
+  bool trace_id_set = j.find(json_trace_id_key) != j.end();
+  bool parent_id_set = j.find(json_parent_id_key) != j.end();
+
+  if (!trace_id_set && !parent_id_set) {
     // both ids empty, return empty context
     return {};
   }
-  if (trace_id_str.empty() || parent_id_str.empty()) {
+  if (!trace_id_set || !parent_id_set) {
     // missing one id, return unexpected error
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
 
+  std::string trace_id_str = j[json_trace_id_key];
+  std::string parent_id_str = j[json_parent_id_key];
   trace_id = std::stoull(trace_id_str);
   parent_id = std::stoull(parent_id_str);
+
   if (j.find(json_sampling_priority_key) != j.end()) {
     sampling_priority = asSamplingPriority(j[json_sampling_priority_key]);
     if (sampling_priority == nullptr) {
@@ -234,11 +249,15 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
       return ot::make_unexpected(ot::span_context_corrupted_error);
     }
   }
-  baggage = j[json_baggage_key].get<std::unordered_map<std::string, std::string>>();
+  if (j.find(json_baggage_key) != j.end()) {
+    baggage = j[json_baggage_key].get<std::unordered_map<std::string, std::string>>();
+  }
 
   return std::unique_ptr<ot::SpanContext>(std::make_unique<SpanContext>(
       parent_id, trace_id, std::move(sampling_priority), std::move(baggage)));
 
+} catch (const json::parse_error &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
 } catch (const std::invalid_argument &ia) {
   return ot::make_unexpected(ot::span_context_corrupted_error);
 } catch (const std::bad_alloc &) {

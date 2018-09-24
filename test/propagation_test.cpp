@@ -114,4 +114,44 @@ TEST_CASE("Binary Span Context") {
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
     }
   }
+
+  SECTION("serialise fails") {
+    SECTION("when the writer is not 'good'") {
+      carrier.clear(carrier.badbit);
+      auto err = context.serialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == std::make_error_code(std::errc::io_error));
+      carrier.clear(carrier.goodbit);
+    }
+  }
+
+  SECTION("deserialize fails") {
+    SECTION("when trace_id is missing") {
+      carrier << "{ \"parent_id\": \"420\" }";
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == ot::span_context_corrupted_error);
+    }
+
+    SECTION("when parent_id is missing") {
+      carrier << "{ \"trace_id\": \"123\" }";
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == ot::span_context_corrupted_error);
+    }
+
+    SECTION("when the sampling priority is whack") {
+      carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == ot::span_context_corrupted_error);
+    }
+
+    SECTION("when given invalid json data") {
+      carrier << "something that isn't JSON";
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == std::make_error_code(std::errc::invalid_argument));
+    }
+  }
 }
