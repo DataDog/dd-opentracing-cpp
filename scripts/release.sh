@@ -92,7 +92,7 @@ ARTIFACT_URLS=$(curl -s https://circleci.com/api/v1.1/project/github/DataDog/dd-
 rm -rf .bin
 mkdir .bin
 cd .bin
-echo $ARTIFACT_URLS | while read ARTIFACT_URL
+echo "${ARTIFACT_URLS}" | while read ARTIFACT_URL
   do
     echo "Downloading artifact: ${ARTIFACT_URL}"
     curl -s -O ${ARTIFACT_URL}
