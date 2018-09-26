@@ -68,11 +68,11 @@ SpanContext SpanContext::NginxOpenTracingCompatibilityHackSpanContext(
 }
 
 SpanContext::SpanContext(SpanContext &&other)
-    : id_(other.id_),
+    : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
+      id_(other.id_),
       trace_id_(other.trace_id_),
       sampling_priority_(std::move(other.sampling_priority_)),
-      baggage_(std::move(other.baggage_)),
-      nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_) {}
+      baggage_(std::move(other.baggage_)) {}
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
