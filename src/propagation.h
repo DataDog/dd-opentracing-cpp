@@ -20,6 +20,12 @@ enum class SamplingPriority : int {
   MaximumValue = UserKeep,
 };
 
+// A SamplingPriority that encompasses only values that may be directly set by users.
+enum class UserSamplingPriority : int {
+  UserDrop = SamplingPriority::UserDrop,
+  UserKeep = SamplingPriority::UserKeep,
+};
+
 // Move to std::optional in C++17 when it has better compiler support.
 using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
 

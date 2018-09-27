@@ -69,7 +69,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
       buffer_(std::move(buffer)),
       get_time_(get_time),
       sampler_(sampler),
-      context_(std::move(context)),
+      context_(std::make_shared<SpanContext>(std::move(context))),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
@@ -77,7 +77,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
                              start_time_.absolute_time.time_since_epoch())
                              .count())) {
-  buffer_->registerSpan(*span_.get());  // Doesn't keep reference.
+  buffer_->registerSpan(context_);
 }
 
 Span::~Span() {
@@ -122,7 +122,7 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   }
   // Check for sampling.
   assignSamplingPriority();
-  OptionalSamplingPriority sampling_priority = context_.getSamplingPriority();
+  OptionalSamplingPriority sampling_priority = context_->getSamplingPriority();
   if (sampling_priority != nullptr) {
     span_->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
   }
@@ -279,21 +279,29 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
 }
 
 void Span::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {
-  context_.setBaggageItem(restricted_key, value);
+  context_->setBaggageItem(restricted_key, value);
 }
 
 std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
-  return context_.baggageItem(restricted_key);
+  return context_->baggageItem(restricted_key);
 }
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
-void Span::assignSamplingPriority() const {
-  bool is_root_span = span_->parent_id == 0;
-  bool sampling_priority_unset = context_.getSamplingPriority() == nullptr;
-  if (is_root_span && sampling_priority_unset) {
-    context_.setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
+OptionalSamplingPriority Span::setSamplingPriority(UserSamplingPriority *priority) {
+  OptionalSamplingPriority current = context_->getSamplingPriority();
+  if (current != nullptr && (*current == SamplerKeep || *current == SamplerDrop)) {
+    return current;
   }
+}
+
+OptionalSamplingPriority Span::assignSamplingPriority() const {
+  bool is_root_span = span_->parent_id == 0;
+  bool sampling_priority_unset = context_->getSamplingPriority() == nullptr;
+  if (is_root_span && sampling_priority_unset) {
+    context_->setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
+  }
+  return context_->getSamplingPriority();
 }
 
 const ot::SpanContext &Span::context() const noexcept {
@@ -307,7 +315,7 @@ const ot::SpanContext &Span::context() const noexcept {
   // this spooky action at a distance of assigning a SamplingPriority.
   // For this reason this method can't be const unless context_ is mutable.
   assignSamplingPriority();
-  return context_;
+  return *context_;
 }
 
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }

@@ -92,9 +92,14 @@ class Span : public ot::Span {
 
   uint64_t traceId() const;
   uint64_t spanId() const;
+  // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
+  // value of the SamplingPriority; this may not be the same as the given parameter if this trace
+  // has propagated from a remote origin and already has a SamplingPriority.
+  OptionalSamplingPriority setSamplingPriority(UserSamplingPriority *priority);
 
  private:
-  void assignSamplingPriority() const;  // Sooo not const. See definition of method Span::context.
+  OptionalSamplingPriority assignSamplingPriority()
+      const;  // Sooo not const. See definition of method Span::context.
 
   mutable std::mutex mutex_;
   std::atomic<bool> is_finished_{false};
@@ -104,7 +109,8 @@ class Span : public ot::Span {
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   std::shared_ptr<SampleProvider> sampler_;
-  mutable SpanContext context_;  // Mutable as a hack. See definition of method Span::context.
+  // Mutable as a hack. See definition of method Span::context.
+  mutable std::shared_ptr<SpanContext> context_;
   TimePoint start_time_;
   std::string operation_name_override_;
 
