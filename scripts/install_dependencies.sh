@@ -1,5 +1,5 @@
-#!/bin/bash
-set -eo pipefail
+#!/bin/sh
+set -e
 
 OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.5.0}
 CURL_VERSION=${CURL_VERSION:-7.61.1}

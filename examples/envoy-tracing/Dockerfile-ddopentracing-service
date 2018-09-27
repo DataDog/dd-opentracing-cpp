@@ -1,48 +1,12 @@
 # Original from envoyproject/envoy:examples/front-proxy/Dockerfile-service
 # Modified by DataDog:
 # - add build and install step for dd-opentracing-cpp library
-#
-# Build and run envoyproxy/envoy, traced by Datadog
-# This build context should match the one envoy uses to avoid shared library version problems (eg:
-FROM frolvlad/alpine-glibc as build
-
-RUN apk update && apk add git pcre-dev zlib-dev curl-dev wget curl tar g++ cmake make binutils 
-
-# Install opentracing dependency
-RUN wget -O opentracing-cpp.tar.gz https://github.com/opentracing/opentracing-cpp/archive/v1.3.0.tar.gz
-RUN tar zxvf opentracing-cpp.tar.gz
-RUN mkdir opentracing-cpp-1.3.0/.build
-WORKDIR opentracing-cpp-1.3.0/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
-
-# Install msgpack dependency
-RUN wget https://github.com/msgpack/msgpack-c/releases/download/cpp-2.1.5/msgpack-2.1.5.tar.gz
-RUN tar zxvf msgpack-2.1.5.tar.gz
-RUN mkdir msgpack-2.1.5/.build
-WORKDIR msgpack-2.1.5/.build
-RUN cmake ..
-RUN make
-RUN make install
-WORKDIR ../..
-
-# Compile dd-opentracing-cpp
-ADD ./ ./dd-opentracing-cpp/
-RUN rm -rf dd-opentracing-cpp/.build 
-RUN mkdir dd-opentracing-cpp/.build
-WORKDIR dd-opentracing-cpp/.build
-RUN cmake -D BUILD_TESTING:BOOL=OFF ..
-RUN make
-RUN make install
-WORKDIR ../..
-
-# Final container
 FROM envoyproxy/envoy-alpine:latest
 
-COPY --from=build /usr/local/lib/libopentracing.so.1 /usr/local/lib/libdd_opentracing.so /usr/local/lib/
-RUN ldconfig /usr/local/lib
+ARG DATADOG_PLUGIN_VERSION=0.3.1
+
+ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
+RUN gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing.so
 
 RUN apk update && apk add python3 bash
 RUN python3 --version && pip3 --version
@@ -52,8 +16,6 @@ ADD ./examples/envoy-tracing/service.py /code
 ADD ./examples/envoy-tracing/start_service.sh /usr/local/bin/start_service.sh
 RUN chmod u+x /usr/local/bin/start_service.sh
 
-RUN apk add libcurl libstdc++
-COPY --from=build /usr/local/lib/libopentracing.so.1 /usr/local/lib/libdd_opentracing.so /usr/local/lib/
-RUN ldconfig /usr/local/lib
+# RUN apk add libcurl libstdc++
 
 ENTRYPOINT /usr/local/bin/start_service.sh
