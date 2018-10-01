@@ -288,11 +288,13 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
-OptionalSamplingPriority Span::setSamplingPriority(UserSamplingPriority *priority) {
-  OptionalSamplingPriority current = context_->getSamplingPriority();
-  if (current != nullptr && (*current == SamplerKeep || *current == SamplerDrop)) {
-    return current;
+OptionalSamplingPriority Span::setSamplingPriority(UserSamplingPriority *user_priority) {
+  OptionalSamplingPriority priority(nullptr);
+  if (user_priority != nullptr) {
+    priority = asSamplingPriority(static_cast<int>(*user_priority));
   }
+  context_->setSamplingPriority(std::move(priority));
+  return context_->getSamplingPriority();
 }
 
 OptionalSamplingPriority Span::assignSamplingPriority() const {

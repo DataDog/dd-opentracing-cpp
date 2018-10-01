@@ -21,31 +21,33 @@ dict getBaggage(SpanContext* ctx) {
 
 TEST_CASE("SpanContext") {
   MockTextMapCarrier carrier{};
+  auto buffer = std::make_shared<MockBuffer>();
   SpanContext context{420,
                       123,
                       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep),
-                      {{"ayy", "lmao"}, {"hi", "haha"}}};
+                      {{"ayy", "lmao"}, {"hi", "haha"}},
+                      buffer};
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier));
 
     SECTION("can be deserialized") {
-      auto sc = SpanContext::deserialize(carrier);
+      auto sc = SpanContext::deserialize(carrier, buffer);
       auto received_context = dynamic_cast<SpanContext*>(sc->get());
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
-      REQUIRE(received_context->trace_id() == 123);
+      REQUIRE(received_context->traceId() == 123);
       REQUIRE(received_context->getSamplingPriority() != nullptr);
       REQUIRE(*received_context->getSamplingPriority() == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
         carrier.Set("some junk thingy", "ayy lmao");
-        auto sc = SpanContext::deserialize(carrier);
+        auto sc = SpanContext::deserialize(carrier, buffer);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
         REQUIRE(received_context->id() == 420);
-        REQUIRE(received_context->trace_id() == 123);
+        REQUIRE(received_context->traceId() == 123);
         REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
       }
     }
@@ -71,7 +73,7 @@ TEST_CASE("SpanContext") {
     SECTION("when there are missing keys") {
       carrier.Set("x-datadog-trace-id", "123");
       carrier.Set("but where is parent-id??", "420");
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
@@ -79,14 +81,14 @@ TEST_CASE("SpanContext") {
     SECTION("when there are formatted keys") {
       carrier.Set("x-datadog-trace-id", "The madman! This isn't even a number!");
       carrier.Set("x-datadog-parent-id", "420");
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when the sampling priority is whack") {
       carrier.Set("x-datadog-sampling-priority", "420");
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
@@ -95,20 +97,22 @@ TEST_CASE("SpanContext") {
 
 TEST_CASE("Binary Span Context") {
   std::stringstream carrier{};
+  auto buffer = std::make_shared<MockBuffer>();
   SpanContext context{420,
                       123,
                       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep),
-                      {{"ayy", "lmao"}, {"hi", "haha"}}};
+                      {{"ayy", "lmao"}, {"hi", "haha"}},
+                      buffer};
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier));
 
     SECTION("can be deserialized") {
-      auto sc = SpanContext::deserialize(carrier);
+      auto sc = SpanContext::deserialize(carrier, buffer);
       auto received_context = dynamic_cast<SpanContext*>(sc->get());
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
-      REQUIRE(received_context->trace_id() == 123);
+      REQUIRE(received_context->traceId() == 123);
       REQUIRE(received_context->getSamplingPriority() != nullptr);
       REQUIRE(*received_context->getSamplingPriority() == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
@@ -126,30 +130,30 @@ TEST_CASE("Binary Span Context") {
   }
 
   SECTION("deserialize fails") {
-    SECTION("when trace_id is missing") {
+    SECTION("when traceId is missing") {
       carrier << "{ \"parent_id\": \"420\" }";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when parent_id is missing") {
-      carrier << "{ \"trace_id\": \"123\" }";
-      auto err = SpanContext::deserialize(carrier);
+      carrier << "{ \"traceId\": \"123\" }";
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when the sampling priority is whack") {
-      carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
-      auto err = SpanContext::deserialize(carrier);
+      carrier << "{ \"traceId\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when given invalid json data") {
       carrier << "something that isn't JSON";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(carrier, buffer);
       REQUIRE(!err);
       REQUIRE(err.error() == std::make_error_code(std::errc::invalid_argument));
     }

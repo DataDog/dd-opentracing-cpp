@@ -16,17 +16,17 @@ TEST_CASE("span") {
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
   auto sampler = std::make_shared<KeepAllSampler>();
-  auto buffer = new MockBuffer();
+  auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   const ot::FinishSpanOptions finish_options;
 
   SECTION("receives id") {
     auto span_id = get_id();
-    Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
+    Span span{nullptr,    buffer,
               get_time,   sampler,
               span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(), "",
               "",         "",
               "",         ""};
@@ -40,10 +40,10 @@ TEST_CASE("span") {
 
   SECTION("registers with SpanBuffer") {
     auto span_id = get_id();
-    Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
+    Span span{nullptr,    buffer,
               get_time,   sampler,
               span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(), "",
               "",         "",
               "",         ""};
@@ -55,10 +55,10 @@ TEST_CASE("span") {
 
   SECTION("timed correctly") {
     auto span_id = get_id();
-    Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
+    Span span{nullptr,    buffer,
               get_time,   sampler,
               span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(), "",
               "",         "",
               "",         ""};
@@ -98,11 +98,13 @@ TEST_CASE("span") {
     std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
     for (auto& test_case : test_cases) {
       auto span_id = get_id();
-      Span span{
-          nullptr,    buffer_ptr, get_time, sampler,
-          span_id,    span_id,    0,        std::move(SpanContext{span_id, span_id, nullptr, {}}),
-          get_time(), "",         "",       "",
-          "",         ""};
+      Span span{nullptr,    buffer_ptr,
+                get_time,   sampler,
+                span_id,    span_id,
+                0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.SetTag("http.url", test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
@@ -114,10 +116,10 @@ TEST_CASE("span") {
 
   SECTION("finishes once") {
     auto span_id = get_id();
-    Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
+    Span span{nullptr,    buffer,
               get_time,   sampler,
               span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(), "",
               "",         "",
               "",         ""};
@@ -133,10 +135,10 @@ TEST_CASE("span") {
 
   SECTION("handles tags") {
     auto span_id = get_id();
-    Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
+    Span span{nullptr,    buffer,
               get_time,   sampler,
               span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(), "",
               "",         "",
               "",         ""};
@@ -178,13 +180,13 @@ TEST_CASE("span") {
   SECTION("maps datadog tags to span data") {
     auto span_id = get_id();
     Span span{nullptr,
-              std::shared_ptr<SpanBuffer>{buffer},
+              buffer,
               get_time,
               sampler,
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(),
               "original service",
               "original type",
@@ -211,13 +213,13 @@ TEST_CASE("span") {
   SECTION("operation name can be overridden") {
     auto span_id = get_id();
     Span span{nullptr,
-              std::shared_ptr<SpanBuffer>{buffer},
+              buffer,
               get_time,
               sampler,
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(),
               "original service",
               "original type",
@@ -239,13 +241,13 @@ TEST_CASE("span") {
   SECTION("special resource tag has priority over operation name override") {
     auto span_id = get_id();
     Span span{nullptr,
-              std::shared_ptr<SpanBuffer>{buffer},
+              buffer,
               get_time,
               sampler,
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(),
               "original service",
               "original type",
@@ -268,13 +270,13 @@ TEST_CASE("span") {
   SECTION("OpenTracing operation name works") {
     auto span_id = get_id();
     Span span{nullptr,
-              std::shared_ptr<SpanBuffer>{buffer},
+              buffer,
               get_time,
               sampler,
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}}),
+              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
               get_time(),
               "original service",
               "original type",
@@ -309,13 +311,11 @@ TEST_CASE("span") {
         std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
 
     SECTION("root spans may be sampled") {
-      Span span{nullptr,    std::shared_ptr<SpanBuffer>{buffer},
-                get_time,   priority_sampler,
-                100,        100,
-                0,          std::move(SpanContext{100, 100, nullptr, {}}),
-                get_time(), "",
-                "",         "",
-                "",         ""};
+      Span span{
+          nullptr,    buffer, get_time, priority_sampler,
+          100,        100,    0,        std::move(SpanContext{100, 100, nullptr, {}, buffer}),
+          get_time(), "",     "",       "",
+          "",         ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces[100].finished_spans->at(0);
@@ -325,13 +325,13 @@ TEST_CASE("span") {
 
     SECTION("non-root spans may not be sampled") {
       Span span{nullptr,
-                std::shared_ptr<SpanBuffer>{buffer},
+                buffer,
                 get_time,
                 priority_sampler,
                 100,
                 100,
                 42 /* Totally not a root span! */,
-                std::move(SpanContext{100, 100, nullptr, {}}),
+                std::move(SpanContext{100, 100, nullptr, {}, buffer}),
                 get_time(),
                 "",
                 "",
@@ -345,21 +345,25 @@ TEST_CASE("span") {
     }
 
     SECTION("spans with an existing sampling priority may not be given a new one at Finish") {
-      Span span{nullptr,
-                std::shared_ptr<SpanBuffer>{buffer},
-                get_time,
-                priority_sampler,
-                100,
-                100,
-                0,
-                std::move(SpanContext{
-                    100, 100, std::make_unique<SamplingPriority>(SamplingPriority::UserDrop), {}}),
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+      Span span{
+          nullptr,
+          buffer,
+          get_time,
+          priority_sampler,
+          100,
+          100,
+          0,
+          std::move(SpanContext{100,
+                                100,
+                                std::make_unique<SamplingPriority>(SamplingPriority::UserDrop),
+                                {},
+                                buffer}),
+          get_time(),
+          "",
+          "",
+          "",
+          "",
+          ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces[100].finished_spans->at(0);

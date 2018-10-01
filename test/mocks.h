@@ -35,14 +35,15 @@ struct TestSpanData : public SpanData {
 struct MockBuffer : public SpanBuffer {
   MockBuffer(){};
 
-  void registerSpan(const SpanData& span) override {
-    uint64_t trace_id = span.traceId();
+  void registerSpan(const std::shared_ptr<SpanContext>& context) override {
+    uint64_t trace_id = context->traceId();
     auto trace = traces.find(trace_id);
     if (trace == traces.end()) {
       traces.emplace(std::make_pair(trace_id, PendingTrace{}));
       trace = traces.find(trace_id);
+      trace->second.root_context = context;
     }
-    trace->second.all_spans.insert(span.spanId());
+    trace->second.all_spans.insert(context->id());
   }
 
   void finishSpan(std::unique_ptr<SpanData> span) override {
@@ -52,6 +53,14 @@ struct MockBuffer : public SpanBuffer {
       return;
     }
     trace->second.finished_spans->push_back(std::move(span));
+  }
+
+  std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const override {
+    auto trace = traces.find(trace_id);
+    if (trace == traces.end()) {
+      return nullptr;
+    }
+    return trace->second.root_context;
   }
 
   std::unordered_map<uint64_t, PendingTrace> traces;

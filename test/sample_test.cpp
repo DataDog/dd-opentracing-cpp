@@ -15,7 +15,7 @@ TEST_CASE("sample") {
   std::tm start{0, 0, 0, 12, 2, 107};  // Starting calendar time 2007-03-12 00:00:00
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
-  auto buffer = new MockBuffer();
+  auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   TracerOptions tracer_options{"", 0, "service_name", "web"};
@@ -23,7 +23,7 @@ TEST_CASE("sample") {
 
   SECTION("keep all traces") {
     std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+        new Tracer{tracer_options, buffer, get_time, get_id,
                    std::shared_ptr<SampleProvider>{new KeepAllSampler()}}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_kept", span_options);
@@ -42,7 +42,7 @@ TEST_CASE("sample") {
 
   SECTION("discard all tracer") {
     std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+        new Tracer{tracer_options, buffer, get_time, get_id,
                    std::shared_ptr<SampleProvider>{new DiscardAllSampler()}}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
@@ -55,7 +55,7 @@ TEST_CASE("sample") {
   SECTION("discard rate sampler") {
     double rate = 0.75;
     std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+        new Tracer{tracer_options, buffer, get_time, get_id,
                    std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
 
     for (int i = 0; i < 100; i++) {
@@ -72,7 +72,7 @@ TEST_CASE("sample") {
   SECTION("discard rate sampler applied to child spans within same trace") {
     double rate = 0;
     std::shared_ptr<ot::Tracer> tracer{
-        new Tracer{tracer_options, std::shared_ptr<SpanBuffer>{buffer}, get_time, get_id,
+        new Tracer{tracer_options, buffer, get_time, get_id,
                    std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
     auto ot_root_span = tracer->StartSpan("/discard_rate_sample");
     uint64_t trace_id = (dynamic_cast<const Span *>(ot_root_span.get()))->traceId();
@@ -99,13 +99,14 @@ TEST_CASE("sample") {
 
 TEST_CASE("priority sampler unit test") {
   PrioritySampler sampler;
+  auto buffer = std::make_shared<MockBuffer>();
 
   SECTION("doesn't discard") {
-    for (const SpanContext &ctx :
-         {SpanContext{1, 1, nullptr, {}}, SpanContext{1, 2, asSamplingPriority(-1), {}},
-          SpanContext{1, 2, asSamplingPriority(0), {}},
-          SpanContext{1, 2, asSamplingPriority(1), {}},
-          SpanContext{1, 2, asSamplingPriority(2), {}}}) {
+    for (const SpanContext &ctx : {SpanContext{1, 1, nullptr, {}, buffer},
+                                   SpanContext{1, 2, asSamplingPriority(-1), {}, buffer},
+                                   SpanContext{1, 2, asSamplingPriority(0), {}, buffer},
+                                   SpanContext{1, 2, asSamplingPriority(1), {}, buffer},
+                                   SpanContext{1, 2, asSamplingPriority(2), {}, buffer}}) {
       REQUIRE(!sampler.discard(ctx));
     }
   }

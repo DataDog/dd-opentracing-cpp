@@ -6,13 +6,13 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "span.h"
 
 namespace datadog {
 namespace opentracing {
 
 class Writer;
 class SpanContext;
-class SpanData;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 struct PendingTrace {
@@ -22,7 +22,7 @@ struct PendingTrace {
   Trace finished_spans;
   std::unordered_set<uint64_t> all_spans;
   // The root span's context.
-  std::shared_ptr<SpanContext> root_context;
+  std::shared_ptr<SpanContext> root_context = nullptr;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -30,7 +30,7 @@ class SpanBuffer {
  public:
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
-  virtual void registerSpan(const std::shared_ptr<SpanContext> context) = 0;
+  virtual void registerSpan(const std::shared_ptr<SpanContext>& context) = 0;
   virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
   virtual std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const = 0;
 };
@@ -40,7 +40,7 @@ class WritingSpanBuffer : public SpanBuffer {
  public:
   WritingSpanBuffer(std::shared_ptr<Writer> writer);
 
-  void registerSpan(const std::shared_ptr<SpanContext> context) override;
+  void registerSpan(const std::shared_ptr<SpanContext>& context) override;
   void finishSpan(std::unique_ptr<SpanData> span) override;
   std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const override;
 

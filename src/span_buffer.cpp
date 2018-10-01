@@ -8,16 +8,16 @@ namespace opentracing {
 
 WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<Writer> writer) : writer_(writer) {}
 
-void WritingSpanBuffer::registerSpan(const std::shared_ptr<SpanContext> context) {
+void WritingSpanBuffer::registerSpan(const std::shared_ptr<SpanContext>& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   uint64_t trace_id = context->traceId();
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
     traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
     trace = traces_.find(trace_id);
+    trace->second.root_context = context;
   }
   trace->second.all_spans.insert(context->id());
-  trace->second.root_context = context;
 }
 
 void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
@@ -39,9 +39,9 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   }
 }
 
-std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const {
+std::shared_ptr<SpanContext> WritingSpanBuffer::getRootSpanContext(uint64_t trace_id) const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  auto trace = traces_.find(span->traceId());
+  auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
     return nullptr;
   }
