@@ -29,7 +29,7 @@ const std::string AgentHttpEncoder::path() { return agent_api_path; }
 
 void AgentHttpEncoder::clearTraces() { traces_.clear(); }
 
-const std::size_t AgentHttpEncoder::pendingTraces() { return traces_.size(); }
+std::size_t AgentHttpEncoder::pendingTraces() { return traces_.size(); }
 
 const std::map<std::string, std::string> AgentHttpEncoder::headers() {
   std::map<std::string, std::string> headers(common_headers_);
