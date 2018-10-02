@@ -49,6 +49,7 @@ endif()
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
+find_package(ZLIB REQUIRED)
 find_library(MSGPACK_LIB msgpack)
 find_package(CURL)
 find_package(Threads REQUIRED)
@@ -56,7 +57,7 @@ find_package(Threads REQUIRED)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/3rd_party/sanitizers-cmake" ${CMAKE_MODULE_PATH})
 find_package(Sanitizers)
 
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads)
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads)
 
 # Includes
 include_directories(SYSTEM 3rd_party/include)
@@ -70,11 +71,6 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 # Outputs
 ## Shared lib
 if(BUILD_SHARED)
-  # Needed for curl if: curl is built statically, we compile a shared lib, and an nginx build
-  # is happening on the same machine. Using zlib1-dev from repos causes a linker fail.
-  find_package(ZLIB)
-  set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${ZLIB_LIBRARIES} ${CURL_LIBRARIES} Threads::Threads)
-
   add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing)
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
