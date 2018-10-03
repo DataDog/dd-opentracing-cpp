@@ -48,26 +48,26 @@ if [ "$BUILD_OPENTRACING" -eq "1" ]; then
   cd ../..
 fi
 
+# Zlib
+if [ "$BUILD_ZLIB" -eq "1" ]; then
+  wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+  tar zxf zlib-${ZLIB_VERSION}.tar.gz
+  cd zlib-${ZLIB_VERSION}
+  CFLAGS="$CFLAGS -fPIC" ./configure --static
+  make && make install
+  cd ..
+fi
+
 # Msgpack
 if [ "$BUILD_MSGPACK" -eq "1" ]; then
   wget https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz -O msgpack.tar.gz
   tar zxvf msgpack.tar.gz
   mkdir msgpack-${MSGPACK_VERSION}/.build
   cd msgpack-${MSGPACK_VERSION}/.build
-  cmake ..
+  cmake -DBUILD_SHARED_LIBS=OFF ..
   make
   make install
   cd ../..
-fi
-
-# Zlib
-if [ "$BUILD_ZLIB" -eq "1" ]; then
-  wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
-  tar zxf zlib-${ZLIB_VERSION}.tar.gz
-  cd zlib-${ZLIB_VERSION}
-  ./configure --static
-  make && make install
-  cd ..
 fi
 
 # Libcurl
@@ -86,6 +86,7 @@ if [ "$BUILD_CURL" -eq "1" ]; then
               --without-ssl \
               --disable-crypto-auth \
               --without-axtls \
+              --with-zlib \
               --disable-rtsp \
               --enable-shared=no \
               --enable-static=yes \
