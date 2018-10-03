@@ -1,6 +1,6 @@
 # Original from envoyproject/envoy:examples/front-proxy/Dockerfile-service
 # Modified by DataDog:
-# - add build and install step for dd-opentracing-cpp library
+# - add install step for dd-opentracing-cpp library
 FROM envoyproxy/envoy-alpine:latest
 
 ARG DATADOG_PLUGIN_VERSION=0.3.1
@@ -15,7 +15,5 @@ RUN mkdir /code
 ADD ./examples/envoy-tracing/service.py /code
 ADD ./examples/envoy-tracing/start_service.sh /usr/local/bin/start_service.sh
 RUN chmod u+x /usr/local/bin/start_service.sh
-
-# RUN apk add libcurl libstdc++
 
 ENTRYPOINT /usr/local/bin/start_service.sh
