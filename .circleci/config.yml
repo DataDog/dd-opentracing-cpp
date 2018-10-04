@@ -82,17 +82,19 @@ jobs:
             cd .build
             cmake $CMAKE_ARGS ..
             make
-            ctest --output-on-failure
+            $RUN_ARGS ctest --output-on-failure
 
   test_tsan:
     <<: *test_sanitizer_base
     environment:
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
+      RUN_ARGS: TSAN_OPTIONS=detect_deadlocks=1:second_deadlock_stack=1
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
+      RUN ARGS:
 
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
