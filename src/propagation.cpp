@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include "sample.h"
 #include "span_buffer.h"
 
 namespace ot = opentracing;
@@ -113,17 +114,21 @@ uint64_t SpanContext::traceId() const {
 
 OptionalSamplingPriority SpanContext::getSamplingPriority() const {
   std::lock_guard<std::mutex> lock{mutex_};
-  return getSamplingPriorityImpl();
+  return getSamplingPriorityImpl(false);
 }
 
-OptionalSamplingPriority SpanContext::getSamplingPriorityImpl() const {
+OptionalSamplingPriority SpanContext::getSamplingPriorityImpl(bool is_root) const {
   // Check to see if there's a root span context, which is authoritative about SamplingPriority.
-  std::shared_ptr<SpanContext> root = pending_traces_->getRootSpanContext(trace_id_);
+  const SpanContext *root = is_root ? this : pending_traces_->getRootSpanContext(trace_id_).get();
   if (root == nullptr) {
+    // This normally shouldn't happen. A SpanContext will only be created in the context of
+    // being a context for a specific Span. That's why we print an error in this case.
+    // SpanContexts are deserialized ("extracted") right before StartSpanWithOptions is called, and
+    // so there is technically a time during which pending_traces will not have a trace for this
+    // context. However the user should not be able to access this context during that time.
+    // Just in case, fall back to returning our own sampling_priority_.
     std::cerr << "No root context found for trace when getting SamplingPriority" << std::endl;
-    return nullptr;
-  }
-  if (root->id() != id()) {
+  } else if (root->id() != id()) {
     return root->getSamplingPriority();
   }
   // We're the root.
@@ -135,8 +140,12 @@ OptionalSamplingPriority SpanContext::getSamplingPriorityImpl() const {
 
 void SpanContext::setSamplingPriority(OptionalSamplingPriority p) {
   std::lock_guard<std::mutex> lock{mutex_};
+  return setSamplingPriorityImpl(std::move(p), false);
+}
+
+void SpanContext::setSamplingPriorityImpl(OptionalSamplingPriority p, bool is_root) {
   // Check to see if there's a root span context, which is authoritative about SamplingPriority.
-  std::shared_ptr<SpanContext> root = pending_traces_->getRootSpanContext(trace_id_);
+  SpanContext *root = is_root ? this : pending_traces_->getRootSpanContext(trace_id_).get();
   if (root == nullptr) {
     std::cerr << "No root context found for trace when setting SamplingPriority" << std::endl;
     return;
@@ -158,6 +167,17 @@ void SpanContext::setSamplingPriority(OptionalSamplingPriority p) {
       sampling_priority_locked_ = true;
     }
   }
+}
+
+OptionalSamplingPriority SpanContext::assignSamplingPriority(
+    const std::shared_ptr<SampleProvider> &sampler, const SpanData *span) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  bool is_root_span = span->parent_id == 0;
+  bool sampling_priority_unset = getSamplingPriorityImpl(true) == nullptr;
+  if (is_root_span && sampling_priority_unset) {
+    setSamplingPriorityImpl(sampler->sample(span->env(), span->service, trace_id_), true);
+  }
+  return getSamplingPriorityImpl(true);
 }
 
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
@@ -196,7 +216,7 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
   // JSON numbers only support 64bit IEEE 754, so we encode these as strings.
   j[json_trace_id_key] = std::to_string(trace_id_);
   j[json_parent_id_key] = std::to_string(id_);
-  OptionalSamplingPriority sampling_priority = getSamplingPriorityImpl();
+  OptionalSamplingPriority sampling_priority = getSamplingPriorityImpl(false);
   if (sampling_priority != nullptr) {
     j[json_sampling_priority_key] = static_cast<int>(*sampling_priority);
   }
@@ -224,7 +244,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
     return result;
   }
 
-  OptionalSamplingPriority sampling_priority = getSamplingPriorityImpl();
+  OptionalSamplingPriority sampling_priority = getSamplingPriorityImpl(false);
   if (sampling_priority != nullptr) {
     result =
         writer.Set(sampling_priority_header, std::to_string(static_cast<int>(*sampling_priority)));

@@ -95,7 +95,7 @@ class Span : public ot::Span {
   // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
   // value of the SamplingPriority; this may not be the same as the given parameter if this trace
   // has propagated from a remote origin and already has a SamplingPriority.
-  OptionalSamplingPriority setSamplingPriority(UserSamplingPriority *priority);
+  OptionalSamplingPriority setSamplingPriority(std::unique_ptr<UserSamplingPriority> priority);
 
  private:
   OptionalSamplingPriority assignSamplingPriority()

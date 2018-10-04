@@ -46,13 +46,18 @@ struct MockBuffer : public SpanBuffer {
     trace->second.all_spans.insert(context->id());
   }
 
-  void finishSpan(std::unique_ptr<SpanData> span) override {
+  void finishSpan(std::unique_ptr<SpanData> span,
+                  const std::shared_ptr<SampleProvider>& sampler) override {
     auto trace = traces.find(span->traceId());
     if (trace == traces.end()) {
       std::cerr << "Missing trace for finished span" << std::endl;
       return;
     }
     trace->second.finished_spans->push_back(std::move(span));
+    if (trace->second.finished_spans->size() == trace->second.all_spans.size()) {
+      // Entire trace is finished!
+      trace->second.finish(sampler);
+    }
   }
 
   std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const override {

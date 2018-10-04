@@ -18,7 +18,6 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
-const std::string sampling_priority_metric = "_sampling_priority_v1";
 }  // namespace
 
 const std::string environment_tag = "environment";
@@ -120,12 +119,6 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
     span_->name = operation_name_override_;
     span_->resource = operation_name_override_;
   }
-  // Check for sampling.
-  assignSamplingPriority();
-  OptionalSamplingPriority sampling_priority = context_->getSamplingPriority();
-  if (sampling_priority != nullptr) {
-    span_->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
-  }
   // Apply special tags.
   // If we add any more cases; then abstract this. For now, KISS.
   auto tag = span_->meta.find(datadog_span_type_tag);
@@ -145,7 +138,7 @@ void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) n
   }
   // Audit and finish span.
   audit(span_.get());
-  buffer_->finishSpan(std::move(span_));
+  buffer_->finishSpan(std::move(span_), sampler_);
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
   span_ = stubSpanData();
@@ -288,21 +281,14 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
 
 void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
 
-OptionalSamplingPriority Span::setSamplingPriority(UserSamplingPriority *user_priority) {
+OptionalSamplingPriority Span::setSamplingPriority(
+    std::unique_ptr<UserSamplingPriority> user_priority) {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
   OptionalSamplingPriority priority(nullptr);
   if (user_priority != nullptr) {
     priority = asSamplingPriority(static_cast<int>(*user_priority));
   }
   context_->setSamplingPriority(std::move(priority));
-  return context_->getSamplingPriority();
-}
-
-OptionalSamplingPriority Span::assignSamplingPriority() const {
-  bool is_root_span = span_->parent_id == 0;
-  bool sampling_priority_unset = context_->getSamplingPriority() == nullptr;
-  if (is_root_span && sampling_priority_unset) {
-    context_->setSamplingPriority(sampler_->sample(span_->env(), span_->service, span_->trace_id));
-  }
   return context_->getSamplingPriority();
 }
 
@@ -316,7 +302,7 @@ const ot::SpanContext &Span::context() const noexcept {
   // anything else happens to want to get and/or serialize a SpanContext, that will end up having
   // this spooky action at a distance of assigning a SamplingPriority.
   // For this reason this method can't be const unless context_ is mutable.
-  assignSamplingPriority();
+  context_->assignSamplingPriority(sampler_, span_.get() /* Doesn't take ownership */);
   return *context_;
 }
 

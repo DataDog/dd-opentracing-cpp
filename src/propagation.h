@@ -11,6 +11,8 @@ namespace datadog {
 namespace opentracing {
 
 class SpanBuffer;
+class SampleProvider;
+class SpanData;
 
 enum class SamplingPriority : int {
   UserDrop = -1,
@@ -71,9 +73,13 @@ class SpanContext : public ot::SpanContext {
   uint64_t traceId() const;
   OptionalSamplingPriority getSamplingPriority() const;
   void setSamplingPriority(OptionalSamplingPriority p);
+  OptionalSamplingPriority assignSamplingPriority(const std::shared_ptr<SampleProvider> &sampler,
+                                                  const SpanData *span);
 
  private:
-  OptionalSamplingPriority getSamplingPriorityImpl() const;  // So we don't need a reentrant mutex.
+  // So we don't need a reentrant mutex.
+  OptionalSamplingPriority getSamplingPriorityImpl(bool is_root) const;
+  void setSamplingPriorityImpl(OptionalSamplingPriority p, bool is_root);
 
   // Terrible, terrible hack; to get around:
   // https://github.com/opentracing-contrib/nginx-opentracing/blob/master/opentracing/src/discover_span_context_keys.cpp#L49-L50

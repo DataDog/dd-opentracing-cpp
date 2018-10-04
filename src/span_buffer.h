@@ -19,6 +19,8 @@ struct PendingTrace {
   PendingTrace()
       : finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}), all_spans() {}
 
+  void finish(const std::shared_ptr<SampleProvider>& sampler);
+
   Trace finished_spans;
   std::unordered_set<uint64_t> all_spans;
   // The root span's context.
@@ -31,7 +33,8 @@ class SpanBuffer {
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
   virtual void registerSpan(const std::shared_ptr<SpanContext>& context) = 0;
-  virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
+  virtual void finishSpan(std::unique_ptr<SpanData> span,
+                          const std::shared_ptr<SampleProvider>& sampler) = 0;
   virtual std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const = 0;
 };
 
@@ -41,7 +44,8 @@ class WritingSpanBuffer : public SpanBuffer {
   WritingSpanBuffer(std::shared_ptr<Writer> writer);
 
   void registerSpan(const std::shared_ptr<SpanContext>& context) override;
-  void finishSpan(std::unique_ptr<SpanData> span) override;
+  void finishSpan(std::unique_ptr<SpanData> span,
+                  const std::shared_ptr<SampleProvider>& sampler) override;
   std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const override;
 
  private:
