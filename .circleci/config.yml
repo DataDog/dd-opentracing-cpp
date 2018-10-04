@@ -82,7 +82,7 @@ jobs:
             cd .build
             cmake $CMAKE_ARGS ..
             make
-            $RUN_ARGS ctest --output-on-failure
+            env $RUN_ARGS ctest --output-on-failure
 
   test_tsan:
     <<: *test_sanitizer_base
