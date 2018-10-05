@@ -89,8 +89,14 @@ namespace {
 // Matches path segments with numbers (except things that look like versions).
 // Similar to, but not the same as,
 // https://github.com/datadog/dd-trace-java/blob/master/dd-trace-ot/src/main/java/datadog/opentracing/decorators/URLAsResourceName.java#L14-L16
-std::regex PATH_MIXED_ALPHANUMERICS{
-    "(\\/)(?:(?:([^?\\/&]*)(?:\\?[^\\/]+))|(?:(?![vV]\\d{1,2}\\/)[^\\/\\d\\?]*[\\d-]+[^\\/]*))"};
+std::regex &PATH_MIXED_ALPHANUMERICS() {
+  // Don't statically initialize a complex object.
+  // Thread safe as of C++11, as long as it's not reentrant.
+  static std::regex r{
+      "(\\/)(?:(?:([^?\\/&]*)(?:\\?[^\\/]+))|(?:(?![vV]\\d{1,2}\\/)[^\\/"
+      "\\d\\?]*[\\d-]+[^\\/]*))"};
+  return r;
+}
 }  // namespace
 
 // Imperfectly audits the data in a Span, removing some things that could cause information leaks
@@ -100,7 +106,7 @@ std::regex PATH_MIXED_ALPHANUMERICS{
 void audit(SpanData *span) {
   auto http_tag = span->meta.find(http_url_tag);
   if (http_tag != span->meta.end()) {
-    http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS, "$1$2?");
+    http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
   }
 }
 

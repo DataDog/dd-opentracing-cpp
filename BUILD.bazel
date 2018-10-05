@@ -17,8 +17,6 @@ cc_library(
         "src/span.h",
         "src/tracer.cpp",
         "src/tracer.h",
-        "src/version_check.cpp",
-        "src/version_check.h",
         "src/writer.cpp",
         "src/writer.h",
         ":version_number.h",
