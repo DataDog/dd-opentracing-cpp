@@ -30,8 +30,8 @@ TEST_CASE("sample") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    REQUIRE(buffer->traces.size() == 1);
-    auto &result = buffer->traces[100].finished_spans->at(0);
+    REQUIRE(buffer->traces().size() == 1);
+    auto &result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->type == "web");
     REQUIRE(result->service == "service_name");
     REQUIRE(result->name == "/should_be_kept");
@@ -49,7 +49,7 @@ TEST_CASE("sample") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    REQUIRE(buffer->traces.size() == 0);
+    REQUIRE(buffer->traces().size() == 0);
   }
 
   SECTION("discard rate sampler") {
@@ -64,7 +64,7 @@ TEST_CASE("sample") {
       span->FinishWithOptions(finish_options);
     }
 
-    auto size = buffer->traces.size();
+    auto size = buffer->traces().size();
     // allow for a tiny bit of variance. double brackets because of macro
     REQUIRE((size >= 24 && size <= 26));
   }
@@ -83,14 +83,14 @@ TEST_CASE("sample") {
     ot_root_span->Finish();
 
     // One trace should have been captured.
-    REQUIRE(buffer->traces.size() == 1);
+    REQUIRE(buffer->traces().size() == 1);
 
     // Both spans should be recorded under the same trace.
-    REQUIRE(buffer->traces[trace_id].finished_spans->size() == 2);
+    REQUIRE(buffer->traces(trace_id).finished_spans->size() == 2);
 
     // The trace id should be the same.
-    auto &root_span = buffer->traces[trace_id].finished_spans->at(1);
-    auto &child_span = buffer->traces[trace_id].finished_spans->at(0);
+    auto &root_span = buffer->traces(trace_id).finished_spans->at(1);
+    auto &child_span = buffer->traces(trace_id).finished_spans->at(0);
     REQUIRE(root_span->traceId() == child_span->traceId());
     // The span id should be different.
     REQUIRE(root_span->spanId() != child_span->spanId());
@@ -102,12 +102,12 @@ TEST_CASE("priority sampler unit test") {
   auto buffer = std::make_shared<MockBuffer>();
 
   SECTION("doesn't discard") {
-    for (const SpanContext &ctx : {SpanContext{1, 1, nullptr, {}, buffer},
-                                   SpanContext{1, 2, asSamplingPriority(-1), {}, buffer},
-                                   SpanContext{1, 2, asSamplingPriority(0), {}, buffer},
-                                   SpanContext{1, 2, asSamplingPriority(1), {}, buffer},
-                                   SpanContext{1, 2, asSamplingPriority(2), {}, buffer}}) {
-      REQUIRE(!sampler.discard(ctx));
+    for (const std::string &p : {"", R"(, "sampling_priority": -1)", R"(, "sampling_priority": 0)",
+                                 R"(, "sampling_priority": 1)", R"(, "sampling_priority": 2)"}) {
+      std::istringstream ctx(R"({"trace_id": "100", "parent_id": "100")" + p + "}");
+      auto context = SpanContext::deserialize(ctx);
+
+      REQUIRE(!sampler.discard(std::move(*static_cast<SpanContext *>(context.value().get()))));
     }
   }
 

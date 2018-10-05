@@ -1,5 +1,6 @@
 #include "span_buffer.h"
 #include <iostream>
+#include "sample.h"
 #include "span.h"
 #include "writer.h"
 
@@ -12,12 +13,10 @@ const std::string sampling_priority_metric = "_sampling_priority_v1";
 
 void PendingTrace::finish(const std::shared_ptr<SampleProvider>& sampler) {
   if (finished_spans->size() == 0) {
+    std::cerr << "finish called on trace with no spans" << std::endl;
     return;  // I don't know why this would ever happen.
   }
   // Check for sampling.
-  SpanData* any_span = finished_spans->at(0).get();
-  OptionalSamplingPriority sampling_priority =
-      root_context->assignSamplingPriority(sampler, any_span);
   if (sampling_priority != nullptr) {
     // Set the metric for every span in the trace.
     for (auto& span : *finished_spans) {
@@ -35,7 +34,9 @@ void WritingSpanBuffer::registerSpan(const std::shared_ptr<SpanContext>& context
   if (trace == traces_.end()) {
     traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
     trace = traces_.find(trace_id);
-    trace->second.root_context = context;
+    auto propagation_status = context->getPropagationStatus();
+    trace->second.sampling_priority_locked = propagation_status.first;
+    trace->second.sampling_priority = std::move(propagation_status.second);
   }
   trace->second.all_spans.insert(context->id());
 }
@@ -53,22 +54,86 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span,
     std::cerr << "A Span that was not registered was submitted to WritingSpanBuffer" << std::endl;
     return;
   }
+  uint64_t trace_id = span->traceId();
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
-    // Entire trace is finished!
+    assignSamplingPriorityImpl(sampler, trace.finished_spans->back().get());
     trace.finish(sampler);
-    writer_->write(std::move(trace.finished_spans));
-    traces_.erase(trace_iter);
+    unbufferAndWriteTrace(trace_id, sampler);
   }
 }
 
-std::shared_ptr<SpanContext> WritingSpanBuffer::getRootSpanContext(uint64_t trace_id) const {
+void WritingSpanBuffer::unbufferAndWriteTrace(uint64_t trace_id,
+                                              const std::shared_ptr<SampleProvider>& sampler) {
+  auto trace_iter = traces_.find(trace_id);
+  if (trace_iter == traces_.end()) {
+    return;
+  }
+  auto& trace = trace_iter->second;
+  writer_->write(std::move(trace.finished_spans));
+  traces_.erase(trace_iter);
+}
+
+OptionalSamplingPriority WritingSpanBuffer::getSamplingPriority(uint64_t trace_id) const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
+  return getSamplingPriorityImpl(trace_id);
+}
+OptionalSamplingPriority WritingSpanBuffer::getSamplingPriorityImpl(uint64_t trace_id) const {
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
+    std::cerr << "Missing trace in getSamplingPriority" << std::endl;
     return nullptr;
   }
-  return trace->second.root_context;
+  if (trace->second.sampling_priority == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<SamplingPriority>(*trace->second.sampling_priority);
+}
+
+OptionalSamplingPriority WritingSpanBuffer::setSamplingPriority(
+    uint64_t trace_id, OptionalSamplingPriority priority) {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  return setSamplingPriorityImpl(trace_id, std::move(priority));
+}
+
+OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
+    uint64_t trace_id, OptionalSamplingPriority priority) {
+  auto trace_entry = traces_.find(trace_id);
+  if (trace_entry == traces_.end()) {
+    std::cerr << "Missing trace in setSamplingPriority" << std::endl;
+    return nullptr;
+  }
+  PendingTrace& trace = trace_entry->second;
+  if (trace.sampling_priority_locked) {
+    std::cerr << "Sampling priority locked, trace already propagated" << std::endl;
+    return getSamplingPriorityImpl(trace_id);
+  }
+  if (priority == nullptr) {
+    trace.sampling_priority.reset(nullptr);
+  } else {
+    trace.sampling_priority.reset(new SamplingPriority(*priority));
+    if (*priority == SamplingPriority::SamplerDrop || *priority == SamplingPriority::SamplerKeep) {
+      // This is an automatically-assigned sampling priority.
+      trace.sampling_priority_locked = true;
+    }
+  }
+  return getSamplingPriorityImpl(trace_id);
+}
+
+OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriority(
+    const std::shared_ptr<SampleProvider>& sampler, const SpanData* span) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  return assignSamplingPriorityImpl(sampler, span);
+}
+
+OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(
+    const std::shared_ptr<SampleProvider>& sampler, const SpanData* span) {
+  bool sampling_priority_unset = getSamplingPriorityImpl(span->trace_id) == nullptr;
+  if (sampling_priority_unset) {
+    setSamplingPriorityImpl(span->trace_id,
+                            sampler->sample(span->env(), span->service, span->trace_id));
+  }
+  return getSamplingPriorityImpl(span->trace_id);
 }
 
 }  // namespace opentracing

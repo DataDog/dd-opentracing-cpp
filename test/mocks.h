@@ -32,45 +32,6 @@ struct TestSpanData : public SpanData {
                      trace_id, parent_id, error);
 };
 
-struct MockBuffer : public SpanBuffer {
-  MockBuffer(){};
-
-  void registerSpan(const std::shared_ptr<SpanContext>& context) override {
-    uint64_t trace_id = context->traceId();
-    auto trace = traces.find(trace_id);
-    if (trace == traces.end()) {
-      traces.emplace(std::make_pair(trace_id, PendingTrace{}));
-      trace = traces.find(trace_id);
-      trace->second.root_context = context;
-    }
-    trace->second.all_spans.insert(context->id());
-  }
-
-  void finishSpan(std::unique_ptr<SpanData> span,
-                  const std::shared_ptr<SampleProvider>& sampler) override {
-    auto trace = traces.find(span->traceId());
-    if (trace == traces.end()) {
-      std::cerr << "Missing trace for finished span" << std::endl;
-      return;
-    }
-    trace->second.finished_spans->push_back(std::move(span));
-    if (trace->second.finished_spans->size() == trace->second.all_spans.size()) {
-      // Entire trace is finished!
-      trace->second.finish(sampler);
-    }
-  }
-
-  std::shared_ptr<SpanContext> getRootSpanContext(uint64_t trace_id) const override {
-    auto trace = traces.find(trace_id);
-    if (trace == traces.end()) {
-      return nullptr;
-    }
-    return trace->second.root_context;
-  }
-
-  std::unordered_map<uint64_t, PendingTrace> traces;
-};
-
 struct MockSampler : public PrioritySampler {
   MockSampler() {}
 
@@ -106,6 +67,20 @@ struct MockWriter : public Writer {
 
  private:
   mutable std::mutex mutex_;
+};
+
+struct MockBuffer : public WritingSpanBuffer {
+  MockBuffer()
+      : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>())){};
+
+  void unbufferAndWriteTrace(uint64_t trace_id,
+                             const std::shared_ptr<SampleProvider>& sampler) override {
+    // Haha NOPE.
+  }
+
+  std::unordered_map<uint64_t, PendingTrace>& traces() { return traces_; };
+
+  PendingTrace& traces(uint64_t id) { return traces_[id]; };
 };
 
 // Advances the relative (steady_clock) time in the given TimePoint by the given number of seconds.

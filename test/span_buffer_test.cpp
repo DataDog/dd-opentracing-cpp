@@ -12,9 +12,8 @@ TEST_CASE("span buffer") {
   MockWriter* writer = writer_ptr.get();
   auto buffer = std::make_shared<WritingSpanBuffer>(writer_ptr);
 
-  auto context_from_span = [&buffer](const TestSpanData& span) -> std::shared_ptr<SpanContext> {
-    return std::shared_ptr<SpanContext>(
-        new SpanContext{span.span_id, span.trace_id, nullptr, {}, buffer});
+  auto context_from_span = [](const TestSpanData& span) -> std::shared_ptr<SpanContext> {
+    return std::shared_ptr<SpanContext>(new SpanContext{span.span_id, span.trace_id, {}});
   };
 
   SECTION("can write a single-span trace") {

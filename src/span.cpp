@@ -288,8 +288,7 @@ OptionalSamplingPriority Span::setSamplingPriority(
   if (user_priority != nullptr) {
     priority = asSamplingPriority(static_cast<int>(*user_priority));
   }
-  context_->setSamplingPriority(std::move(priority));
-  return context_->getSamplingPriority();
+  return buffer_->setSamplingPriority(context_->traceId(), std::move(priority));
 }
 
 const ot::SpanContext &Span::context() const noexcept {
@@ -301,8 +300,7 @@ const ot::SpanContext &Span::context() const noexcept {
   // here, when the context is fetched before being serialized. The negative side-effect is that if
   // anything else happens to want to get and/or serialize a SpanContext, that will end up having
   // this spooky action at a distance of assigning a SamplingPriority.
-  // For this reason this method can't be const unless context_ is mutable.
-  context_->assignSamplingPriority(sampler_, span_.get() /* Doesn't take ownership */);
+  buffer_->assignSamplingPriority(sampler_, span_.get() /* Doesn't take ownership */);
   return *context_;
 }
 

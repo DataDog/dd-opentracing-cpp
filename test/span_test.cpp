@@ -23,16 +23,13 @@ TEST_CASE("span") {
 
   SECTION("receives id") {
     auto span_id = get_id();
-    Span span{nullptr,    buffer,
-              get_time,   sampler,
-              span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-              get_time(), "",
-              "",         "",
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        std::move(SpanContext{span_id, span_id, {}}),
+              get_time(), "",      "",       "",
               "",         ""};
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
@@ -40,32 +37,26 @@ TEST_CASE("span") {
 
   SECTION("registers with SpanBuffer") {
     auto span_id = get_id();
-    Span span{nullptr,    buffer,
-              get_time,   sampler,
-              span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-              get_time(), "",
-              "",         "",
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        std::move(SpanContext{span_id, span_id, {}}),
+              get_time(), "",      "",       "",
               "",         ""};
-    REQUIRE(buffer->traces.size() == 1);
-    REQUIRE(buffer->traces.find(100) != buffer->traces.end());
-    REQUIRE(buffer->traces[100].finished_spans->size() == 0);
-    REQUIRE(buffer->traces[100].all_spans.size() == 1);
+    REQUIRE(buffer->traces().size() == 1);
+    REQUIRE(buffer->traces().find(100) != buffer->traces().end());
+    REQUIRE(buffer->traces(100).finished_spans->size() == 0);
+    REQUIRE(buffer->traces(100).all_spans.size() == 1);
   }
 
   SECTION("timed correctly") {
     auto span_id = get_id();
-    Span span{nullptr,    buffer,
-              get_time,   sampler,
-              span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-              get_time(), "",
-              "",         "",
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        std::move(SpanContext{span_id, span_id, {}}),
+              get_time(), "",      "",       "",
               "",         ""};
     advanceSeconds(time, 10);
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->duration == 10000000000);
   }
 
@@ -98,49 +89,40 @@ TEST_CASE("span") {
     std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
     for (auto& test_case : test_cases) {
       auto span_id = get_id();
-      Span span{nullptr,    buffer_ptr,
-                get_time,   sampler,
-                span_id,    span_id,
-                0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-                get_time(), "",
-                "",         "",
+      Span span{nullptr,    buffer_ptr, get_time, sampler,
+                span_id,    span_id,    0,        std::move(SpanContext{span_id, span_id, {}}),
+                get_time(), "",         "",       "",
                 "",         ""};
       span.SetTag("http.url", test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[span_id].finished_spans->back();
+      auto& result = buffer->traces(span_id).finished_spans->back();
       REQUIRE(result->meta.find("http.url")->second == test_case.second);
     }
   }
 
   SECTION("finishes once") {
     auto span_id = get_id();
-    Span span{nullptr,    buffer,
-              get_time,   sampler,
-              span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-              get_time(), "",
-              "",         "",
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        std::move(SpanContext{span_id, span_id, {}}),
+              get_time(), "",      "",       "",
               "",         ""};
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++) {
       threads.emplace_back([&]() { span.FinishWithOptions(finish_options); });
     }
     std::for_each(threads.begin(), threads.end(), std::mem_fn(&std::thread::join));
-    REQUIRE(buffer->traces.size() == 1);
-    REQUIRE(buffer->traces.find(100) != buffer->traces.end());
-    REQUIRE(buffer->traces[100].finished_spans->size() == 1);
+    REQUIRE(buffer->traces().size() == 1);
+    REQUIRE(buffer->traces().find(100) != buffer->traces().end());
+    REQUIRE(buffer->traces(100).finished_spans->size() == 1);
   }
 
   SECTION("handles tags") {
     auto span_id = get_id();
-    Span span{nullptr,    buffer,
-              get_time,   sampler,
-              span_id,    span_id,
-              0,          std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
-              get_time(), "",
-              "",         "",
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        std::move(SpanContext{span_id, span_id, {}}),
+              get_time(), "",      "",       "",
               "",         ""};
 
     span.SetTag("bool", true);
@@ -158,7 +140,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     // Check "map" seperately, because JSON key order is non-deterministic therefore we can't do
     // simple string matching.
     REQUIRE(json::parse(result->meta["map"]) ==
@@ -186,7 +168,7 @@ TEST_CASE("span") {
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
+              std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
               "original service",
               "original type",
@@ -200,7 +182,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     // Datadog special tags aren't kept, they just set the Span values.
     REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
                                 {"tag with no special meaning", "ayy lmao"}});
@@ -219,7 +201,7 @@ TEST_CASE("span") {
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
+              std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
               "original service",
               "original type",
@@ -229,7 +211,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
@@ -247,7 +229,7 @@ TEST_CASE("span") {
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
+              std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
               "original service",
               "original type",
@@ -258,7 +240,7 @@ TEST_CASE("span") {
     span.SetTag("resource.name", "new resource");
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
@@ -276,7 +258,7 @@ TEST_CASE("span") {
               span_id,
               span_id,
               0,
-              std::move(SpanContext{span_id, span_id, nullptr, {}, buffer}),
+              std::move(SpanContext{span_id, span_id, {}}),
               get_time(),
               "original service",
               "original type",
@@ -289,7 +271,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[100].finished_spans->at(0);
+      auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->name == "operation name");
       REQUIRE(result->resource == "operation name");
     }
@@ -299,7 +281,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[100].finished_spans->at(0);
+      auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->name == "operation name");
       REQUIRE(result->resource == "resource tag override");
     }
@@ -311,62 +293,72 @@ TEST_CASE("span") {
         std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
 
     SECTION("root spans may be sampled") {
-      Span span{
-          nullptr,    buffer, get_time, priority_sampler,
-          100,        100,    0,        std::move(SpanContext{100, 100, nullptr, {}, buffer}),
-          get_time(), "",     "",       "",
-          "",         ""};
+      Span span{nullptr,    buffer, get_time, priority_sampler,
+                100,        100,    0,        std::move(SpanContext{100, 100, {}}),
+                get_time(), "",     "",       "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[100].finished_spans->at(0);
+      auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
               std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
     }
 
-    SECTION("non-root spans may not be sampled") {
-      Span span{nullptr,
-                buffer,
-                get_time,
-                priority_sampler,
-                100,
-                100,
-                42 /* Totally not a root span! */,
-                std::move(SpanContext{100, 100, nullptr, {}, buffer}),
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+    SECTION("non-root spans may be sampled, as long as the trace is not yet distributed") {
+      Span span{nullptr,    buffer,
+                get_time,   priority_sampler,
+                100,        42,
+                42,         std::move(SpanContext{100, 42, {}}),  // Non-distributed SpanContext
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[100].finished_spans->at(0);
+      auto& result = buffer->traces(42).finished_spans->at(0);
+      REQUIRE(result->metrics ==
+              std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
+    }
+
+    SECTION("non-root spans may not be sampled if they are distributed") {
+      // parent_id is decoded to span_id, and the tracer will create a child context with the
+      // span_id set to the span it's for. In this case we're deserializing (so as to simulate
+      // propagation) but directly passing to the Span; so we encode parent_id as the id of the
+      // span we're passing to.
+      std::istringstream ctx(R"({
+            "trace_id": "42",
+            "parent_id": "100"
+          })");
+      auto context = SpanContext::deserialize(ctx);
+      Span span{nullptr,    buffer,
+                get_time,   priority_sampler,
+                100,        42,
+                42,         std::move(*static_cast<SpanContext*>(context.value().get())),
+                get_time(), "",
+                "",         "",
+                "",         ""};
+      span.FinishWithOptions(finish_options);
+
+      auto& result = buffer->traces(42).finished_spans->at(0);
       REQUIRE(result->metrics == std::unordered_map<std::string, int>{});
     }
 
     SECTION("spans with an existing sampling priority may not be given a new one at Finish") {
-      Span span{
-          nullptr,
-          buffer,
-          get_time,
-          priority_sampler,
-          100,
-          100,
-          0,
-          std::move(SpanContext{100,
-                                100,
-                                std::make_unique<SamplingPriority>(SamplingPriority::UserDrop),
-                                {},
-                                buffer}),
-          get_time(),
-          "",
-          "",
-          "",
-          "",
-          ""};
+      std::istringstream ctx(R"({
+            "trace_id": "100",
+            "parent_id": "100",
+            "sampling_priority": -1
+          })");
+      auto context = SpanContext::deserialize(ctx);
+      Span span{nullptr,    buffer,
+                get_time,   priority_sampler,
+                100,        100,
+                0,          std::move(*static_cast<SpanContext*>(context.value().get())),
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces[100].finished_spans->at(0);
+      auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
               std::unordered_map<std::string, int>{{"_sampling_priority_v1", -1}});
     }

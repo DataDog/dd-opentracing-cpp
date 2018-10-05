@@ -26,7 +26,7 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->type == "web");
     REQUIRE(result->service == "service_name");
     REQUIRE(result->name == "/what_up");
@@ -38,7 +38,7 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
@@ -46,7 +46,7 @@ TEST_CASE("tracer") {
 
   SECTION("span context is propagated") {
     MockTextMapCarrier carrier;
-    SpanContext context{420, 69, nullptr, {{"ayy", "lmao"}, {"hi", "haha"}}, buffer};
+    SpanContext context{420, 69, {{"ayy", "lmao"}, {"hi", "haha"}}};
     auto success = tracer->Inject(context, carrier);
     REQUIRE(success);
     auto span_context_maybe = tracer->Extract(carrier);
@@ -54,7 +54,7 @@ TEST_CASE("tracer") {
     auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
-    auto& result = buffer->traces[69].finished_spans->at(0);
+    auto& result = buffer->traces(69).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 69);
     REQUIRE(result->parent_id == 420);
@@ -66,7 +66,7 @@ TEST_CASE("tracer") {
     auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
-    auto& result = buffer->traces[100].finished_spans->at(0);
+    auto& result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
