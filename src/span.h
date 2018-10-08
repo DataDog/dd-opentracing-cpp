@@ -134,7 +134,7 @@ class Span : public DatadogSpan {
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   std::shared_ptr<SampleProvider> sampler_;
-  std::shared_ptr<SpanContext> context_;
+  SpanContext context_;
   TimePoint start_time_;
   std::string operation_name_override_;
 

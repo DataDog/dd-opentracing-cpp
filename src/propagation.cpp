@@ -105,7 +105,7 @@ uint64_t SpanContext::traceId() const {
 }
 
 std::pair<bool, OptionalSamplingPriority> SpanContext::getPropagationStatus() const {
-  // Not locked. Both these members are only evet written in the constructor/builder.
+  // Not locked. Both these members are only ever written in the constructor/builder.
   OptionalSamplingPriority p = nullptr;
   if (propagated_sampling_priority_ != nullptr) {
     p.reset(new SamplingPriority(*propagated_sampling_priority_));

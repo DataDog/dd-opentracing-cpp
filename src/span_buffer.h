@@ -33,7 +33,7 @@ class SpanBuffer {
  public:
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
-  virtual void registerSpan(const std::shared_ptr<SpanContext>& context) = 0;
+  virtual void registerSpan(const SpanContext& context) = 0;
   virtual void finishSpan(std::unique_ptr<SpanData> span,
                           const std::shared_ptr<SampleProvider>& sampler) = 0;
   virtual OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const = 0;
@@ -48,7 +48,7 @@ class WritingSpanBuffer : public SpanBuffer {
  public:
   WritingSpanBuffer(std::shared_ptr<Writer> writer);
 
-  void registerSpan(const std::shared_ptr<SpanContext>& context) override;
+  void registerSpan(const SpanContext& context) override;
   void finishSpan(std::unique_ptr<SpanData> span,
                   const std::shared_ptr<SampleProvider>& sampler) override;
 
@@ -59,6 +59,7 @@ class WritingSpanBuffer : public SpanBuffer {
                                                   const SpanData* span) override;
 
  private:
+  // These xImpl methods exist so we can avoid using reentrant locks.
   OptionalSamplingPriority getSamplingPriorityImpl(uint64_t trace_id) const;
   OptionalSamplingPriority setSamplingPriorityImpl(uint64_t trace_id,
                                                    OptionalSamplingPriority priority);
@@ -69,6 +70,8 @@ class WritingSpanBuffer : public SpanBuffer {
   mutable std::mutex mutex_;
 
  protected:
+  // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish
+  // behaviour.
   virtual void unbufferAndWriteTrace(uint64_t trace_id,
                                      const std::shared_ptr<SampleProvider>& sampler);
 

@@ -76,6 +76,7 @@ struct MockBuffer : public WritingSpanBuffer {
   void unbufferAndWriteTrace(uint64_t trace_id,
                              const std::shared_ptr<SampleProvider>& sampler) override {
     // Haha NOPE.
+    // Leave the trace inside the traces map instead of deleting it.
   }
 
   std::unordered_map<uint64_t, PendingTrace>& traces() { return traces_; };
