@@ -10,6 +10,19 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
+namespace {
+ot::expected<PropagationStyle> asPropagationStyle(std::string s) {
+  if (s == "DatadogOnly") {
+    return PropagationStyle::DatadogOnly;
+  } else if (s == "Both") {
+    return PropagationStyle::Both;
+  } else if (s == "B3Only") {
+    return PropagationStyle::B3Only;
+  }
+  return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+}
+}  // namespace
+
 // Accepts configuration in JSON format, with the following keys:
 // "service": Required. A string, the name of the service.
 // "agent_host": A string, defaults to localhost.
@@ -23,6 +36,11 @@ namespace opentracing {
 //     based on a combination of user-assigned priorities and configuration from the agent.
 // "operation_name_override": A string, if not empty it overrides the operation name (and the
 //     overridden operation name is recorded in the tag "operation").
+// "propagation_style_extract": A string, one of "DatadogOnly", "Both", "B3Only". Defaults to
+//     "Both". The type of headers to use to propagate distributed traces.
+// "propagation_style_inject": A string, one of "DatadogOnly", "Both", "B3Only". Defaults to
+//     "DatadogOnly". The type of headers to use to receive distributed traces.
+//
 // Extra keys will be ignored.
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
@@ -63,6 +81,26 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     }
     if (config.find("operation_name_override") != config.end()) {
       options.operation_name_override = config["operation_name_override"];
+    }
+    if (config.find("propagation_stle_extract") != config.end()) {
+      auto style = asPropagationStyleEnum(config["propagation_stle_extract"]);
+      if (!style) {
+        error_message =
+            "Invalid value for propagation_stle_extract, must be one of 'DatadogOnly', 'Both', "
+            "'B3Only'";
+        return style;
+      }
+      options.extract = style;
+    }
+    if (config.find("propagation_stle_inject") != config.end()) {
+      auto style = asPropagationStyleEnum(config["propagation_stle_inject"]);
+      if (!style) {
+        error_message =
+            "Invalid value for propagation_stle_inject, must be one of 'DatadogOnly', 'Both', "
+            "'B3Only'";
+        return style;
+      }
+      options.inject = style;
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";

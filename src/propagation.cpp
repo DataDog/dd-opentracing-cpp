@@ -15,9 +15,15 @@ namespace opentracing {
 namespace {
 
 // Header names for trace data.
-const std::string trace_id_header = "x-datadog-trace-id";
-const std::string parent_id_header = "x-datadog-parent-id";
-const std::string sampling_priority_header = "x-datadog-sampling-priority";
+// Datadog
+// const std::string trace_id_header = "x-datadog-trace-id";
+// const std::string parent_id_header = "x-datadog-parent-id";
+// const std::string sampling_priority_header = "x-datadog-sampling-priority";
+// // B3 https://github.com/openzipkin/b3-propagation
+// const std::string trace_id_header = "x-datadog-trace-id";
+// const std::string parent_id_header = "x-datadog-parent-id";
+// const std::string sampling_priority_header = "x-datadog-sampling-priority";
+
 // Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
 // interop.
 const ot::string_view baggage_prefix = "ot-baggage-";
@@ -167,7 +173,8 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
 }
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
-                                          const std::shared_ptr<SpanBuffer> pending_traces) const {
+                                          const std::shared_ptr<SpanBuffer> pending_traces,
+                                          PropagationStyle style) const {
   std::lock_guard<std::mutex> lock{mutex_};
   auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
   if (!result) {
@@ -263,7 +270,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
-    const ot::TextMapReader &reader) try {
+    const ot::TextMapReader &reader, PropagationStyle style) try {
   uint64_t trace_id, parent_id;
   OptionalSamplingPriority sampling_priority = nullptr;
   bool trace_id_set = false;

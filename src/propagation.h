@@ -1,6 +1,7 @@
 #ifndef DD_OPENTRACING_PROPAGATION_H
 #define DD_OPENTRACING_PROPAGATION_H
 
+#include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
 #include <mutex>
 #include <unordered_map>
@@ -58,14 +59,15 @@ class SpanContext : public ot::SpanContext {
   ot::expected<void> serialize(std::ostream &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
-                               const std::shared_ptr<SpanBuffer> pending_traces) const;
+                               const std::shared_ptr<SpanBuffer> pending_traces,
+                               PropagationStyle style) const;
 
   SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader);
+      const ot::TextMapReader &reader, PropagationStyle style);
 
   uint64_t id() const;
   uint64_t traceId() const;
