@@ -55,7 +55,7 @@ Each of these can be downloaded and used precompiled.
 wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.6.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
 tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 # Install Datadog OpenTracing
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.2.3/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.1/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -124,14 +124,17 @@ Coming soon!
 **Dependencies**
 
 - cmake >= 3.0
-- [OpenTracing C++](https://github.com/opentracing/)
-- [msgpack-c](ttps://github.com/msgpack/msgpack-c/)
-- [libCURL](https://curl.haxx.se/libcurl/)
 - Build tools (eg. build-essential, xcode)
 
 See scripts/install_dependencies.sh
 
 **Build steps**
+
+First install dependencies:
+
+    scripts/install_dependencies.sh
+
+Then:
 
     mkdir .build
     cd .build
