@@ -10,7 +10,7 @@ jobs:
     <<: *defaults
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_SHARED=OFF
-      NGINX_OPENTRACING_VERSION: 0.6.0
+      NGINX_OPENTRACING_VERSION: 0.7.0
       NGINX_VERSION: 1.14.0
     steps:
       - checkout
@@ -57,7 +57,7 @@ jobs:
               --with-cc-opt="-g -O2 -fdebug-prefix-map=/data/builder/debuild/nginx-${NGINX_VERSION}/debian/debuild-base/nginx-${NGINX_VERSION}=. -specs=/usr/share/dpkg/no-pie-compile.specs -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC" \
               --with-ld-opt='-Wl,-Bsymbolic-functions -specs=/usr/share/dpkg/no-pie-link.specs -Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie' \
               --add-dynamic-module=../nginx-opentracing/opentracing
-            make
+            make modules
             cp objs/ngx_http_opentracing_module.so /tmp/build/ngx_http_opentracing_module.so
       - persist_to_workspace:
           root: /tmp/
