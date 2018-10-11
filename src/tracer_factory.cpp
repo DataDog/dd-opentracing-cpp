@@ -83,24 +83,24 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
       options.operation_name_override = config["operation_name_override"];
     }
     if (config.find("propagation_stle_extract") != config.end()) {
-      auto style = asPropagationStyleEnum(config["propagation_stle_extract"]);
+      auto style = asPropagationStyle(config["propagation_stle_extract"]);
       if (!style) {
         error_message =
             "Invalid value for propagation_stle_extract, must be one of 'DatadogOnly', 'Both', "
             "'B3Only'";
-        return style;
+        return style.get_unexpected();
       }
-      options.extract = style;
+      options.extract = style.value();
     }
     if (config.find("propagation_stle_inject") != config.end()) {
-      auto style = asPropagationStyleEnum(config["propagation_stle_inject"]);
+      auto style = asPropagationStyle(config["propagation_stle_inject"]);
       if (!style) {
         error_message =
             "Invalid value for propagation_stle_inject, must be one of 'DatadogOnly', 'Both', "
             "'B3Only'";
-        return style;
+        return style.get_unexpected();
       }
-      options.inject = style;
+      options.inject = style.value();
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";

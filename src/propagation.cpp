@@ -12,17 +12,30 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
+struct HeadersImpl {  // Don't forget clamp samping_priority values for b3
+  const char *trace_id_header;
+  const char *span_id_header;
+  const char *sampling_priority_header;
+  const int base;
+  std::string (*encode_id)(uint64_t);
+};
+
 namespace {
+std::string as_hex(uint64_t id) {
+  std::stringstream stream;
+  stream << std::hex << id;
+  return stream.str();
+}
 
 // Header names for trace data.
-// Datadog
-// const std::string trace_id_header = "x-datadog-trace-id";
-// const std::string parent_id_header = "x-datadog-parent-id";
-// const std::string sampling_priority_header = "x-datadog-sampling-priority";
-// // B3 https://github.com/openzipkin/b3-propagation
-// const std::string trace_id_header = "x-datadog-trace-id";
-// const std::string parent_id_header = "x-datadog-parent-id";
-// const std::string sampling_priority_header = "x-datadog-sampling-priority";
+constexpr struct {
+  // https://docs.datadoghq.com/tracing/faq/distributed-tracing/
+  HeadersImpl datadog{"x-datadog-trace-id", "x-datadog-parent-id", "x-datadog-sampling-priority",
+                      10, std::to_string};
+  // https://github.com/openzipkin/b3-propagation
+  HeadersImpl b3{"X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled", 16, as_hex};
+
+} propagation_headers;
 
 // Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
 // interop.
@@ -90,6 +103,21 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
   return *this;
 }
 
+bool SpanContext::operator==(const SpanContext &other) {
+  if (id_ != other.id_ || trace_id_ != other.trace_id_ ||
+      has_propagated_ != other.has_propagated_ || baggage_ != other.baggage_ ||
+      nginx_opentracing_compatibility_hack_ != other.nginx_opentracing_compatibility_hack_) {
+    return false;
+  }
+  if (propagated_sampling_priority_ == nullptr) {
+    return other.propagated_sampling_priority_ == nullptr;
+  }
+  return other.propagated_sampling_priority_ != nullptr &&
+         *propagated_sampling_priority_ == *other.propagated_sampling_priority_;
+}
+
+bool SpanContext::operator!=(const SpanContext &other) { return !(*this == other); }
+
 void SpanContext::ForeachBaggageItem(
     std::function<bool(const std::string &, const std::string &)> f) const {
   std::lock_guard<std::mutex> lock{mutex_};
@@ -147,7 +175,8 @@ SpanContext SpanContext::withId(uint64_t id) const {
 }
 
 ot::expected<void> SpanContext::serialize(std::ostream &writer,
-                                          const std::shared_ptr<SpanBuffer> pending_traces) const {
+                                          const std::shared_ptr<SpanBuffer> pending_traces) const
+    try {
   // check ostream state
   if (!writer.good()) {
     return ot::make_unexpected(std::make_error_code(std::errc::io_error));
@@ -170,33 +199,53 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
   }
 
   return {};
+} catch (const std::bad_alloc &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
                                           const std::shared_ptr<SpanBuffer> pending_traces,
-                                          PropagationStyle style) const {
+                                          PropagationStyle style) const try {
+  if (style == PropagationStyle::DatadogOnly) {
+    return serialize(writer, pending_traces, propagation_headers.datadog);
+  }
+  if (style == PropagationStyle::B3Only) {
+    return serialize(writer, pending_traces, propagation_headers.b3);
+  }
+  auto result = serialize(writer, pending_traces, propagation_headers.datadog);
+  if (!result) {
+    return result;
+  }
+  return serialize(writer, pending_traces, propagation_headers.b3);
+} catch (const std::bad_alloc &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+}
+
+ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
+                                          const std::shared_ptr<SpanBuffer> pending_traces,
+                                          const HeadersImpl &headers_impl) const {
   std::lock_guard<std::mutex> lock{mutex_};
-  auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
+  auto result = writer.Set(headers_impl.trace_id_header, headers_impl.encode_id(trace_id_));
   if (!result) {
     return result;
   }
   // Yes, "id" does go to "parent id" since this is the point where subsequent Spans getting this
   // context become children.
-  result = writer.Set(parent_id_header, std::to_string(id_));
+  result = writer.Set(headers_impl.span_id_header, headers_impl.encode_id(id_));
   if (!result) {
     return result;
   }
 
   OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
   if (sampling_priority != nullptr) {
-    result =
-        writer.Set(sampling_priority_header, std::to_string(static_cast<int>(*sampling_priority)));
+    result = writer.Set(headers_impl.sampling_priority_header,
+                        std::to_string(static_cast<int>(*sampling_priority)));
     if (!result) {
       return result;
     }
   } else if (nginx_opentracing_compatibility_hack_) {
     // See the comment in the header file on nginx_opentracing_compatibility_hack_.
-    result = writer.Set(sampling_priority_header, "1");
+    result = writer.Set(headers_impl.sampling_priority_header, "1");
     if (!result) {
       return result;
     }
@@ -271,6 +320,41 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     const ot::TextMapReader &reader, PropagationStyle style) try {
+  if (style == PropagationStyle::DatadogOnly) {
+    return SpanContext::deserialize(reader, propagation_headers.datadog);
+  } else if (style == PropagationStyle::B3Only) {
+    return SpanContext::deserialize(reader, propagation_headers.b3);
+  }
+  // PropagationStyle::Both
+  auto result = SpanContext::deserialize(reader, propagation_headers.datadog);
+  if (!result) {
+    return ot::make_unexpected(result.error());
+  }
+  std::unique_ptr<ot::SpanContext> context = std::move(result.value());
+  result = SpanContext::deserialize(reader, propagation_headers.b3);
+  if (!result) {
+    return ot::make_unexpected(result.error());
+  }
+  // If just one of the two propagation styles returned a context, return that.
+  if (result.value() == nullptr) {
+    return context;  // Fine if context is also nullptr, that's a valid return value.
+  } else if (context == nullptr) {
+    return result;
+  }
+  // There were two sets of headers. Check they gave the same values.
+  if (*dynamic_cast<SpanContext *>(result.value().get()) !=
+      *dynamic_cast<SpanContext *>(context.get())) {
+    std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
+              << std::endl;
+    return ot::make_unexpected(ot::span_context_corrupted_error);
+  }
+  return result;  // Return either one, since they're the same.
+} catch (const std::bad_alloc &) {
+  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+}
+
+ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
+    const ot::TextMapReader &reader, const HeadersImpl &headers_impl) {
   uint64_t trace_id, parent_id;
   OptionalSamplingPriority sampling_priority = nullptr;
   bool trace_id_set = false;
@@ -279,13 +363,13 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   auto result =
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
-          if (equals_ignore_case(key, trace_id_header)) {
-            trace_id = std::stoull(value);
+          if (equals_ignore_case(key, headers_impl.trace_id_header)) {
+            trace_id = std::stoull(value, nullptr, headers_impl.base);
             trace_id_set = true;
-          } else if (equals_ignore_case(key, parent_id_header)) {
-            parent_id = std::stoull(value);
+          } else if (equals_ignore_case(key, headers_impl.span_id_header)) {
+            parent_id = std::stoull(value, nullptr, headers_impl.base);
             parent_id_set = true;
-          } else if (equals_ignore_case(key, sampling_priority_header)) {
+          } else if (equals_ignore_case(key, headers_impl.sampling_priority_header)) {
             sampling_priority = asSamplingPriority(std::stoi(value));
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
@@ -318,9 +402,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   context->has_propagated_ = true;
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
-} catch (const std::bad_alloc &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
-}
+}  // namespace opentracing
 
 }  // namespace opentracing
 }  // namespace datadog

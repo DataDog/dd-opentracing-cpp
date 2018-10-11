@@ -14,6 +14,7 @@ namespace opentracing {
 class SpanBuffer;
 class SampleProvider;
 class SpanData;
+struct HeadersImpl;
 
 enum class SamplingPriority : int {
   UserDrop = -1,
@@ -47,6 +48,8 @@ class SpanContext : public ot::SpanContext {
 
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
+  bool operator==(const SpanContext &other);
+  bool operator!=(const SpanContext &other);
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
@@ -77,6 +80,12 @@ class SpanContext : public ot::SpanContext {
   std::pair<bool, OptionalSamplingPriority> getPropagationStatus() const;
 
  private:
+  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
+      const ot::TextMapReader &reader, const HeadersImpl &headers_impl);
+  ot::expected<void> serialize(const ot::TextMapWriter &writer,
+                               const std::shared_ptr<SpanBuffer> pending_traces,
+                               const HeadersImpl &headers_impl) const;
+
   // Terrible, terrible hack; to get around:
   // https://github.com/opentracing-contrib/nginx-opentracing/blob/master/opentracing/src/discover_span_context_keys.cpp#L49-L50
   // nginx-opentracing needs to know in-advance the headers that may propagate from a tracer. It

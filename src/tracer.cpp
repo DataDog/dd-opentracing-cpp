@@ -97,17 +97,29 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc, std::ostream &writer) const {
-  return inject(sc, writer);
+  auto span_context = dynamic_cast<const SpanContext *>(&sc);
+  if (span_context == nullptr) {
+    return ot::make_unexpected(ot::invalid_span_context_error);
+  }
+  return span_context->serialize(writer, buffer_);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
                                   const ot::TextMapWriter &writer) const {
-  return inject(sc, writer);
+  auto span_context = dynamic_cast<const SpanContext *>(&sc);
+  if (span_context == nullptr) {
+    return ot::make_unexpected(ot::invalid_span_context_error);
+  }
+  return span_context->serialize(writer, buffer_, opts_.inject);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
                                   const ot::HTTPHeadersWriter &writer) const {
-  return inject(sc, writer);
+  auto span_context = dynamic_cast<const SpanContext *>(&sc);
+  if (span_context == nullptr) {
+    return ot::make_unexpected(ot::invalid_span_context_error);
+  }
+  return span_context->serialize(writer, buffer_, opts_.inject);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &reader) const {
@@ -116,12 +128,12 @@ ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &rea
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::TextMapReader &reader) const {
-  return SpanContext::deserialize(reader);
+  return SpanContext::deserialize(reader, opts_.extract);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::HTTPHeadersReader &reader) const {
-  return SpanContext::deserialize(reader);
+  return SpanContext::deserialize(reader, opts_.extract);
 }
 
 void Tracer::Close() noexcept {}
