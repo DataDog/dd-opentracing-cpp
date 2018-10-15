@@ -3,7 +3,7 @@ version: 2
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_2
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_3
 
 jobs:
   build:
@@ -31,7 +31,7 @@ jobs:
           command: |
             ./scripts/install_dependencies.sh
       - run:
-          name: Build
+          name: Build (with cmake)
           command: |
             rm -rf .build
             mkdir -p .build
@@ -40,6 +40,10 @@ jobs:
             cmake $CMAKE_ARGS ..
             make
             cp libdd_opentracing_plugin.so /tmp/build/libdd_opentracing_plugin.so
+      - run:
+          name: Build (with bazel)
+          command: |
+            bazel build //:dd_opentracing_cpp
       - run:
           name: Build opentracing-nginx
           command: |
