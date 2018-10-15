@@ -7,7 +7,8 @@ namespace datadog {
 namespace opentracing {
 
 NoopSpan::NoopSpan(std::shared_ptr<const Tracer> tracer, uint64_t span_id, uint64_t trace_id,
-                   uint64_t parent_id, SpanContext context, const ot::StartSpanOptions &options)
+                   uint64_t parent_id, SpanContext context,
+                   const ot::StartSpanOptions & /* options */)
     : tracer_(std::move(tracer)),
       span_id_(span_id),
       trace_id_(trace_id),
@@ -21,19 +22,22 @@ NoopSpan::NoopSpan(NoopSpan &&other)
       parent_id_(other.parent_id_),
       context_(std::move(other.context_)) {}
 
-void NoopSpan::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept {}
+void NoopSpan::FinishWithOptions(
+    const ot::FinishSpanOptions & /* finish_span_options */) noexcept {}
 
-void NoopSpan::SetOperationName(ot::string_view operation_name) noexcept {}
+void NoopSpan::SetOperationName(ot::string_view /* operation_name */) noexcept {}
 
-void NoopSpan::SetTag(ot::string_view key, const ot::Value &value) noexcept {}
+void NoopSpan::SetTag(ot::string_view /* key */, const ot::Value & /* value */) noexcept {}
 
-void NoopSpan::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {}
+void NoopSpan::SetBaggageItem(ot::string_view /* restricted_key */,
+                              ot::string_view /* value */) noexcept {}
 
 std::string NoopSpan::BaggageItem(ot::string_view restricted_key) const noexcept {
   return context_.baggageItem(restricted_key);
 }
 
-void NoopSpan::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
+void NoopSpan::Log(
+    std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
 
 const ot::SpanContext &NoopSpan::context() const noexcept { return context_; }
 
