@@ -1,4 +1,5 @@
 #include "span.h"
+#include <opentracing/ext/tags.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -19,7 +20,6 @@ const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
-const std::string priority_sampling_tag = "sampling.priority";
 }  // namespace
 
 const std::string environment_tag = "environment";
@@ -282,7 +282,7 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   // sampling.priority because if no sampling is set before the Span Finishes then one is
   // assigned immutably.
   // Doesn't need to be in the same mutex lock as above.
-  if (key == priority_sampling_tag) {
+  if (key == ::ot::ext::sampling_priority) {
     // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
     // "sampling.priority"
     try {
@@ -294,9 +294,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
       }
       setSamplingPriority(std::move(sampling_priority));
     } catch (const std::invalid_argument &ia) {
-      std::cerr << "Unable to parse " << priority_sampling_tag << " tag" << std::endl;
+      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
     } catch (const std::out_of_range &oor) {
-      std::cerr << "Unable to parse " << priority_sampling_tag << " tag" << std::endl;
+      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
     }
   }
 }
