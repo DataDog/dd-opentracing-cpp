@@ -11,7 +11,7 @@ namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
 }  // namespace
 
-void PendingTrace::finish(const std::shared_ptr<SampleProvider>& sampler) {
+void PendingTrace::finish() {
   if (finished_spans->size() == 0) {
     std::cerr << "finish called on trace with no spans" << std::endl;
     return;  // I don't know why this would ever happen.
@@ -58,13 +58,12 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span,
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
     assignSamplingPriorityImpl(sampler, trace.finished_spans->back().get());
-    trace.finish(sampler);
-    unbufferAndWriteTrace(trace_id, sampler);
+    trace.finish();
+    unbufferAndWriteTrace(trace_id);
   }
 }
 
-void WritingSpanBuffer::unbufferAndWriteTrace(uint64_t trace_id,
-                                              const std::shared_ptr<SampleProvider>& sampler) {
+void WritingSpanBuffer::unbufferAndWriteTrace(uint64_t trace_id) {
   auto trace_iter = traces_.find(trace_id);
   if (trace_iter == traces_.end()) {
     return;

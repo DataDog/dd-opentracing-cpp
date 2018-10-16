@@ -48,7 +48,8 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 }  // namespace
 
 OptionalSamplingPriority asSamplingPriority(int i) {
-  if (i < (int)SamplingPriority::MinimumValue || i > (int)SamplingPriority::MaximumValue) {
+  if (i < static_cast<int>(SamplingPriority::MinimumValue) ||
+      i > static_cast<int>(SamplingPriority::MaximumValue)) {
     return nullptr;
   }
   return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));

@@ -11,8 +11,12 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("sample") {
-  int id = 100;                        // Starting span id.
-  std::tm start{0, 0, 0, 12, 2, 107};  // Starting calendar time 2007-03-12 00:00:00
+  int id = 100;  // Starting span id.
+  // Starting calendar time 2007-03-12 00:00:00
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
   auto buffer = std::make_shared<MockBuffer>();
@@ -133,7 +137,7 @@ TEST_CASE("priority sampler unit test") {
         REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
         count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
       }
-      double sample_rate = count_sampled / (double)total;
+      double sample_rate = count_sampled / static_cast<double>(total);
       REQUIRE((sample_rate < 0.85 && sample_rate > 0.75));
       // Case 2, service:nginx,env:prod => 0.2
       count_sampled = 0;
@@ -144,7 +148,7 @@ TEST_CASE("priority sampler unit test") {
         REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
         count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
       }
-      sample_rate = count_sampled / (double)total;
+      sample_rate = count_sampled / static_cast<double>(total);
       REQUIRE((sample_rate < 0.85 && sample_rate > 0.75));
     }
   }
@@ -225,7 +229,7 @@ TEST_CASE("priority sampler \"integration\" test") {
       REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
       count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
     }
-    double sample_rate = count_sampled / (double)total;
+    double sample_rate = count_sampled / static_cast<double>(total);
     REQUIRE((sample_rate < 0.35 && sample_rate > 0.25));
   }
 }

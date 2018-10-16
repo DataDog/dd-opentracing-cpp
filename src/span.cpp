@@ -112,7 +112,8 @@ void audit(SpanData *span) {
   }
 }
 
-void Span::FinishWithOptions(const ot::FinishSpanOptions &finish_span_options) noexcept try {
+void Span::FinishWithOptions(
+    const ot::FinishSpanOptions & /* finish_span_options */) noexcept try {
   if (is_finished_.exchange(true)) {
     return;
   }
@@ -309,7 +310,8 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
   return context_.baggageItem(restricted_key);
 }
 
-void Span::Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept {}
+void Span::Log(
+    std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
 
 OptionalSamplingPriority Span::setSamplingPriority(
     std::unique_ptr<UserSamplingPriority> user_priority) {
