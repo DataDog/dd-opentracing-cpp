@@ -67,6 +67,8 @@ include_directories(include)
 # Code
 install(DIRECTORY include/datadog DESTINATION include)
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
+add_compile_options(-Wall -Wextra -Werror -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+
 
 # Outputs
 ## Shared lib
