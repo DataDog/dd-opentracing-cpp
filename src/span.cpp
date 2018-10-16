@@ -1,7 +1,9 @@
 #include "span.h"
+#include <opentracing/ext/tags.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <string>
 #include "sample.h"
 #include "span_buffer.h"
 #include "tracer.h"
@@ -275,6 +277,28 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     span_->meta[key] = result;
   }
+
+  // Normally special tags are processed at Span Finish, but this cannot be done for
+  // sampling.priority because if no sampling is set before the Span Finishes then one is
+  // assigned immutably.
+  // Doesn't need to be in the same mutex lock as above.
+  if (key == ::ot::ext::sampling_priority) {
+    // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
+    // "sampling.priority"
+    try {
+      std::unique_ptr<UserSamplingPriority> sampling_priority = nullptr;
+      if (result != "") {
+        sampling_priority = std::make_unique<UserSamplingPriority>(
+            std::stoi(result) == 0 ? UserSamplingPriority::UserDrop
+                                   : UserSamplingPriority::UserKeep);
+      }
+      setSamplingPriority(std::move(sampling_priority));
+    } catch (const std::invalid_argument &ia) {
+      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
+    } catch (const std::out_of_range &oor) {
+      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
+    }
+  }
 }
 
 void Span::SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept {
@@ -295,6 +319,11 @@ OptionalSamplingPriority Span::setSamplingPriority(
     priority = asSamplingPriority(static_cast<int>(*user_priority));
   }
   return buffer_->setSamplingPriority(context_.traceId(), std::move(priority));
+}
+
+OptionalSamplingPriority Span::getSamplingPriority() const {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  return buffer_->getSamplingPriority(context_.traceId());
 }
 
 const ot::SpanContext &Span::context() const noexcept {

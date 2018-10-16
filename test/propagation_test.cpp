@@ -190,13 +190,31 @@ TEST_CASE("sampling behaviour") {
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
   ot::Tracer::InitGlobal(tracer);
 
+  // There's two ways we can set the sampling priority. Either directly using the method, or
+  // through a tag. Test both.
+  auto setSamplingPriority = GENERATE(
+      values<
+          std::function<OptionalSamplingPriority(Span*, std::unique_ptr<UserSamplingPriority>)>>({
+          [](Span* span, std::unique_ptr<UserSamplingPriority> p) {
+            return span->setSamplingPriority(std::move(p));
+          },
+          [](Span* span, std::unique_ptr<UserSamplingPriority> p) {
+            if (p != nullptr) {
+              span->SetTag("sampling.priority", static_cast<int>(*p));
+            } else {
+              span->SetTag("sampling.priority", "");
+            }
+            return span->getSamplingPriority();
+          },
+      }));
+
   SECTION("sampling priority can be set on a root span") {
     // Root: ##########x
     //          ^ Set here, should succeed, not overridden by automatic set
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
-    auto p = static_cast<Span*>(span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    auto p = setSamplingPriority(
+        static_cast<Span*>(span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
     span->Finish();
@@ -224,9 +242,9 @@ TEST_CASE("sampling behaviour") {
     sampler->sampling_priority = nullptr;
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     span->Finish();
-    auto p = static_cast<Span*>(span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    auto p = setSamplingPriority(
+        static_cast<Span*>(span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(!p);
 
     auto& result = writer->traces[0][0];
@@ -245,7 +263,7 @@ TEST_CASE("sampling behaviour") {
 
     // setSamplingPriority should fail, since it's already set & locked, and should return the
     // assigned value.
-    REQUIRE(*static_cast<Span*>(span.get())->setSamplingPriority(nullptr) ==
+    REQUIRE(*setSamplingPriority(static_cast<Span*>(span.get()), nullptr) ==
             SamplingPriority::SamplerKeep);
     // Double-checking!
     REQUIRE(carrier.text_map["x-datadog-sampling-priority"] == "1");
@@ -264,9 +282,9 @@ TEST_CASE("sampling behaviour") {
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
 
-    auto p = static_cast<Span*>(child_span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    auto p = setSamplingPriority(
+        static_cast<Span*>(child_span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
 
@@ -305,9 +323,9 @@ TEST_CASE("sampling behaviour") {
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
     child_span->Finish();
 
-    auto p = static_cast<Span*>(span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    auto p = setSamplingPriority(
+        static_cast<Span*>(span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
 
@@ -329,12 +347,12 @@ TEST_CASE("sampling behaviour") {
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
     child_span->Finish();
     span->Finish();
-    REQUIRE(!static_cast<Span*>(span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
-    REQUIRE(!static_cast<Span*>(child_span.get())
-                 ->setSamplingPriority(
-                     std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
+    REQUIRE(!setSamplingPriority(
+        static_cast<Span*>(span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
+    REQUIRE(!setSamplingPriority(
+        static_cast<Span*>(child_span.get()),
+        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
 
     auto& trace = writer->traces[0];
     REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
@@ -357,9 +375,9 @@ TEST_CASE("sampling behaviour") {
 
     // setSamplingPriority should fail, since it's already set & locked, and should return the
     // assigned value.
-    REQUIRE(*static_cast<Span*>(span.get())->setSamplingPriority(nullptr) ==
+    REQUIRE(*setSamplingPriority(static_cast<Span*>(span.get()), nullptr) ==
             SamplingPriority::SamplerKeep);
-    REQUIRE(*static_cast<Span*>(child_span.get())->setSamplingPriority(nullptr) ==
+    REQUIRE(*setSamplingPriority(static_cast<Span*>(child_span.get()), nullptr) ==
             SamplingPriority::SamplerKeep);
     // Double-checking!
     REQUIRE(carrier.text_map["x-datadog-sampling-priority"] == "1");

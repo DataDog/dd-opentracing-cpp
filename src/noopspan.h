@@ -5,6 +5,7 @@
 #include <opentracing/tracer.h>
 #include <memory>
 #include "propagation.h"
+#include "span.h"
 
 namespace ot = opentracing;
 
@@ -14,7 +15,7 @@ namespace opentracing {
 class Tracer;
 
 // A NoopSpan, provides a noop implementation of opentracing::Span methods
-class NoopSpan : public ot::Span {
+class NoopSpan : public DatadogSpan {
  public:
   // Creates a new NoopSpan, usually called by Tracer::StartSpanWithOptions.
   NoopSpan(std::shared_ptr<const Tracer> tracer, uint64_t span_id, uint64_t trace_id,
@@ -31,7 +32,11 @@ class NoopSpan : public ot::Span {
   void Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override;
   const ot::SpanContext &context() const noexcept override;
   const ot::Tracer &tracer() const noexcept override;
-  uint64_t traceId() const;
+  uint64_t traceId() const override;
+  uint64_t spanId() const override;
+  OptionalSamplingPriority setSamplingPriority(
+      std::unique_ptr<UserSamplingPriority> priority) override;
+  OptionalSamplingPriority getSamplingPriority() const override;
 
  private:
   std::shared_ptr<const Tracer> tracer_;

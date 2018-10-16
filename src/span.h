@@ -83,6 +83,7 @@ class DatadogSpan : public ot::Span {
   // has propagated from a remote origin and already has a SamplingPriority.
   virtual OptionalSamplingPriority setSamplingPriority(
       std::unique_ptr<UserSamplingPriority> priority) = 0;
+  virtual OptionalSamplingPriority getSamplingPriority() const = 0;
   virtual uint64_t traceId() const = 0;
   virtual uint64_t spanId() const = 0;
 };
@@ -121,6 +122,7 @@ class Span : public DatadogSpan {
   uint64_t spanId() const override;
   OptionalSamplingPriority setSamplingPriority(
       std::unique_ptr<UserSamplingPriority> priority) override;
+  OptionalSamplingPriority getSamplingPriority() const override;
 
  private:
   OptionalSamplingPriority assignSamplingPriority()
