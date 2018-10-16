@@ -73,8 +73,7 @@ struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
       : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>())){};
 
-  void unbufferAndWriteTrace(uint64_t trace_id,
-                             const std::shared_ptr<SampleProvider>& sampler) override {
+  void unbufferAndWriteTrace(uint64_t trace_id) {
     // Haha NOPE.
     // Leave the trace inside the traces map instead of deleting it.
   }

@@ -47,7 +47,7 @@ uint64_t NoopSpan::traceId() const { return trace_id_; }
 uint64_t NoopSpan::spanId() const { return span_id_; }
 
 OptionalSamplingPriority NoopSpan::setSamplingPriority(
-    std::unique_ptr<UserSamplingPriority> priority) {
+    std::unique_ptr<UserSamplingPriority> /* priority */) {
   return nullptr;
 };
 OptionalSamplingPriority NoopSpan::getSamplingPriority() const { return nullptr; };
