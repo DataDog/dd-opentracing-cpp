@@ -40,6 +40,13 @@ const ot::SpanContext &NoopSpan::context() const noexcept { return context_; }
 const ot::Tracer &NoopSpan::tracer() const noexcept { return *tracer_; }
 
 uint64_t NoopSpan::traceId() const { return trace_id_; }
+uint64_t NoopSpan::spanId() const { return span_id_; }
+
+OptionalSamplingPriority NoopSpan::setSamplingPriority(
+    std::unique_ptr<UserSamplingPriority> priority) {
+  return nullptr;
+};
+OptionalSamplingPriority NoopSpan::getSamplingPriority() const { return nullptr; };
 
 }  // namespace opentracing
 }  // namespace datadog

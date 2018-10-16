@@ -2,6 +2,9 @@
 #include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <utility>
+#include "sample.h"
+#include "span_buffer.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -52,33 +55,30 @@ OptionalSamplingPriority asSamplingPriority(int i) {
 }
 
 SpanContext::SpanContext(uint64_t id, uint64_t trace_id,
-                         OptionalSamplingPriority sampling_priority,
                          std::unordered_map<std::string, std::string> &&baggage)
-    : id_(id),
-      trace_id_(trace_id),
-      sampling_priority_(std::move(sampling_priority)),
-      baggage_(std::move(baggage)) {}
+    : id_(id), trace_id_(trace_id), baggage_(std::move(baggage)) {}
 
 SpanContext SpanContext::NginxOpenTracingCompatibilityHackSpanContext(
-    uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
-    std::unordered_map<std::string, std::string> &&baggage) {
-  SpanContext c = SpanContext(id, trace_id, std::move(sampling_priority), std::move(baggage));
+    uint64_t id, uint64_t trace_id, std::unordered_map<std::string, std::string> &&baggage) {
+  SpanContext c = SpanContext{id, trace_id, std::move(baggage)};
   c.nginx_opentracing_compatibility_hack_ = true;
   return c;
 }
 
 SpanContext::SpanContext(SpanContext &&other)
     : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
+      propagated_sampling_priority_(std::move(other.propagated_sampling_priority_)),
+      has_propagated_(other.has_propagated_),
       id_(other.id_),
       trace_id_(other.trace_id_),
-      sampling_priority_(std::move(other.sampling_priority_)),
       baggage_(std::move(other.baggage_)) {}
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
   id_ = other.id_;
   trace_id_ = other.trace_id_;
-  sampling_priority_ = std::move(other.sampling_priority_);
+  propagated_sampling_priority_ = std::move(other.propagated_sampling_priority_);
+  has_propagated_ = other.has_propagated_;
   baggage_ = std::move(other.baggage_);
   nginx_opentracing_compatibility_hack_ = other.nginx_opentracing_compatibility_hack_;
   return *this;
@@ -99,26 +99,18 @@ uint64_t SpanContext::id() const {
   return id_;
 }
 
-uint64_t SpanContext::trace_id() const {
+uint64_t SpanContext::traceId() const {
   // Not locked, since trace_id_ never modified.
   return trace_id_;
 }
 
-OptionalSamplingPriority SpanContext::getSamplingPriority() const {
-  std::lock_guard<std::mutex> lock{mutex_};
-  if (sampling_priority_ == nullptr) {
-    return nullptr;
+std::pair<bool, OptionalSamplingPriority> SpanContext::getPropagationStatus() const {
+  // Not locked. Both these members are only ever written in the constructor/builder.
+  OptionalSamplingPriority p = nullptr;
+  if (propagated_sampling_priority_ != nullptr) {
+    p.reset(new SamplingPriority(*propagated_sampling_priority_));
   }
-  return std::make_unique<SamplingPriority>(*sampling_priority_);
-}
-
-void SpanContext::setSamplingPriority(OptionalSamplingPriority p) {
-  std::lock_guard<std::mutex> lock{mutex_};
-  if (p == nullptr) {
-    sampling_priority_.reset(nullptr);
-  } else {
-    sampling_priority_.reset(new SamplingPriority(*p));
-  }
+  return std::make_pair(has_propagated_, std::move(p));
 }
 
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
@@ -139,15 +131,17 @@ std::string SpanContext::baggageItem(ot::string_view key) const {
 SpanContext SpanContext::withId(uint64_t id) const {
   std::lock_guard<std::mutex> lock{mutex_};
   auto baggage = baggage_;  // (Shallow) copy baggage.
-  // Copy sampling_priority_.
-  std::unique_ptr<SamplingPriority> p = nullptr;
-  if (sampling_priority_ != nullptr) {
-    p.reset(new SamplingPriority(*sampling_priority_));
+  SpanContext context{id, trace_id_, std::move(baggage)};
+  if (propagated_sampling_priority_ != nullptr) {
+    context.propagated_sampling_priority_.reset(
+        new SamplingPriority(*propagated_sampling_priority_));
   }
-  return SpanContext{id, trace_id_, std::move(p), std::move(baggage)};
+  context.has_propagated_ = has_propagated_;
+  return context;
 }
 
-ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
+ot::expected<void> SpanContext::serialize(std::ostream &writer,
+                                          const std::shared_ptr<SpanBuffer> pending_traces) const {
   // check ostream state
   if (!writer.good()) {
     return ot::make_unexpected(std::make_error_code(std::errc::io_error));
@@ -157,8 +151,9 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
   // JSON numbers only support 64bit IEEE 754, so we encode these as strings.
   j[json_trace_id_key] = std::to_string(trace_id_);
   j[json_parent_id_key] = std::to_string(id_);
-  if (sampling_priority_ != nullptr) {
-    j[json_sampling_priority_key] = static_cast<int>(*sampling_priority_);
+  OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
+  if (sampling_priority != nullptr) {
+    j[json_sampling_priority_key] = static_cast<int>(*sampling_priority);
   }
   j[json_baggage_key] = baggage_;
 
@@ -171,7 +166,8 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer) const {
   return {};
 }
 
-ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const {
+ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
+                                          const std::shared_ptr<SpanBuffer> pending_traces) const {
   std::lock_guard<std::mutex> lock{mutex_};
   auto result = writer.Set(trace_id_header, std::to_string(trace_id_));
   if (!result) {
@@ -184,9 +180,10 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer) const
     return result;
   }
 
-  if (sampling_priority_ != nullptr) {
-    result = writer.Set(sampling_priority_header,
-                        std::to_string(static_cast<int>(*sampling_priority_)));
+  OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
+  if (sampling_priority != nullptr) {
+    result =
+        writer.Set(sampling_priority_header, std::to_string(static_cast<int>(*sampling_priority)));
     if (!result) {
       return result;
     }
@@ -253,9 +250,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
     baggage = j[json_baggage_key].get<std::unordered_map<std::string, std::string>>();
   }
 
-  return std::unique_ptr<ot::SpanContext>(std::make_unique<SpanContext>(
-      parent_id, trace_id, std::move(sampling_priority), std::move(baggage)));
-
+  auto context = std::make_unique<SpanContext>(parent_id, trace_id, std::move(baggage));
+  context->has_propagated_ = true;
+  context->propagated_sampling_priority_ = std::move(sampling_priority);
+  return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
 } catch (const std::invalid_argument &ia) {
@@ -309,8 +307,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     // Partial context, this shouldn't happen.
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
-  return std::unique_ptr<ot::SpanContext>(std::make_unique<SpanContext>(
-      parent_id, trace_id, std::move(sampling_priority), std::move(baggage)));
+  auto context = std::make_unique<SpanContext>(parent_id, trace_id, std::move(baggage));
+  context->has_propagated_ = true;
+  context->propagated_sampling_priority_ = std::move(sampling_priority);
+  return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }

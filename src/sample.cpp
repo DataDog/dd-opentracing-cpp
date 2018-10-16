@@ -34,7 +34,7 @@ bool DiscardRateSampler::discard(const SpanContext& context) const {
   // rather than generating a new random number here. It's a bit faster, and more importantly it's
   // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
   // bit awkward.
-  uint64_t hashed_id = context.trace_id() * constant_rate_hash_factor;
+  uint64_t hashed_id = context.traceId() * constant_rate_hash_factor;
   if (hashed_id < max_trace_id_) {
     return false;
   }

@@ -10,6 +10,10 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+class SpanBuffer;
+class SampleProvider;
+class SpanData;
+
 enum class SamplingPriority : int {
   UserDrop = -1,
   SamplerDrop = 0,
@@ -20,6 +24,12 @@ enum class SamplingPriority : int {
   MaximumValue = UserKeep,
 };
 
+// A SamplingPriority that encompasses only values that may be directly set by users.
+enum class UserSamplingPriority : int {
+  UserDrop = static_cast<int>(SamplingPriority::UserDrop),
+  UserKeep = static_cast<int>(SamplingPriority::UserKeep),
+};
+
 // Move to std::optional in C++17 when it has better compiler support.
 using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
 
@@ -27,13 +37,12 @@ OptionalSamplingPriority asSamplingPriority(int i);
 
 class SpanContext : public ot::SpanContext {
  public:
-  SpanContext(uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
+  SpanContext(uint64_t id, uint64_t trace_id,
               std::unordered_map<std::string, std::string> &&baggage);
 
   // Enables a hack, see the comment below on nginx_opentracing_compatibility_hack_.
   static SpanContext NginxOpenTracingCompatibilityHackSpanContext(
-      uint64_t id, uint64_t trace_id, OptionalSamplingPriority sampling_priority,
-      std::unordered_map<std::string, std::string> &&baggage);
+      uint64_t id, uint64_t trace_id, std::unordered_map<std::string, std::string> &&baggage);
 
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
@@ -46,8 +55,10 @@ class SpanContext : public ot::SpanContext {
   std::string baggageItem(ot::string_view key) const;
 
   // Serializes the context into the given writer.
-  ot::expected<void> serialize(std::ostream &writer) const;
-  ot::expected<void> serialize(const ot::TextMapWriter &writer) const;
+  ot::expected<void> serialize(std::ostream &writer,
+                               const std::shared_ptr<SpanBuffer> pending_traces) const;
+  ot::expected<void> serialize(const ot::TextMapWriter &writer,
+                               const std::shared_ptr<SpanBuffer> pending_traces) const;
 
   SpanContext withId(uint64_t id) const;
 
@@ -57,9 +68,11 @@ class SpanContext : public ot::SpanContext {
       const ot::TextMapReader &reader);
 
   uint64_t id() const;
-  uint64_t trace_id() const;
-  OptionalSamplingPriority getSamplingPriority() const;
-  void setSamplingPriority(OptionalSamplingPriority p);
+  uint64_t traceId() const;
+  // Returns a pair of:
+  // * bool, true if this SpanContext may have arrived via propagation.
+  // * an OptionalSamplingPriority, the propagated sampling priority.
+  std::pair<bool, OptionalSamplingPriority> getPropagationStatus() const;
 
  private:
   // Terrible, terrible hack; to get around:
@@ -80,11 +93,14 @@ class SpanContext : public ot::SpanContext {
   // make it more of a pain to do and less obvious what's happening.
   bool nginx_opentracing_compatibility_hack_ = false;
 
+  OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
+  bool has_propagated_ = false;
+
   uint64_t id_;
   uint64_t trace_id_;
-  OptionalSamplingPriority sampling_priority_;
-  std::unordered_map<std::string, std::string> baggage_;
+
   mutable std::mutex mutex_;
+  std::unordered_map<std::string, std::string> baggage_;
 };
 
 }  // namespace opentracing
