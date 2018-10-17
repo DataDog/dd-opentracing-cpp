@@ -12,7 +12,6 @@ namespace opentracing {
 
 class SpanBuffer;
 class SampleProvider;
-class SpanData;
 
 enum class SamplingPriority : int {
   UserDrop = -1,
