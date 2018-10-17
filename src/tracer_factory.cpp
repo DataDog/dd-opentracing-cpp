@@ -82,21 +82,21 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     if (config.find("operation_name_override") != config.end()) {
       options.operation_name_override = config["operation_name_override"];
     }
-    if (config.find("propagation_stle_extract") != config.end()) {
-      auto style = asPropagationStyle(config["propagation_stle_extract"]);
+    if (config.find("propagation_style_extract") != config.end()) {
+      auto style = asPropagationStyle(config["propagation_style_extract"]);
       if (!style) {
         error_message =
-            "Invalid value for propagation_stle_extract, must be one of 'DatadogOnly', 'Both', "
+            "Invalid value for propagation_style_extract, must be one of 'DatadogOnly', 'Both', "
             "'B3Only'";
         return style.get_unexpected();
       }
       options.extract = style.value();
     }
-    if (config.find("propagation_stle_inject") != config.end()) {
-      auto style = asPropagationStyle(config["propagation_stle_inject"]);
+    if (config.find("propagation_style_inject") != config.end()) {
+      auto style = asPropagationStyle(config["propagation_style_inject"]);
       if (!style) {
         error_message =
-            "Invalid value for propagation_stle_inject, must be one of 'DatadogOnly', 'Both', "
+            "Invalid value for propagation_style_inject, must be one of 'DatadogOnly', 'Both', "
             "'B3Only'";
         return style.get_unexpected();
       }

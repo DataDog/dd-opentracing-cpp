@@ -8,8 +8,8 @@ namespace opentracing {
 const std::string sample_type_baggage_key = "_sample_type";
 
 // Constants used for the Knuth hashing, same constants as the Agent.
-const double max_trace_id_double = std::numeric_limits<uint64_t>::max();
-const uint64_t constant_rate_hash_factor = 1111111111111111111;
+constexpr double max_trace_id_double = static_cast<double>(std::numeric_limits<uint64_t>::max());
+constexpr uint64_t constant_rate_hash_factor = UINT64_C(1111111111111111111);
 
 const std::string sample_rate_metric_key = "_sample_rate";
 
@@ -52,16 +52,15 @@ bool PrioritySampler::discard(const SpanContext& context) const { return false; 
 OptionalSamplingPriority PrioritySampler::sample(const std::string& environment,
                                                  const std::string& service,
                                                  uint64_t trace_id) const {
-  uint64_t max_hash;
+  uint64_t max_hash = std::numeric_limits<uint64_t>::max();
   std::ostringstream key;
   key << "service:" << service << ",env:" << environment;
   {
     std::lock_guard<std::mutex> lock{mutex_};
     auto const rule = max_hash_by_service_env_.find(key.str());
-    if (rule == max_hash_by_service_env_.end()) {
-      return nullptr;
+    if (rule != max_hash_by_service_env_.end()) {
+      max_hash = rule->second;
     }
-    max_hash = rule->second;
   }
   // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
   // rather than generating a new random number here. It's a bit faster, and more importantly it's

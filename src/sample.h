@@ -63,7 +63,8 @@ class PrioritySampler : public SampleProvider {
   virtual void configure(json config);
 
  private:
-  std::map<std::string, uint64_t> max_hash_by_service_env_;
+  std::map<std::string, uint64_t> max_hash_by_service_env_{
+      {"service:,env:", std::numeric_limits<uint64_t>::max()}};
   mutable std::mutex mutex_;
 };
 
