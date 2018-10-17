@@ -3,7 +3,7 @@ version: 2
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_3
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_4
 
 jobs:
   build:
@@ -43,6 +43,8 @@ jobs:
       - run:
           name: Build (with bazel)
           command: |
+            export CC=clang-5.0
+            export CXX=clang++-5.0
             bazel build //:dd_opentracing_cpp
       - run:
           name: Build opentracing-nginx
