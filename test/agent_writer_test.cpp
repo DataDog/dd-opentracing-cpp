@@ -12,9 +12,9 @@ using namespace datadog::opentracing;
 Trace make_trace(std::initializer_list<TestSpanData> spans) {
   Trace trace{new std::vector<std::unique_ptr<SpanData>>{}};
   for (const TestSpanData& span : spans) {
-    trace->emplace_back(std::move(std::unique_ptr<TestSpanData>{new TestSpanData{span}}));
+    trace->emplace_back(std::unique_ptr<TestSpanData>{new TestSpanData{span}});
   }
-  return std::move(trace);
+  return trace;
 }
 
 TEST_CASE("writer") {

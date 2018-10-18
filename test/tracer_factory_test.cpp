@@ -63,16 +63,31 @@ TEST_CASE("tracer") {
   TracerFactory<MockTracer> factory;
 
   SECTION("can be created with valid config") {
-    std::string input{R"(
+    // Checks all combinations.
+    auto propagation_style_inject = GENERATE(values<std::pair<std::string, PropagationStyle>>(
+        {{"DatadogOnly", PropagationStyle::DatadogOnly},
+         {"B3Only", PropagationStyle::B3Only},
+         {"Both", PropagationStyle::Both}}));
+    auto propagation_style_extract = GENERATE(values<std::pair<std::string, PropagationStyle>>(
+        {{"DatadogOnly", PropagationStyle::DatadogOnly},
+         {"B3Only", PropagationStyle::B3Only},
+         {"Both", PropagationStyle::Both}}));
+
+    std::ostringstream input;
+    input << R"(
       {
         "service": "my-service",
         "agent_host": "www.omfgdogs.com",
         "agent_port": 80,
-        "type": "db"
+        "type": "db",
+        "propagation_style_extract": ")"
+          << propagation_style_extract.first << R"(",
+        "propagation_style_inject": ")"
+          << propagation_style_inject.first << R"("
       }
-    )"};
+    )";
     std::string error = "";
-    auto result = factory.MakeTracer(input.c_str(), error);
+    auto result = factory.MakeTracer(input.str().c_str(), error);
     REQUIRE(error == "");
     REQUIRE(result->get() != nullptr);
     auto tracer = dynamic_cast<MockTracer *>(result->get());
@@ -80,6 +95,8 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.agent_port == 80);
     REQUIRE(tracer->opts.service == "my-service");
     REQUIRE(tracer->opts.type == "db");
+    REQUIRE(tracer->opts.extract == propagation_style_extract.second);
+    REQUIRE(tracer->opts.inject == propagation_style_inject.second);
   }
 
   SECTION("can be created without optional fields") {
@@ -152,6 +169,38 @@ TEST_CASE("tracer") {
     std::string error = "";
     auto result = factory.MakeTracer(input.c_str(), error);
     REQUIRE(error == "configuration has an argument with an incorrect type");
+    REQUIRE(!result);
+    REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+  }
+
+  SECTION("handles bad propagation style (extract)") {
+    std::string input{R"(
+      {
+        "service": "my-service",
+        "propagation_style_extract": "i dunno"
+      }
+    )"};
+    std::string error = "";
+    auto result = factory.MakeTracer(input.c_str(), error);
+    REQUIRE(error ==
+            "Invalid value for propagation_style_extract, must be one of 'DatadogOnly', 'Both', "
+            "'B3Only'");
+    REQUIRE(!result);
+    REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+  }
+
+  SECTION("handles bad propagation style (inject)") {
+    std::string input{R"(
+      {
+        "service": "my-service",
+        "propagation_style_inject": "i dunno"
+      }
+    )"};
+    std::string error = "";
+    auto result = factory.MakeTracer(input.c_str(), error);
+    REQUIRE(error ==
+            "Invalid value for propagation_style_inject, must be one of 'DatadogOnly', 'Both', "
+            "'B3Only'");
     REQUIRE(!result);
     REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
   }

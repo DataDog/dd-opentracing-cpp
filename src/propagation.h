@@ -47,8 +47,8 @@ class SpanContext : public ot::SpanContext {
 
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
-  bool operator==(const SpanContext &other);
-  bool operator!=(const SpanContext &other);
+  bool operator==(const SpanContext &other) const;
+  bool operator!=(const SpanContext &other) const;
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;

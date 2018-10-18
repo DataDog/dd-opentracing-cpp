@@ -173,7 +173,7 @@ struct MockHandle : public Handle {
       deserialized.convert(*dst.get());
       options.erase(CURLOPT_POSTFIELDS);
     }
-    return std::move(dst);
+    return dst;
   }
 
   std::unordered_map<CURLoption, std::string, EnumClassHash> options;

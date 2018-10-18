@@ -52,6 +52,17 @@ TEST_CASE("SpanContext") {
         REQUIRE(received_context->id() == 420);
         REQUIRE(received_context->traceId() == 123);
         REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
+
+        SECTION("equality works") {
+          // Can't compare to original SpanContext 'context', because has_propagated_ is unset and
+          // deserialization sets it.
+          MockTextMapCarrier carrier2{};
+          REQUIRE(received_context->serialize(carrier2, buffer, propagation_style));
+          carrier2.Set("more junk", "ayy lmao");
+          auto sc2 = SpanContext::deserialize(carrier2, propagation_style);
+          auto received_context2 = dynamic_cast<SpanContext*>(sc2->get());
+          REQUIRE(*received_context2 == *received_context);
+        }
       }
     }
   }
@@ -116,6 +127,32 @@ TEST_CASE("deserialise fails") {
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
+}
+
+TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
+  MockTextMapCarrier carrier{};
+  carrier.Set("x-datadog-trace-id", "420");
+  carrier.Set("x-datadog-parent-id", "421");
+  carrier.Set("x-datadog-sampling-priority", "1");
+  carrier.Set("X-B3-TraceId", "1A4");
+  carrier.Set("X-B3-SpanId", "1A5");
+  carrier.Set("X-B3-Sampled", "1");
+
+  auto test_case = GENERATE(
+      values<std::pair<std::string, std::string>>({{"x-datadog-trace-id", "666"},
+                                                   {"x-datadog-parent-id", "666"},
+                                                   {"x-datadog-sampling-priority", "2"},
+                                                   {"X-B3-TraceId", "29A"},
+                                                   {"X-B3-SpanId", "29A"},
+                                                   {"X-B3-Sampled", "0"},
+                                                   // Invalid values for B3 but not for Datadog.
+                                                   {"X-B3-Sampled", "-1"},
+                                                   {"X-B3-Sampled", "2"}}));
+  carrier.Set(test_case.first, test_case.second);
+
+  auto err = SpanContext::deserialize(carrier, PropagationStyle::Both);
+  REQUIRE(!err);
+  REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
 TEST_CASE("Binary Span Context") {

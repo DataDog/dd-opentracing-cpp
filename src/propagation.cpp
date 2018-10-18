@@ -104,7 +104,7 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
   return *this;
 }
 
-bool SpanContext::operator==(const SpanContext &other) {
+bool SpanContext::operator==(const SpanContext &other) const {
   if (id_ != other.id_ || trace_id_ != other.trace_id_ ||
       has_propagated_ != other.has_propagated_ || baggage_ != other.baggage_ ||
       nginx_opentracing_compatibility_hack_ != other.nginx_opentracing_compatibility_hack_) {
@@ -117,7 +117,7 @@ bool SpanContext::operator==(const SpanContext &other) {
          *propagated_sampling_priority_ == *other.propagated_sampling_priority_;
 }
 
-bool SpanContext::operator!=(const SpanContext &other) { return !(*this == other); }
+bool SpanContext::operator!=(const SpanContext &other) const { return !(*this == other); }
 
 void SpanContext::ForeachBaggageItem(
     std::function<bool(const std::string &, const std::string &)> f) const {
