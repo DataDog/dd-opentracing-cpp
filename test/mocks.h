@@ -35,9 +35,10 @@ struct TestSpanData : public SpanData {
 struct MockSampler : public PrioritySampler {
   MockSampler() {}
 
-  bool discard(const SpanContext& context) const override { return discard_spans; }
-  OptionalSamplingPriority sample(const std::string& environment, const std::string& service,
-                                  uint64_t trace_id) const override {
+  bool discard(const SpanContext& /* context */) const override { return discard_spans; }
+  OptionalSamplingPriority sample(const std::string& /* environment */,
+                                  const std::string& /* service */,
+                                  uint64_t /* trace_id */) const override {
     if (sampling_priority == nullptr) {
       return nullptr;
     }
@@ -73,8 +74,7 @@ struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
       : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>())){};
 
-  void unbufferAndWriteTrace(uint64_t trace_id,
-                             const std::shared_ptr<SampleProvider>& sampler) override {
+  void unbufferAndWriteTrace(uint64_t /* trace_id */) {
     // Haha NOPE.
     // Leave the trace inside the traces map instead of deleting it.
   }
@@ -215,7 +215,7 @@ struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
     return {};
   }
 
-  ot::expected<ot::string_view> LookupKey(ot::string_view key) const override {
+  ot::expected<ot::string_view> LookupKey(ot::string_view /* key */) const override {
     return ot::make_unexpected(ot::lookup_key_not_supported_error);
   }
 

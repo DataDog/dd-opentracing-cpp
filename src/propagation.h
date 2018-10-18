@@ -13,7 +13,6 @@ namespace opentracing {
 
 class SpanBuffer;
 class SampleProvider;
-class SpanData;
 struct HeadersImpl;
 
 enum class SamplingPriority : int {

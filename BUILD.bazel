@@ -31,7 +31,15 @@ cc_library(
         "@io_opentracing_cpp//:opentracing",
         "@com_github_msgpack_msgpack_c//:msgpack",
     ],
-    copts = ["-std=c++14"],
+    copts = [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wnon-virtual-dtor",
+        "-Woverloaded-virtual",
+        "-Wold-style-cast",
+        "-std=c++14",
+    ],
 )
 
 genrule(

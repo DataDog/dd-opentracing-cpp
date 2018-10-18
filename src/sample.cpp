@@ -41,13 +41,13 @@ bool DiscardRateSampler::discard(const SpanContext& context) const {
   return true;
 }
 
-OptionalSamplingPriority DiscardRateSampler::sample(const std::string& environment,
-                                                    const std::string& service,
-                                                    uint64_t trace_id) const {
+OptionalSamplingPriority DiscardRateSampler::sample(const std::string& /* environment */,
+                                                    const std::string& /* service */,
+                                                    uint64_t /* trace_id */) const {
   return nullptr;
 }
 
-bool PrioritySampler::discard(const SpanContext& context) const { return false; }
+bool PrioritySampler::discard(const SpanContext& /* context */) const { return false; }
 
 OptionalSamplingPriority PrioritySampler::sample(const std::string& environment,
                                                  const std::string& service,

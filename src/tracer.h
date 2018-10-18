@@ -43,6 +43,10 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
                                                  const ot::StartSpanOptions &options) const
       noexcept override;
 
+  // Ensure we aren't hiding methods from ot::Tracer due to the overloaded overrides.
+  using ot::Tracer::Extract;
+  using ot::Tracer::Inject;
+
   ot::expected<void> Inject(const ot::SpanContext &sc, std::ostream &writer) const override;
 
   ot::expected<void> Inject(const ot::SpanContext &sc,

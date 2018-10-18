@@ -67,7 +67,8 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 }  // namespace
 
 OptionalSamplingPriority asSamplingPriority(int i) {
-  if (i < (int)SamplingPriority::MinimumValue || i > (int)SamplingPriority::MaximumValue) {
+  if (i < static_cast<int>(SamplingPriority::MinimumValue) ||
+      i > static_cast<int>(SamplingPriority::MaximumValue)) {
     return nullptr;
   }
   return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));
@@ -212,6 +213,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
   if (style == PropagationStyle::B3Only) {
     return serialize(writer, pending_traces, propagation_headers.b3);
   }
+  // PropagationStyle::Both
   auto result = serialize(writer, pending_traces, propagation_headers.datadog);
   if (!result) {
     return result;

@@ -20,7 +20,7 @@ struct PendingTrace {
   PendingTrace()
       : finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}), all_spans() {}
 
-  void finish(const std::shared_ptr<SampleProvider>& sampler);
+  void finish();
 
   Trace finished_spans;
   std::unordered_set<uint64_t> all_spans;
@@ -72,8 +72,7 @@ class WritingSpanBuffer : public SpanBuffer {
  protected:
   // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish
   // behaviour.
-  virtual void unbufferAndWriteTrace(uint64_t trace_id,
-                                     const std::shared_ptr<SampleProvider>& sampler);
+  virtual void unbufferAndWriteTrace(uint64_t trace_id);
 
   std::unordered_map<uint64_t, PendingTrace> traces_;
 };

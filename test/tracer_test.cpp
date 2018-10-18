@@ -9,8 +9,12 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("tracer") {
-  int id = 100;                        // Starting span id.
-  std::tm start{0, 0, 0, 12, 2, 107};  // Starting calendar time 2007-03-12 00:00:00
+  int id = 100;  // Starting span id.
+  // Starting calendar time 2007-03-12 00:00:00
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
   TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
   auto buffer = std::make_shared<MockBuffer>();
