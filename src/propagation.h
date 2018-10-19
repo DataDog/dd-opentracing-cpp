@@ -1,8 +1,10 @@
 #ifndef DD_OPENTRACING_PROPAGATION_H
 #define DD_OPENTRACING_PROPAGATION_H
 
+#include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 
 namespace ot = opentracing;
@@ -12,6 +14,7 @@ namespace opentracing {
 
 class SpanBuffer;
 class SampleProvider;
+struct HeadersImpl;
 
 enum class SamplingPriority : int {
   UserDrop = -1,
@@ -45,6 +48,8 @@ class SpanContext : public ot::SpanContext {
 
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
+  bool operator==(const SpanContext &other) const;
+  bool operator!=(const SpanContext &other) const;
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
@@ -57,14 +62,15 @@ class SpanContext : public ot::SpanContext {
   ot::expected<void> serialize(std::ostream &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
-                               const std::shared_ptr<SpanBuffer> pending_traces) const;
+                               const std::shared_ptr<SpanBuffer> pending_traces,
+                               std::set<PropagationStyle> styles) const;
 
   SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader);
+      const ot::TextMapReader &reader, std::set<PropagationStyle> styles);
 
   uint64_t id() const;
   uint64_t traceId() const;
@@ -74,6 +80,12 @@ class SpanContext : public ot::SpanContext {
   std::pair<bool, OptionalSamplingPriority> getPropagationStatus() const;
 
  private:
+  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
+      const ot::TextMapReader &reader, const HeadersImpl &headers_impl);
+  ot::expected<void> serialize(const ot::TextMapWriter &writer,
+                               const std::shared_ptr<SpanBuffer> pending_traces,
+                               const HeadersImpl &headers_impl) const;
+
   // Terrible, terrible hack; to get around:
   // https://github.com/opentracing-contrib/nginx-opentracing/blob/master/opentracing/src/discover_span_context_keys.cpp#L49-L50
   // nginx-opentracing needs to know in-advance the headers that may propagate from a tracer. It

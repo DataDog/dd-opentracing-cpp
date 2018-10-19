@@ -104,7 +104,12 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
   }
   PendingTrace& trace = trace_entry->second;
   if (trace.sampling_priority_locked) {
-    std::cerr << "Sampling priority locked, trace already propagated" << std::endl;
+    if (priority == nullptr || *priority == SamplingPriority::UserKeep ||
+        *priority == SamplingPriority::UserDrop) {
+      // Only print an error if a user is taking this action. This case is legitimate (albeit with
+      // the same outcome) if the Sampler itself is trying to assignSamplingPriority.
+      std::cerr << "Sampling priority locked, trace already propagated" << std::endl;
+    }
     return getSamplingPriorityImpl(trace_id);
   }
   if (priority == nullptr) {

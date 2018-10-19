@@ -115,16 +115,17 @@ TEST_CASE("priority sampler unit test") {
     }
   }
 
-  SECTION("default unconfigured sampling behaviour is to not apply any priority sampling") {
-    REQUIRE(sampler.sample("", "", 0) == nullptr);
-    REQUIRE(sampler.sample("env", "service", 1) == nullptr);
+  SECTION("default unconfigured priority sampling behaviour is to always sample") {
+    REQUIRE(*sampler.sample("", "", 0) == SamplingPriority::SamplerKeep);
+    REQUIRE(*sampler.sample("env", "service", 1) == SamplingPriority::SamplerKeep);
   }
 
   SECTION("configured") {
     sampler.configure("{ \"service:nginx,env:\": 0.8, \"service:nginx,env:prod\": 0.2 }"_json);
 
-    SECTION("spans that don't match a rule are not given a sampling priority") {
-      REQUIRE(sampler.sample("different env", "different service", 1) == nullptr);
+    SECTION("spans that don't match a rule are given a sampling priority of SamplerKeep") {
+      REQUIRE(*sampler.sample("different env", "different service", 1) ==
+              SamplingPriority::SamplerKeep);
     }
 
     SECTION("spans can be sampled") {

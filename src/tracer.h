@@ -66,17 +66,6 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   void Close() noexcept override;
 
  private:
-  template <class Carrier>
-  ot::expected<void> inject(const ot::SpanContext &sc, Carrier &carrier) const try {
-    auto span_context = dynamic_cast<const SpanContext *>(&sc);
-    if (span_context == nullptr) {
-      return ot::make_unexpected(ot::invalid_span_context_error);
-    }
-    return span_context->serialize(carrier, buffer_);
-  } catch (const std::bad_alloc &) {
-    return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
-  }
-
   const TracerOptions opts_;
   // Keeps finished spans until their entire trace is finished.
   std::shared_ptr<SpanBuffer> buffer_;

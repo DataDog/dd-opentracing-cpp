@@ -10,6 +10,25 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
+namespace {
+ot::expected<std::set<PropagationStyle>> asPropagationStyle(json styles) {
+  std::set<PropagationStyle> propagation_styles;
+  for (auto &style : styles) {
+    if (style == "Datadog") {
+      propagation_styles.insert(PropagationStyle::Datadog);
+    } else if (style == "B3") {
+      propagation_styles.insert(PropagationStyle::B3);
+    } else {
+      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    }
+  }
+  if (propagation_styles.size() == 0) {
+    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+  return propagation_styles;
+}
+}  // namespace
+
 // Accepts configuration in JSON format, with the following keys:
 // "service": Required. A string, the name of the service.
 // "agent_host": A string, defaults to localhost.
@@ -23,6 +42,11 @@ namespace opentracing {
 //     based on a combination of user-assigned priorities and configuration from the agent.
 // "operation_name_override": A string, if not empty it overrides the operation name (and the
 //     overridden operation name is recorded in the tag "operation").
+// "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
+//     to ["Datadog", "B3"]. The type of headers to use to propagate distributed traces.
+// "propagation_style_inject": A list of strings, each string is one of "Datadog", "B3". Defaults
+//     to ["Datadog"]. The type of headers to use to receive distributed traces.
+//
 // Extra keys will be ignored.
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
@@ -63,6 +87,26 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     }
     if (config.find("operation_name_override") != config.end()) {
       options.operation_name_override = config["operation_name_override"];
+    }
+    if (config.find("propagation_style_extract") != config.end()) {
+      auto styles = asPropagationStyle(config["propagation_style_extract"]);
+      if (!styles || styles.value().size() == 0) {
+        error_message =
+            "Invalid value for propagation_style_extract, must be a list of at least one element "
+            "with value 'Datadog', or 'B3'";
+        return styles.get_unexpected();
+      }
+      options.extract = styles.value();
+    }
+    if (config.find("propagation_style_inject") != config.end()) {
+      auto styles = asPropagationStyle(config["propagation_style_inject"]);
+      if (!styles || styles.value().size() == 0) {
+        error_message =
+            "Invalid value for propagation_style_inject, must be a list of at least one element "
+            "with value 'Datadog', or 'B3'";
+        return styles.get_unexpected();
+      }
+      options.inject = styles.value();
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";

@@ -3,13 +3,23 @@
 
 #include <opentracing/tracer.h>
 
-#include <deque>
 #include <map>
+#include <set>
 
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
+
+// The type of headers that are used for propagating distributed traces.
+// B3 headers only support 64 bit trace IDs.
+enum class PropagationStyle {
+  // Using Datadog headers.
+  Datadog,
+  // Use B3 headers.
+  // https://github.com/openzipkin/b3-propagation
+  B3,
+};
 
 struct TracerOptions {
   // Hostname or IP address of the Datadog agent.
@@ -39,6 +49,10 @@ struct TracerOptions {
   // If not empty, the given string overrides the operation name (and the overridden operation name
   // is recorded in the tag "operation").
   std::string operation_name_override = "";
+  // The style of propagation headers to accept/extract.
+  std::set<PropagationStyle> extract{PropagationStyle::Datadog, PropagationStyle::B3};
+  // The style of propagation headers to emit/inject.
+  std::set<PropagationStyle> inject{PropagationStyle::Datadog};
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the
