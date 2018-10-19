@@ -12,28 +12,45 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
-struct HeadersImpl {  // Don't forget clamp samping_priority values for b3
+struct HeadersImpl {
   const char *trace_id_header;
   const char *span_id_header;
   const char *sampling_priority_header;
   const int base;
   std::string (*encode_id)(uint64_t);
+  std::string (*encode_sampling_priority)(SamplingPriority);
 };
 
 namespace {
-std::string as_hex(uint64_t id) {
+std::string asHex(uint64_t id) {
   std::stringstream stream;
   stream << std::hex << id;
   return stream.str();
 }
 
+// B3 style header propagation only supports "drop" and "keep", with no distinction between
+// user/sampler as the decision maker. Here we clamp the serialized values.
+std::string clampB3SamplingPriorityValue(SamplingPriority p) {
+  if (static_cast<int>(p) > 0) {
+    return "1";  // Keep, as SamplingPriority::SamplerKeep.
+  }
+  return "0";  // Drop, as SamplingPriority::SamplerDrop.
+}
+
+std::string to_string(SamplingPriority p) { return std::to_string(static_cast<int>(p)); }
+
 // Header names for trace data.
 constexpr struct {
   // https://docs.datadoghq.com/tracing/faq/distributed-tracing/
-  HeadersImpl datadog{"x-datadog-trace-id", "x-datadog-parent-id", "x-datadog-sampling-priority",
-                      10, std::to_string};
+  HeadersImpl datadog{"x-datadog-trace-id",
+                      "x-datadog-parent-id",
+                      "x-datadog-sampling-priority",
+                      10,
+                      std::to_string,
+                      to_string};
   // https://github.com/openzipkin/b3-propagation
-  HeadersImpl b3{"X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled", 16, as_hex};
+  HeadersImpl b3{
+      "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled", 16, asHex, clampB3SamplingPriorityValue};
 
 } propagation_headers;
 
@@ -231,8 +248,6 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
   if (!result) {
     return result;
   }
-  // Yes, "id" does go to "parent id" since this is the point where subsequent Spans getting this
-  // context become children.
   result = writer.Set(headers_impl.span_id_header, headers_impl.encode_id(id_));
   if (!result) {
     return result;
@@ -241,7 +256,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
   OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
   if (sampling_priority != nullptr) {
     result = writer.Set(headers_impl.sampling_priority_header,
-                        std::to_string(static_cast<int>(*sampling_priority)));
+                        headers_impl.encode_sampling_priority(*sampling_priority));
     if (!result) {
       return result;
     }
@@ -404,7 +419,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   context->has_propagated_ = true;
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
-}  // namespace opentracing
+}
 
 }  // namespace opentracing
 }  // namespace datadog

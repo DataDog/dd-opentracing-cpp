@@ -129,6 +129,31 @@ TEST_CASE("deserialise fails") {
   }
 }
 
+TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
+  // first = value before serialization + clamping, second = value after.
+  auto priority = GENERATE(values<std::pair<SamplingPriority, SamplingPriority>>(
+      {{SamplingPriority::UserDrop, SamplingPriority::SamplerDrop},
+       {SamplingPriority::SamplerDrop, SamplingPriority::SamplerDrop},
+       {SamplingPriority::SamplerKeep, SamplingPriority::SamplerKeep},
+       {SamplingPriority::UserKeep, SamplingPriority::SamplerKeep}}));
+
+  MockTextMapCarrier carrier{};
+  auto buffer = std::make_shared<MockBuffer>();
+  buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
+  SpanContext context{420, 123, {}};
+
+  REQUIRE(context.serialize(carrier, buffer, PropagationStyle::B3Only));
+
+  auto sc = SpanContext::deserialize(carrier, PropagationStyle::B3Only);
+  auto received_context = dynamic_cast<SpanContext*>(sc->get());
+  REQUIRE(received_context);
+  REQUIRE(received_context->id() == 420);
+  REQUIRE(received_context->traceId() == 123);
+  auto status = received_context->getPropagationStatus();
+  REQUIRE(status.first == true);
+  REQUIRE(*status.second == priority.second);
+}
+
 TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
   MockTextMapCarrier carrier{};
   carrier.Set("x-datadog-trace-id", "420");
