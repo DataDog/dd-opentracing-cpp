@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_ENCODER_H
 
 #include <datadog/opentracing.h>
+#include <deque>
 #include <sstream>
 
 namespace datadog {

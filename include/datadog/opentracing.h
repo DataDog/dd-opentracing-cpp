@@ -3,8 +3,8 @@
 
 #include <opentracing/tracer.h>
 
-#include <deque>
 #include <map>
+#include <set>
 
 namespace ot = opentracing;
 
@@ -15,12 +15,10 @@ namespace opentracing {
 // B3 headers only support 64 bit trace IDs.
 enum class PropagationStyle {
   // Using Datadog headers.
-  DatadogOnly,
-  // Use both Datadog and B3 headers.
-  Both,
-  // Use only B3 headers.
+  Datadog,
+  // Use B3 headers.
   // https://github.com/openzipkin/b3-propagation
-  B3Only,
+  B3,
 };
 
 struct TracerOptions {
@@ -52,9 +50,9 @@ struct TracerOptions {
   // is recorded in the tag "operation").
   std::string operation_name_override = "";
   // The style of propagation headers to accept/extract.
-  PropagationStyle extract = PropagationStyle::Both;
+  std::set<PropagationStyle> extract{PropagationStyle::Datadog, PropagationStyle::B3};
   // The style of propagation headers to emit/inject.
-  PropagationStyle inject = PropagationStyle::DatadogOnly;
+  std::set<PropagationStyle> inject{PropagationStyle::Datadog};
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

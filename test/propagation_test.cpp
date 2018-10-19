@@ -27,14 +27,16 @@ TEST_CASE("SpanContext") {
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
 
-  auto propagation_style =
-      GENERATE(PropagationStyle::DatadogOnly, PropagationStyle::B3Only, PropagationStyle::Both);
+  auto propagation_styles =
+      GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
+               std::set<PropagationStyle>{PropagationStyle::B3},
+               std::set<PropagationStyle>{PropagationStyle::Datadog, PropagationStyle::B3});
 
   SECTION("can be serialized") {
-    REQUIRE(context.serialize(carrier, buffer, propagation_style));
+    REQUIRE(context.serialize(carrier, buffer, propagation_styles));
 
     SECTION("can be deserialized") {
-      auto sc = SpanContext::deserialize(carrier, propagation_style);
+      auto sc = SpanContext::deserialize(carrier, propagation_styles);
       auto received_context = dynamic_cast<SpanContext*>(sc->get());
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
@@ -46,7 +48,7 @@ TEST_CASE("SpanContext") {
 
       SECTION("even with extra keys") {
         carrier.Set("some junk thingy", "ayy lmao");
-        auto sc = SpanContext::deserialize(carrier, propagation_style);
+        auto sc = SpanContext::deserialize(carrier, propagation_styles);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
         REQUIRE(received_context->id() == 420);
@@ -57,9 +59,9 @@ TEST_CASE("SpanContext") {
           // Can't compare to original SpanContext 'context', because has_propagated_ is unset and
           // deserialization sets it.
           MockTextMapCarrier carrier2{};
-          REQUIRE(received_context->serialize(carrier2, buffer, propagation_style));
+          REQUIRE(received_context->serialize(carrier2, buffer, propagation_styles));
           carrier2.Set("more junk", "ayy lmao");
-          auto sc2 = SpanContext::deserialize(carrier2, propagation_style);
+          auto sc2 = SpanContext::deserialize(carrier2, propagation_styles);
           auto received_context2 = dynamic_cast<SpanContext*>(sc2->get());
           REQUIRE(*received_context2 == *received_context);
         }
@@ -70,14 +72,14 @@ TEST_CASE("SpanContext") {
   SECTION("serialise fails") {
     SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
-      auto err = context.serialize(carrier, buffer, propagation_style);
+      auto err = context.serialize(carrier, buffer, propagation_styles);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
 
     SECTION("when setting parent id fails") {
       carrier.set_fails_after = 1;
-      auto err = context.serialize(carrier, buffer, propagation_style);
+      auto err = context.serialize(carrier, buffer, propagation_styles);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
@@ -92,21 +94,23 @@ TEST_CASE("deserialise fails") {
   SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
-    PropagationStyle style;
+    std::set<PropagationStyle> styles;
     std::string x_datadog_trace_id;
     std::string x_datadog_parent_id;
     std::string x_datadog_sampling_priority;
   };
 
   auto test_case = GENERATE(values<PropagationStyleTestCase>(
-      {{PropagationStyle::DatadogOnly, "x-datadog-trace-id", "x-datadog-parent-id",
+      {{{PropagationStyle::Datadog},
+        "x-datadog-trace-id",
+        "x-datadog-parent-id",
         "x-datadog-sampling-priority"},
-       {PropagationStyle::B3Only, "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled"}}));
+       {{PropagationStyle::B3}, "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled"}}));
 
   SECTION("when there are missing keys") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
     carrier.Set("but where is parent-id??", "420");
-    auto err = SpanContext::deserialize(carrier, test_case.style);
+    auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -114,7 +118,7 @@ TEST_CASE("deserialise fails") {
   SECTION("when there are formatted keys") {
     carrier.Set(test_case.x_datadog_trace_id, "The madman! This isn't even a number!");
     carrier.Set(test_case.x_datadog_parent_id, "420");
-    auto err = SpanContext::deserialize(carrier, test_case.style);
+    auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -123,7 +127,7 @@ TEST_CASE("deserialise fails") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
     carrier.Set(test_case.x_datadog_parent_id, "456");
     carrier.Set(test_case.x_datadog_sampling_priority, "420");
-    auto err = SpanContext::deserialize(carrier, test_case.style);
+    auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -142,9 +146,9 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
   SpanContext context{420, 123, {}};
 
-  REQUIRE(context.serialize(carrier, buffer, PropagationStyle::B3Only));
+  REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}));
 
-  auto sc = SpanContext::deserialize(carrier, PropagationStyle::B3Only);
+  auto sc = SpanContext::deserialize(carrier, {PropagationStyle::B3});
   auto received_context = dynamic_cast<SpanContext*>(sc->get());
   REQUIRE(received_context);
   REQUIRE(received_context->id() == 420);
@@ -175,7 +179,7 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
                                                    {"X-B3-Sampled", "2"}}));
   carrier.Set(test_case.first, test_case.second);
 
-  auto err = SpanContext::deserialize(carrier, PropagationStyle::Both);
+  auto err = SpanContext::deserialize(carrier, {PropagationStyle::Datadog, PropagationStyle::B3});
   REQUIRE(!err);
   REQUIRE(err.error() == ot::span_context_corrupted_error);
 }

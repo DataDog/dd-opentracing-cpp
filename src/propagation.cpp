@@ -39,7 +39,7 @@ std::string clampB3SamplingPriorityValue(SamplingPriority p) {
 
 std::string to_string(SamplingPriority p) { return std::to_string(static_cast<int>(p)); }
 
-// Header names for trace data.
+// Header names for trace data. Hax constexpr map-like object.
 constexpr struct {
   // https://docs.datadoghq.com/tracing/faq/distributed-tracing/
   HeadersImpl datadog{"x-datadog-trace-id",
@@ -51,6 +51,13 @@ constexpr struct {
   // https://github.com/openzipkin/b3-propagation
   HeadersImpl b3{
       "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled", 16, asHex, clampB3SamplingPriorityValue};
+
+  const HeadersImpl &operator[](const PropagationStyle style) const {
+    if (style == PropagationStyle::B3) {
+      return b3;
+    }
+    return datadog;
+  };
 
 } propagation_headers;
 
@@ -223,19 +230,15 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
                                           const std::shared_ptr<SpanBuffer> pending_traces,
-                                          PropagationStyle style) const try {
-  if (style == PropagationStyle::DatadogOnly) {
-    return serialize(writer, pending_traces, propagation_headers.datadog);
+                                          std::set<PropagationStyle> styles) const try {
+  ot::expected<void> result;
+  for (PropagationStyle style : styles) {
+    result = serialize(writer, pending_traces, propagation_headers[style]);
+    if (!result) {
+      return result;
+    }
   }
-  if (style == PropagationStyle::B3Only) {
-    return serialize(writer, pending_traces, propagation_headers.b3);
-  }
-  // PropagationStyle::Both
-  auto result = serialize(writer, pending_traces, propagation_headers.datadog);
-  if (!result) {
-    return result;
-  }
-  return serialize(writer, pending_traces, propagation_headers.b3);
+  return result;
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
@@ -336,36 +339,24 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
-    const ot::TextMapReader &reader, PropagationStyle style) try {
-  if (style == PropagationStyle::DatadogOnly) {
-    return SpanContext::deserialize(reader, propagation_headers.datadog);
-  } else if (style == PropagationStyle::B3Only) {
-    return SpanContext::deserialize(reader, propagation_headers.b3);
+    const ot::TextMapReader &reader, std::set<PropagationStyle> styles) try {
+  std::unique_ptr<ot::SpanContext> context = nullptr;
+  for (PropagationStyle style : styles) {
+    auto result = SpanContext::deserialize(reader, propagation_headers[style]);
+    if (!result) {
+      return ot::make_unexpected(result.error());
+    }
+    if (result.value() != nullptr) {
+      if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
+                                    *dynamic_cast<SpanContext *>(context.get())) {
+        std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
+                  << std::endl;
+        return ot::make_unexpected(ot::span_context_corrupted_error);
+      }
+      context = std::move(result.value());
+    }
   }
-  // PropagationStyle::Both
-  auto result = SpanContext::deserialize(reader, propagation_headers.datadog);
-  if (!result) {
-    return ot::make_unexpected(result.error());
-  }
-  std::unique_ptr<ot::SpanContext> context = std::move(result.value());
-  result = SpanContext::deserialize(reader, propagation_headers.b3);
-  if (!result) {
-    return ot::make_unexpected(result.error());
-  }
-  // If just one of the two propagation styles returned a context, return that.
-  if (result.value() == nullptr) {
-    return context;  // Fine if context is also nullptr, that's a valid return value.
-  } else if (context == nullptr) {
-    return result;
-  }
-  // There were two sets of headers. Check they gave the same values.
-  if (*dynamic_cast<SpanContext *>(result.value().get()) !=
-      *dynamic_cast<SpanContext *>(context.get())) {
-    std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
-              << std::endl;
-    return ot::make_unexpected(ot::span_context_corrupted_error);
-  }
-  return result;  // Return either one, since they're the same.
+  return context;
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }

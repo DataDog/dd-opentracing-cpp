@@ -4,6 +4,7 @@
 #include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 
 namespace ot = opentracing;
@@ -62,14 +63,14 @@ class SpanContext : public ot::SpanContext {
                                const std::shared_ptr<SpanBuffer> pending_traces) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces,
-                               PropagationStyle style) const;
+                               std::set<PropagationStyle> styles) const;
 
   SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader, PropagationStyle style);
+      const ot::TextMapReader &reader, std::set<PropagationStyle> styles);
 
   uint64_t id() const;
   uint64_t traceId() const;

@@ -64,14 +64,20 @@ TEST_CASE("tracer") {
 
   SECTION("can be created with valid config") {
     // Checks all combinations.
-    auto propagation_style_inject = GENERATE(values<std::pair<std::string, PropagationStyle>>(
-        {{"DatadogOnly", PropagationStyle::DatadogOnly},
-         {"B3Only", PropagationStyle::B3Only},
-         {"Both", PropagationStyle::Both}}));
-    auto propagation_style_extract = GENERATE(values<std::pair<std::string, PropagationStyle>>(
-        {{"DatadogOnly", PropagationStyle::DatadogOnly},
-         {"B3Only", PropagationStyle::B3Only},
-         {"Both", PropagationStyle::Both}}));
+    auto propagation_style_inject =
+        GENERATE(values<std::pair<std::string, std::set<PropagationStyle>>>(
+            {{"[\"Datadog\"]", {PropagationStyle::Datadog}},
+             {"[\"B3\"]", {PropagationStyle::B3}},
+             {"[\"Datadog\", \"B3\"]", {PropagationStyle::Datadog, PropagationStyle::B3}},
+             {"[\"Datadog\", \"B3\", \"Datadog\", \"B3\"]",
+              {PropagationStyle::Datadog, PropagationStyle::B3}}}));
+    auto propagation_style_extract =
+        GENERATE(values<std::pair<std::string, std::set<PropagationStyle>>>(
+            {{"[\"Datadog\"]", {PropagationStyle::Datadog}},
+             {"[\"B3\"]", {PropagationStyle::B3}},
+             {"[\"Datadog\", \"B3\"]", {PropagationStyle::Datadog, PropagationStyle::B3}},
+             {"[\"Datadog\", \"B3\", \"Datadog\", \"B3\"]",
+              {PropagationStyle::Datadog, PropagationStyle::B3}}}));
 
     std::ostringstream input;
     input << R"(
@@ -80,10 +86,10 @@ TEST_CASE("tracer") {
         "agent_host": "www.omfgdogs.com",
         "agent_port": 80,
         "type": "db",
-        "propagation_style_extract": ")"
-          << propagation_style_extract.first << R"(",
-        "propagation_style_inject": ")"
-          << propagation_style_inject.first << R"("
+        "propagation_style_extract": )"
+          << propagation_style_extract.first << R"(,
+        "propagation_style_inject": )"
+          << propagation_style_inject.first << R"(
       }
     )";
     std::string error = "";
@@ -173,35 +179,43 @@ TEST_CASE("tracer") {
     REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
   }
 
-  SECTION("handles bad propagation style (extract)") {
-    std::string input{R"(
-      {
-        "service": "my-service",
-        "propagation_style_extract": "i dunno"
-      }
-    )"};
-    std::string error = "";
-    auto result = factory.MakeTracer(input.c_str(), error);
-    REQUIRE(error ==
-            "Invalid value for propagation_style_extract, must be one of 'DatadogOnly', 'Both', "
-            "'B3Only'");
-    REQUIRE(!result);
-    REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
-  }
+  SECTION("handles bad propagation style") {
+    auto bad_value = GENERATE(
+        values<std::string>({"\"i dunno\"", "[]", "[\"Not a real propagation style!\"]"}));
 
-  SECTION("handles bad propagation style (inject)") {
-    std::string input{R"(
+    SECTION("extract") {
+      std::ostringstream input;
+      input << R"(
       {
         "service": "my-service",
-        "propagation_style_inject": "i dunno"
-      }
-    )"};
-    std::string error = "";
-    auto result = factory.MakeTracer(input.c_str(), error);
-    REQUIRE(error ==
-            "Invalid value for propagation_style_inject, must be one of 'DatadogOnly', 'Both', "
-            "'B3Only'");
-    REQUIRE(!result);
-    REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+        "propagation_style_extract": )"
+            << bad_value << R"(
+      })";
+      std::string error = "";
+      auto result = factory.MakeTracer(input.str().c_str(), error);
+      REQUIRE(error ==
+              "Invalid value for propagation_style_extract, must be a list of at least one "
+              "element "
+              "with value 'Datadog', or 'B3'");
+      REQUIRE(!result);
+      REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+    }
+
+    SECTION("hinject") {
+      std::ostringstream input;
+      input << R"(
+      {
+        "service": "my-service",
+        "propagation_style_inject": )"
+            << bad_value << R"(
+      })";
+      std::string error = "";
+      auto result = factory.MakeTracer(input.str().c_str(), error);
+      REQUIRE(error ==
+              "Invalid value for propagation_style_inject, must be a list of at least one element "
+              "with value 'Datadog', or 'B3'");
+      REQUIRE(!result);
+      REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+    }
   }
 }
