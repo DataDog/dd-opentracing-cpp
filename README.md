@@ -52,10 +52,10 @@ Each of these can be downloaded and used precompiled.
 
 ```bash
 # Install OpenTracing nginx module
-wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.6.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
+wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.7.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
 tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 # Install Datadog OpenTracing
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.1/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.3/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -109,7 +109,13 @@ Annotated Datadog config JSON:
   "agent_host": "localhost",
   "agent_port": 8126,
   // Client-side sampling. Discards (without counting) some number of traces where 1.0 means "keep all traces" and 0.0 means "keep no traces". Useful for improving performance in the case where nginx receives a large number of very small requests. Default value is 1.0 / keep everything.
-  "sample_rate": 1.0
+  "sample_rate": 1.0,
+  // A list of strings, each string is one of "Datadog", "B3". Defaults to ["Datadog", "B3"]. The type of headers
+  // to use to propagate distributed traces.
+  "propagation_style_extract": ["Datadog", "B3"],
+  // A list of strings, each string is one of "Datadog", "B3". Defaults to ["Datadog"]. The type of headers to use
+  // to receive distributed traces. 
+  "propagation_style_inject": ["Datadog"]
 }
 ```
 
