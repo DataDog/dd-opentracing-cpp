@@ -37,7 +37,7 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(json styles) {
 // "environment": A string, defaults to "". The environment this trace belongs to.
 //     eg. "" (env:none), "staging", "prod"
 // "sample_rate": A double, defaults to 1.0.
-// "dd.priority.sampling": A boolean, false by default. If true disables client-side sampling (thus
+// "dd.priority.sampling": A boolean, true by default. If true disables client-side sampling (thus
 //     ignoring sample_rate) and enables distributed priority sampling, where traces are sampled
 //     based on a combination of user-assigned priorities and configuration from the agent.
 // "operation_name_override": A string, if not empty it overrides the operation name (and the

@@ -110,6 +110,10 @@ Annotated Datadog config JSON:
   "agent_port": 8126,
   // Client-side sampling. Discards (without counting) some number of traces where 1.0 means "keep all traces" and 0.0 means "keep no traces". Useful for improving performance in the case where nginx receives a large number of very small requests. Default value is 1.0 / keep everything.
   "sample_rate": 1.0,
+  // Priority sampling. A boolean, true by default. If true disables client-side sampling (thus ignoring sample_rate)
+  // and enables distributed priority sampling, where traces are sampled based on a combination of user-assigned
+  // priorities and configuration from the agent.
+  "dd.priority.sampling": true,
   // A list of strings, each string is one of "Datadog", "B3". Defaults to ["Datadog", "B3"]. The type of headers
   // to use to propagate distributed traces.
   "propagation_style_extract": ["Datadog", "B3"],

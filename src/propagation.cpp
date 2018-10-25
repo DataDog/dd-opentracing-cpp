@@ -112,7 +112,6 @@ SpanContext SpanContext::NginxOpenTracingCompatibilityHackSpanContext(
 SpanContext::SpanContext(SpanContext &&other)
     : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
       propagated_sampling_priority_(std::move(other.propagated_sampling_priority_)),
-      has_propagated_(other.has_propagated_),
       id_(other.id_),
       trace_id_(other.trace_id_),
       baggage_(std::move(other.baggage_)) {}
@@ -122,15 +121,13 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
   id_ = other.id_;
   trace_id_ = other.trace_id_;
   propagated_sampling_priority_ = std::move(other.propagated_sampling_priority_);
-  has_propagated_ = other.has_propagated_;
   baggage_ = std::move(other.baggage_);
   nginx_opentracing_compatibility_hack_ = other.nginx_opentracing_compatibility_hack_;
   return *this;
 }
 
 bool SpanContext::operator==(const SpanContext &other) const {
-  if (id_ != other.id_ || trace_id_ != other.trace_id_ ||
-      has_propagated_ != other.has_propagated_ || baggage_ != other.baggage_ ||
+  if (id_ != other.id_ || trace_id_ != other.trace_id_ || baggage_ != other.baggage_ ||
       nginx_opentracing_compatibility_hack_ != other.nginx_opentracing_compatibility_hack_) {
     return false;
   }
@@ -163,13 +160,13 @@ uint64_t SpanContext::traceId() const {
   return trace_id_;
 }
 
-std::pair<bool, OptionalSamplingPriority> SpanContext::getPropagationStatus() const {
+OptionalSamplingPriority SpanContext::getPropagatedSamplingPriority() const {
   // Not locked. Both these members are only ever written in the constructor/builder.
   OptionalSamplingPriority p = nullptr;
   if (propagated_sampling_priority_ != nullptr) {
     p.reset(new SamplingPriority(*propagated_sampling_priority_));
   }
-  return std::make_pair(has_propagated_, std::move(p));
+  return p;
 }
 
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
@@ -195,7 +192,6 @@ SpanContext SpanContext::withId(uint64_t id) const {
     context.propagated_sampling_priority_.reset(
         new SamplingPriority(*propagated_sampling_priority_));
   }
-  context.has_propagated_ = has_propagated_;
   return context;
 }
 
@@ -327,7 +323,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
   }
 
   auto context = std::make_unique<SpanContext>(parent_id, trace_id, std::move(baggage));
-  context->has_propagated_ = true;
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
@@ -407,7 +402,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
   auto context = std::make_unique<SpanContext>(parent_id, trace_id, std::move(baggage));
-  context->has_propagated_ = true;
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 }

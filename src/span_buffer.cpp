@@ -18,9 +18,15 @@ void PendingTrace::finish() {
   }
   // Check for sampling.
   if (sampling_priority != nullptr) {
-    // Set the metric for every span in the trace.
+    // Set the metric for the root span.
     for (auto& span : *finished_spans) {
-      span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
+      if (/* root span */
+          span->parent_id == 0 ||
+          /* local root span of a distributed trace */
+          all_spans.find(span->parent_id) == all_spans.end()) {
+        span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
+        break;
+      }
     }
   }
 }
@@ -34,9 +40,9 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   if (trace == traces_.end()) {
     traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
     trace = traces_.find(trace_id);
-    auto propagation_status = context.getPropagationStatus();
-    trace->second.sampling_priority_locked = propagation_status.first;
-    trace->second.sampling_priority = std::move(propagation_status.second);
+    OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
+    trace->second.sampling_priority_locked = p != nullptr;
+    trace->second.sampling_priority = std::move(p);
   }
   trace->second.all_spans.insert(context.id());
 }

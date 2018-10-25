@@ -74,10 +74,10 @@ class SpanContext : public ot::SpanContext {
 
   uint64_t id() const;
   uint64_t traceId() const;
-  // Returns a pair of:
-  // * bool, true if this SpanContext may have arrived via propagation.
-  // * an OptionalSamplingPriority, the propagated sampling priority.
-  std::pair<bool, OptionalSamplingPriority> getPropagationStatus() const;
+  // Returns an OptionalSamplingPriority, the propagated sampling priority. It may hold a value of
+  // nullptr, in which case either there has been no propagation or the up-stream tracer did not
+  // set a sampling priority.
+  OptionalSamplingPriority getPropagatedSamplingPriority() const;
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -105,7 +105,6 @@ class SpanContext : public ot::SpanContext {
   bool nginx_opentracing_compatibility_hack_ = false;
 
   OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
-  bool has_propagated_ = false;
 
   uint64_t id_;
   uint64_t trace_id_;

@@ -42,7 +42,7 @@ struct TracerOptions {
   // If true, disables client-side sampling (thus ignoring sample_rate) and enables distributed
   // priority sampling, where traces are sampled based on a combination of user-assigned priorities
   // and configuration from the agent.
-  bool priority_sampling = false;
+  bool priority_sampling = true;
   // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
   // than 10s, so that is the upper bound.
   int64_t write_period_ms = 1000;

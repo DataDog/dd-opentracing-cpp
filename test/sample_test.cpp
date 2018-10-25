@@ -160,6 +160,7 @@ TEST_CASE("correct sampler is used") {
 
   SECTION("rate sampler") {
     tracer_options.sample_rate = 0.4;
+    tracer_options.priority_sampling = false;
     auto sampler = sampleProviderFromOptions(tracer_options);
     REQUIRE(std::dynamic_pointer_cast<DiscardRateSampler>(sampler));
   }

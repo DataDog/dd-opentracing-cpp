@@ -1,6 +1,7 @@
 #include "../src/propagation.h"
 #include <opentracing/tracer.h>
 #include <string>
+#include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
 
@@ -41,9 +42,9 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto status = received_context->getPropagationStatus();
-      REQUIRE(status.first == true);
-      REQUIRE(*status.second == SamplingPriority::SamplerKeep);
+      auto priority = received_context->getPropagatedSamplingPriority();
+      REQUIRE(priority != nullptr);
+      REQUIRE(*priority == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
@@ -153,9 +154,9 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   REQUIRE(received_context);
   REQUIRE(received_context->id() == 420);
   REQUIRE(received_context->traceId() == 123);
-  auto status = received_context->getPropagationStatus();
-  REQUIRE(status.first == true);
-  REQUIRE(*status.second == priority.second);
+  auto received_priority = received_context->getPropagatedSamplingPriority();
+  REQUIRE(received_priority != nullptr);
+  REQUIRE(*received_priority == priority.second);
 }
 
 TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
@@ -200,9 +201,9 @@ TEST_CASE("Binary Span Context") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto status = received_context->getPropagationStatus();
-      REQUIRE(status.first == true);
-      REQUIRE(*status.second == SamplingPriority::SamplerKeep);
+      auto priority = received_context->getPropagatedSamplingPriority();
+      REQUIRE(priority != nullptr);
+      REQUIRE(*priority == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
     }
   }
@@ -358,8 +359,8 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::UserKeep));
+    // Child doesn't have metric set.
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::UserKeep));
   }
@@ -375,8 +376,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::SamplerKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
   }
@@ -398,8 +398,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::UserKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::UserKeep));
   }
@@ -452,8 +451,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::SamplerKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
   }
