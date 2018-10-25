@@ -321,7 +321,9 @@ TEST_CASE("span") {
               std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
     }
 
-    SECTION("non-root spans may not be sampled if they are distributed") {
+    SECTION(
+        "with priority sampling enabled enabled, propagated spans without a sampling priority "
+        "will be sampled even though they're not the root") {
       // parent_id is decoded to span_id, and the tracer will create a child context with the
       // span_id set to the span it's for. In this case we're deserializing (so as to simulate
       // propagation) but directly passing to the Span; so we encode parent_id as the id of the
@@ -341,7 +343,8 @@ TEST_CASE("span") {
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(42).finished_spans->at(0);
-      REQUIRE(result->metrics == std::unordered_map<std::string, int>{});
+      REQUIRE(result->metrics ==
+              std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
     }
 
     SECTION("spans with an existing sampling priority may not be given a new one at Finish") {

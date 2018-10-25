@@ -41,9 +41,9 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto status = received_context->getPropagationStatus();
-      REQUIRE(status.first == true);
-      REQUIRE(*status.second == SamplingPriority::SamplerKeep);
+      auto priority = received_context->getPropagatedSamplingPriority();
+      REQUIRE(priority != nullptr);
+      REQUIRE(*priority == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
@@ -153,9 +153,9 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   REQUIRE(received_context);
   REQUIRE(received_context->id() == 420);
   REQUIRE(received_context->traceId() == 123);
-  auto status = received_context->getPropagationStatus();
-  REQUIRE(status.first == true);
-  REQUIRE(*status.second == priority.second);
+  auto received_priority = received_context->getPropagatedSamplingPriority();
+  REQUIRE(received_priority != nullptr);
+  REQUIRE(*received_priority == priority.second);
 }
 
 TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
@@ -200,9 +200,9 @@ TEST_CASE("Binary Span Context") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto status = received_context->getPropagationStatus();
-      REQUIRE(status.first == true);
-      REQUIRE(*status.second == SamplingPriority::SamplerKeep);
+      auto priority = received_context->getPropagatedSamplingPriority();
+      REQUIRE(priority != nullptr);
+      REQUIRE(*priority == SamplingPriority::SamplerKeep);
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
     }
   }
