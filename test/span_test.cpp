@@ -320,8 +320,8 @@ TEST_CASE("span") {
     }
 
     SECTION(
-        "with priority sampling enabled enabled, propagated spans without a sampling priority "
-        "will be sampled even though they're not the root") {
+        "with priority sampling enabled, propagated spans without a sampling priority will be "
+        "sampled even though they're not the root") {
       // parent_id is decoded to span_id, and the tracer will create a child context with the
       // span_id set to the span it's for. In this case we're deserializing (so as to simulate
       // propagation) but directly passing to the Span; so we encode parent_id as the id of the
