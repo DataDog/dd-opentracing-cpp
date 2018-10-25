@@ -1,6 +1,7 @@
 #include "../src/propagation.h"
 #include <opentracing/tracer.h>
 #include <string>
+#include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
 
@@ -358,8 +359,8 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::UserKeep));
+    // Child doesn't have metric set.
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::UserKeep));
   }
@@ -375,8 +376,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::SamplerKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
   }
@@ -398,8 +398,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::UserKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::UserKeep));
   }
@@ -452,8 +451,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
 
     auto& trace = writer->traces[0];
-    REQUIRE(trace[0]->metrics["_sampling_priority_v1"] ==
-            static_cast<int>(SamplingPriority::SamplerKeep));
+    REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
   }

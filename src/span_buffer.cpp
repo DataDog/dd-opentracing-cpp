@@ -18,9 +18,15 @@ void PendingTrace::finish() {
   }
   // Check for sampling.
   if (sampling_priority != nullptr) {
-    // Set the metric for every span in the trace.
+    // Set the metric for the root span.
     for (auto& span : *finished_spans) {
-      span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
+      if (/* root span */
+          span->parent_id == 0 ||
+          /* local root span of a distributed trace */
+          all_spans.find(span->parent_id) == all_spans.end()) {
+        span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
+        break;
+      }
     }
   }
 }

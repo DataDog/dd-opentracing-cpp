@@ -316,9 +316,7 @@ TEST_CASE("span") {
           "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(42).finished_spans->at(0);
-      REQUIRE(result->metrics ==
-              std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
+      REQUIRE(*buffer->traces(42).sampling_priority == SamplingPriority::SamplerKeep);
     }
 
     SECTION(
