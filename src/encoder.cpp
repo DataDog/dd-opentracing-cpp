@@ -11,21 +11,26 @@ namespace opentracing {
 
 namespace {
 const std::string priority_sampling_key = "rate_by_service";
+const std::string header_content_type = "Content-Type";
+const std::string header_dd_meta_lang = "Datadog-Meta-Lang";
+const std::string header_dd_meta_lang_version = "Datadog-Meta-Lang-Version";
+const std::string header_dd_meta_tracer_version = "Datadog-Meta-Tracer-Version";
+const std::string header_dd_trace_count = "X-Datadog-Trace-Count";
 }  // namespace
 
 AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<SampleProvider> sampler)
     : /* May be nullptr if priority sampling disabled. */ sampler_(
           std::dynamic_pointer_cast<PrioritySampler>(sampler)) {
   // Set up common headers and default encoder
-  common_headers_ = {{"Content-Type", "application/msgpack"},
-                     {"Datadog-Meta-Lang", "cpp"},
-                     {"Datadog-Meta-Lang-Version", config::cpp_version},
-                     {"Datadog-Meta-Tracer-Version", config::tracer_version}};
+  common_headers_ = {{header_content_type, "application/msgpack"},
+                     {header_dd_meta_lang, "cpp"},
+                     {header_dd_meta_lang_version, config::cpp_version},
+                     {header_dd_meta_tracer_version, config::tracer_version}};
 }
 
 const std::string agent_api_path = "/v0.4/traces";
 
-const std::string AgentHttpEncoder::path() { return agent_api_path; }
+const std::string& AgentHttpEncoder::path() { return agent_api_path; }
 
 void AgentHttpEncoder::clearTraces() { traces_.clear(); }
 
@@ -33,7 +38,7 @@ std::size_t AgentHttpEncoder::pendingTraces() { return traces_.size(); }
 
 const std::map<std::string, std::string> AgentHttpEncoder::headers() {
   std::map<std::string, std::string> headers(common_headers_);
-  headers["X-Datadog-Trace-Count"] = std::to_string(traces_.size());
+  headers[header_dd_trace_count] = std::to_string(traces_.size());
   return headers;
 }
 
