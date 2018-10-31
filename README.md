@@ -12,9 +12,186 @@
 
 ## Usage
 
-### Tracing C++ Code
+### Tracing C++ Applications
 
-Support coming soon.
+#### Getting Started
+
+To begin tracing applications written in any language, first [install and configure the Datadog Agent](https://docs.datadoghq.com/tracing/setup).
+
+You will need to compile against [OpenTracing-cpp](https://github.com/opentracing/opentracing-cpp).
+
+#### Installation
+
+Datadog tracing can be enabled in one of two ways:
+
+* Compile against dd-opentracing-cpp, where the Datadog lib is compiled in and configured in code
+* Dynamic loading, where the Datadog OpenTracing library is loaded at run-time and configured via JSON
+
+##### Compile with dd-opentracing-cpp
+
+```bash
+# Download and install dd-opentracing-cpp library.
+wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.4.tar.gz -O dd-opentracing-cpp.tar.gz
+tar zxvf dd-opentracing-cpp.tar.gz
+mkdir dd-opentracing-cpp-0.3.4/.build
+cd dd-opentracing-cpp-0.3.4/.build
+# Download and install the correct version of opentracing-cpp, & other deps.
+../scripts/install_dependencies.sh
+cmake ..
+make
+make install
+```
+
+Include `<datadog/opentracing.h>` and create the tracer:
+
+```cpp
+// tracer_example.cpp
+#include <datadog/opentracing.h>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "service_name"};
+  auto tracer = datadog::opentracing::makeTracer(tracer_options);
+
+  // Create some spans.
+  {
+    auto span_a = tracer->StartSpan("A");
+    span_a->SetTag("tag", 123);
+    auto span_b =
+        tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    span_b->SetTag("tag", "value");
+  }
+
+  tracer->Close();
+  return 0;
+}
+```
+
+Just link against libdd_opentracing and libopentracing (making sure that they are both in your LD_LIBRARY_PATH):
+
+```bash
+g++ -o tracer_example tracer_example.cpp -ldd_opentracing -lopentracing
+./tracer_example
+```
+
+##### Dynamic Loading
+
+```bash
+# Download and install OpenTracing-cpp
+wget https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz -O opentracing-cpp.tar.gz
+tar zxvf opentracing-cpp.tar.gz
+mkdir opentracing-cpp-1.5.0/.build
+cd opentracing-cpp-1.5.0/.build
+cmake ..
+make
+make install
+# Install dd-opentracing-cpp shared plugin.
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.4/linux-amd64-libdd_opentracing_plugin.so.gz
+gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
+```
+
+Include `<opentracing/dynamic_load.h>` and load the tracer from libdd_opentracing_plugin.so:
+
+```cpp
+// tracer_example.cpp
+#include <opentracing/dynamic_load.h>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+  // Load the tracer library.
+  std::string error_message;
+  auto handle_maybe = opentracing::DynamicallyLoadTracingLibrary(
+    "/usr/local/lib/libdd_opentracing_plugin.so", error_message);
+  if (!handle_maybe) {
+    std::cerr << "Failed to load tracer library " << error_message << "\n";
+    return false;
+  }
+
+  // Read in the tracer's configuration.
+  std::string tracer_config = R"({
+      "service": "service-name",
+      "agent_host": "dd-agent",
+      "agent_port": 8126
+    })";
+
+  // Construct a tracer.
+  auto& tracer_factory = handle_maybe->tracer_factory();
+  auto tracer_maybe = tracer_factory.MakeTracer(
+    tracer_config.c_str(), error_message);
+  if (!tracer_maybe) {
+    std::cerr << "Failed to create tracer " << error_message << "\n";
+    return false;
+  }
+  auto& tracer = *tracer_maybe;
+
+  // Create some spans.
+  {
+    auto span_a = tracer->StartSpan("A");
+    span_a->SetTag("tag", 123);
+    auto span_b =
+        tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    span_b->SetTag("tag", "value");
+  }
+
+  tracer->Close();
+  return 0;
+}
+```
+
+Just link against libopentracing (making sure that libopentracing.so is in your LD_LIBRARY_PATH):
+
+```bash
+g++ -o tracer_example tracer_example.cpp -lopentracing
+./tracer_example
+```
+
+#### Manual Instrumentation
+
+To manually instrument your code, install using one of the above methods and then use the tracer object to create Spans.
+
+```cpp
+{
+  // Create a root span.
+  auto root_span = tracer->StartSpan("operation_name");
+  // Create a child span.
+  auto child_span = tracer->StartSpan(
+      "operation_name",
+      {opentracing::ChildOf(&root_span->context())});
+  // Spans can be finished at a specific time ...
+  child_span->Finish();
+} // ... or when they are destructed (root_span finishes here).
+```
+
+##### Adding tags to a span
+
+Add tags directly to a Span object by calling Span.SetTag(). For example:
+
+```cpp
+auto tracer = ...
+auto span = tracer->StartSpan("operation_name");
+span->SetTag("key must be string", "Values are variable types");
+span->SetTag("key must be string", 1234);
+```
+
+Values are of [variable type](https://github.com/opentracing/opentracing-cpp/blob/master/include/opentracing/value.h) and can be complex objects. Values are serialized as JSON, with the exception of a string value being serialized bare (without extra quotation marks).
+
+##### Distributed Tracing
+
+Distributed tracing can be accomplished by [using the Inject and Extract methods on the tracer](https://github.com/opentracing/opentracing-cpp/#inject-span-context-into-a-textmapwriter), which accept a generic `Carrier` type (usually a string:string map of HTTP header key/values). Priority sampling (enabled by default) should be on to ensure uniform delivery of spans.
+
+##### Priority Sampling
+
+Priority sampling is enabled by default, and can be disabled in the TracerOptions. You can mark a span to be kept or discarded by setting the tag `sampling.priority`. A value of `0` means reject/don't sample and any value greater than 0 means keep/sample.
+
+```cpp
+auto tracer = ...
+auto span = tracer->StartSpan("operation_name");
+span->SetTag("sampling.priority", 1); // Keep this span.
+auto another_span = tracer->StartSpan("operation_name");
+another_span->SetTag("sampling.priority", 0); // Discard this span.
+```
 
 ### Tracing Nginx
 
