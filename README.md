@@ -53,10 +53,10 @@ Datadog tracing can be enabled in one of two ways:
 
 ```bash
 # Download and install dd-opentracing-cpp library.
-wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.4.tar.gz -O dd-opentracing-cpp.tar.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz -O dd-opentracing-cpp.tar.gz
 tar zxvf dd-opentracing-cpp.tar.gz
-mkdir dd-opentracing-cpp-0.3.4/.build
-cd dd-opentracing-cpp-0.3.4/.build
+mkdir dd-opentracing-cpp-0.3.5/.build
+cd dd-opentracing-cpp-0.3.5/.build
 # Download and install the correct version of opentracing-cpp, & other deps.
 ../scripts/install_dependencies.sh
 cmake ..
@@ -109,7 +109,7 @@ cmake ..
 make
 make install
 # Install dd-opentracing-cpp shared plugin.
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.4/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -311,7 +311,7 @@ Each of these can be downloaded and used precompiled.
 wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.7.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
 tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 # Install Datadog OpenTracing
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.3/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
