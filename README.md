@@ -73,15 +73,14 @@ Include `<datadog/opentracing.h>` and create the tracer:
 #include <string>
 
 int main(int argc, char* argv[]) {
-  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "compiled-in example"};
+  datadog::opentracing::TracerOptions tracer_options{"dd-agent", 8126, "compiled-in example"};
   auto tracer = datadog::opentracing::makeTracer(tracer_options);
 
   // Create some spans.
   {
     auto span_a = tracer->StartSpan("A");
     span_a->SetTag("tag", 123);
-    auto span_b =
-        tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    auto span_b = tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
     span_b->SetTag("tag", "value");
   }
 
@@ -125,7 +124,7 @@ int main(int argc, char* argv[]) {
   // Load the tracer library.
   std::string error_message;
   auto handle_maybe = opentracing::DynamicallyLoadTracingLibrary(
-    "/usr/local/lib/libdd_opentracing_plugin.so", error_message);
+      "/usr/local/lib/libdd_opentracing_plugin.so", error_message);
   if (!handle_maybe) {
     std::cerr << "Failed to load tracer library " << error_message << "\n";
     return false;
@@ -140,8 +139,7 @@ int main(int argc, char* argv[]) {
 
   // Construct a tracer.
   auto& tracer_factory = handle_maybe->tracer_factory();
-  auto tracer_maybe = tracer_factory.MakeTracer(
-    tracer_config.c_str(), error_message);
+  auto tracer_maybe = tracer_factory.MakeTracer(tracer_config.c_str(), error_message);
   if (!tracer_maybe) {
     std::cerr << "Failed to create tracer " << error_message << "\n";
     return false;
@@ -152,8 +150,7 @@ int main(int argc, char* argv[]) {
   {
     auto span_a = tracer->StartSpan("A");
     span_a->SetTag("tag", 123);
-    auto span_b =
-        tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    auto span_b = tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
     span_b->SetTag("tag", "value");
   }
 
