@@ -21,7 +21,7 @@ class AgentHttpEncoder : public TraceEncoder {
   ~AgentHttpEncoder() override {}
 
   // Returns the path that is used to submit HTTP requests to the agent.
-  const std::string path() override;
+  const std::string& path() override;
   std::size_t pendingTraces() override;
   void clearTraces() override;
   // Returns the HTTP headers that are required for the collection of traces.

@@ -63,7 +63,7 @@ class TraceEncoder {
   virtual ~TraceEncoder() {}
 
   // Returns the Datadog Agent endpoint that traces should be sent to.
-  virtual const std::string path() = 0;
+  virtual const std::string &path() = 0;
   virtual std::size_t pendingTraces() = 0;
   virtual void clearTraces() = 0;
   // Returns the HTTP headers that are required for the collection of traces.
