@@ -8,6 +8,7 @@
   - [Usage](#usage)
     - [Tracing C++ Applications](#tracing-c-applications)
       - [Getting Started](#getting-started)
+      - [Compatibility](#compatibility)
       - [Installation](#installation)
         - [Compile against dd-opentracing-cpp](#compile-against-dd-opentracing-cpp)
         - [Dynamic Loading](#dynamic-loading)
@@ -34,6 +35,12 @@
 To begin tracing applications written in any language, first [install and configure the Datadog Agent](https://docs.datadoghq.com/tracing/setup).
 
 You will need to compile against [OpenTracing-cpp](https://github.com/opentracing/opentracing-cpp).
+
+#### Compatibility
+
+dd-opentracing-cpp needs C++14 to build, but if you use [dynamic loading](#dynamic-loading) then you are instead limited by OpenTracing's requirement for [C++11 or later](https://github.com/opentracing/opentracing-cpp/#cc98).
+
+Supported platforms are: Linux & Mac. If you need Windows support, please let us know.
 
 #### Installation
 
@@ -66,7 +73,7 @@ Include `<datadog/opentracing.h>` and create the tracer:
 #include <string>
 
 int main(int argc, char* argv[]) {
-  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "service_name"};
+  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "compiled-in example"};
   auto tracer = datadog::opentracing::makeTracer(tracer_options);
 
   // Create some spans.
@@ -126,7 +133,7 @@ int main(int argc, char* argv[]) {
 
   // Read in the tracer's configuration.
   std::string tracer_config = R"({
-      "service": "service-name",
+      "service": "dynamic-load example",
       "agent_host": "dd-agent",
       "agent_port": 8126
     })";
