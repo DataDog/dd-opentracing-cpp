@@ -206,7 +206,7 @@ TEST_CASE("priority sampler \"integration\" test") {
 
   auto span = tracer->StartSpanWithOptions("operation_name", span_options);
   span->FinishWithOptions(finish_options);
-  writer->flush();
+  writer->flush(std::chrono::seconds(10));
   handle->response = "";
 
   SECTION("sampling rate is applied") {
@@ -217,7 +217,7 @@ TEST_CASE("priority sampler \"integration\" test") {
       auto span = tracer->StartSpanWithOptions("operation_name", span_options);
       span->FinishWithOptions(finish_options);
     }
-    writer->flush();
+    writer->flush(std::chrono::seconds(10));
     // Check the spans, and the rate at which they were sampled.
     auto traces = handle->getTraces();
     REQUIRE(traces->size() == total);

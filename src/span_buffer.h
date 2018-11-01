@@ -41,6 +41,7 @@ class SpanBuffer {
                                                        OptionalSamplingPriority priority) = 0;
   virtual OptionalSamplingPriority assignSamplingPriority(
       const std::shared_ptr<SampleProvider>& sampler, const SpanData* span) = 0;
+  virtual void flush(std::chrono::milliseconds timeout) = 0;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.
@@ -57,6 +58,8 @@ class WritingSpanBuffer : public SpanBuffer {
                                                OptionalSamplingPriority priority) override;
   OptionalSamplingPriority assignSamplingPriority(const std::shared_ptr<SampleProvider>& sampler,
                                                   const SpanData* span) override;
+
+  void flush(std::chrono::milliseconds timeout) override;
 
  private:
   // These xImpl methods exist so we can avoid using reentrant locks.

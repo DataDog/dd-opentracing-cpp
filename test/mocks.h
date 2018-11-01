@@ -64,6 +64,8 @@ struct MockWriter : public Writer {
     }
   }
 
+  void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
+
   std::vector<std::vector<std::unique_ptr<SpanData>>> traces;
 
  private:
@@ -74,14 +76,16 @@ struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
       : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>())){};
 
-  void unbufferAndWriteTrace(uint64_t /* trace_id */) {
-    // Haha NOPE.
-    // Leave the trace inside the traces map instead of deleting it.
-  }
+  void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
+      // Haha NOPE.
+      // Leave the trace inside the traces map instead of deleting it.
+  };
 
   std::unordered_map<uint64_t, PendingTrace>& traces() { return traces_; };
 
   PendingTrace& traces(uint64_t id) { return traces_[id]; };
+
+  void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
 };
 
 // Advances the relative (steady_clock) time in the given TimePoint by the given number of seconds.

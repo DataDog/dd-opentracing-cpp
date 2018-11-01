@@ -44,7 +44,7 @@ TEST_CASE("writer") {
   SECTION("traces can be sent") {
     writer.write(make_trace(
         {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
 
     // Check span body.
     auto traces = handle->getTraces();
@@ -79,7 +79,7 @@ TEST_CASE("writer") {
     handle->response = "{\"rate_by_service\": {\"service:nginx,env:\": 0.5}}";
     writer.write(make_trace(
         {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
 
     REQUIRE(sampler->config == "{\"service:nginx,env:\":0.5}");
   }
@@ -92,7 +92,7 @@ TEST_CASE("writer") {
 
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
     REQUIRE(error_message.str() == "Unable to parse response from agent\n");
     std::cerr.rdbuf(stderr);  // Restore stderr.
     REQUIRE(sampler->config == "");
@@ -103,7 +103,7 @@ TEST_CASE("writer") {
       writer.write(make_trace(
           {TestSpanData{"service.name", "service", "resource", "web", 1, i, 0, 0, 69, 420}}));
     }
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
     auto traces = handle->getTraces();
     REQUIRE(traces->size() == 25);
   }
@@ -123,7 +123,7 @@ TEST_CASE("writer") {
     // Redirect stderr so the test logs don't look like a failure.
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
-    writer.flush();  // Doesn't throw an error. That's the test!
+    writer.flush(std::chrono::seconds(10));  // Doesn't throw an error. That's the test!
     REQUIRE(error_message.str() == "Error setting agent request size: Timeout was reached\n");
     std::cerr.rdbuf(stderr);  // Restore stderr.
     // Dropped all spans.
@@ -138,7 +138,7 @@ TEST_CASE("writer") {
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
     REQUIRE(error_message.str() ==
             "Error sending traces to agent: Timeout was reached\nerror from libcurl\n");
     std::cerr.rdbuf(stderr);  // Restore stderr.
@@ -149,7 +149,7 @@ TEST_CASE("writer") {
     handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
     writer.write(make_trace(
         {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
 
     REQUIRE(sampler->config == "");
   }
@@ -162,7 +162,7 @@ TEST_CASE("writer") {
     // Check that these don't crash (but neither will they do anything).
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
   }
 
   SECTION("there can be multiple threads sending Spans") {
@@ -187,7 +187,7 @@ TEST_CASE("writer") {
     for (std::thread& sender : senders) {
       sender.join();
     }
-    writer.flush();
+    writer.flush(std::chrono::seconds(10));
     // Now check.
     auto traces = handle->getTraces();
     REQUIRE(traces->size() == 4);
@@ -271,13 +271,13 @@ TEST_CASE("writer") {
 
     SECTION("will retry") {
       handle->perform_result = {CURLE_OPERATION_TIMEDOUT, CURLE_OK};
-      writer.flush();
+      writer.flush(std::chrono::seconds(10));
       REQUIRE(handle->perform_call_count == 2);
     }
 
     SECTION("will eventually give up") {
       handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
-      writer.flush();
+      writer.flush(std::chrono::seconds(10));
       REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
     }
 
@@ -294,7 +294,7 @@ TEST_CASE("writer") {
           {TestSpanData{"web", "service", "resource", "service.name", 2, 1, 1, 69, 420, 0}}));
       writer.write(make_trace(
           {TestSpanData{"web", "service", "resource", "service.name", 3, 1, 1, 69, 420, 0}}));
-      writer.flush();
+      writer.flush(std::chrono::seconds(10));
       REQUIRE(handle->headers == std::map<std::string, std::string>{
                                      {"Content-Type", "application/msgpack"},
                                      {"Datadog-Meta-Lang", "cpp"},
@@ -303,4 +303,38 @@ TEST_CASE("writer") {
                                      {"X-Datadog-Trace-Count", "3"}});
     }
   }
+}
+
+TEST_CASE("flush") {
+  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
+  MockHandle* handle = handle_ptr.get();
+  std::vector<std::chrono::milliseconds> retry_periods{std::chrono::seconds(60)};
+  AgentWriter writer{std::move(handle_ptr),
+                     std::chrono::seconds(3600),
+                     max_queued_traces,
+                     retry_periods,
+                     "hostname",
+                     6319,
+                     std::make_shared<KeepAllSampler>()};
+  // Redirect cerr, so the the terminal output doesn't imply failure.
+  std::stringstream error_message;
+  std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
+
+  writer.write(make_trace(
+      {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
+
+  SECTION("will time out") {
+    // MockHandle doesn't actually block/wait, but we can make the AgentWriter wait for 60
+    // seconds (see retry_periods above) to retry. We make sure that flush() times out before
+    // that.
+    handle->perform_result = {CURLE_OPERATION_TIMEDOUT};
+    steady_clock::time_point start = steady_clock::now();
+    writer.flush(std::chrono::milliseconds(250));
+    steady_clock::duration wait_time = steady_clock::now() - start;
+    // Since this involves timing, it is technically possible for it to flake. I think it's
+    // unlikely since 30s >>> 0.25s
+    REQUIRE(wait_time < (retry_periods[0] / 2));
+  }
+
+  std::cerr.rdbuf(stderr);  // Restore stderr.
 }

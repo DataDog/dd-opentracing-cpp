@@ -111,7 +111,7 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
           if (success) {
             trace_encoder_->handleResponse(handle->getResponse());
           }
-          // Let thread calling 'flush' that we're done flushing.
+          // Let thread calling 'flush' know that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
             flush_worker_ = false;
@@ -122,12 +122,12 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
       std::move(handle));
 }
 
-void AgentWriter::flush() try {
+void AgentWriter::flush(std::chrono::milliseconds timeout) try {
   std::unique_lock<std::mutex> lock(mutex_);
   flush_worker_ = true;
   condition_.notify_all();
   // Wait until flush is complete.
-  condition_.wait(lock, [&]() -> bool { return !flush_worker_ || stop_writing_; });
+  condition_.wait_for(lock, timeout, [&]() -> bool { return !flush_worker_ || stop_writing_; });
 } catch (const std::bad_alloc &) {
 }
 
@@ -137,14 +137,12 @@ bool AgentWriter::retryFiniteOnFail(std::function<bool()> f) const {
       return true;
     }
     {
-      // Just check for stop_writing_ between attempts. No need to allow wake-from-sleep
-      // stop_writing signal during retry period since that should always be short.
       std::unique_lock<std::mutex> lock(mutex_);
+      condition_.wait_for(lock, backoff, [&]() -> bool { return stop_writing_; });
       if (stop_writing_) {
         return false;
       }
     }
-    std::this_thread::sleep_for(backoff);
   }
   return f();  // Final try after final sleep.
 }
