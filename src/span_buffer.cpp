@@ -79,6 +79,8 @@ void WritingSpanBuffer::unbufferAndWriteTrace(uint64_t trace_id) {
   traces_.erase(trace_iter);
 }
 
+void WritingSpanBuffer::flush(std::chrono::milliseconds timeout) { writer_->flush(timeout); }
+
 OptionalSamplingPriority WritingSpanBuffer::getSamplingPriority(uint64_t trace_id) const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   return getSamplingPriorityImpl(trace_id);

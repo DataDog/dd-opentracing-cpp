@@ -1,6 +1,7 @@
 #ifndef DD_OPENTRACING_WRITER_H
 #define DD_OPENTRACING_WRITER_H
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -27,6 +28,10 @@ class Writer {
   // Writes the given Trace.
   virtual void write(Trace trace) = 0;
 
+  // Send any buffered Traces to the destination now. Will block until sending is complete, or
+  // timeout passes.
+  virtual void flush(std::chrono::milliseconds timeout) = 0;
+
  protected:
   std::shared_ptr<AgentHttpEncoder> trace_encoder_;
 };
@@ -40,6 +45,9 @@ class ExternalWriter : public Writer {
 
   // Implements Writer methods.
   void write(Trace trace) override;
+
+  // No flush implementation, since ExternalWriter is not in charge of its own writing schedule.
+  void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
 
   std::shared_ptr<TraceEncoder> encoder() { return trace_encoder_; }
 };
