@@ -4,11 +4,26 @@
 
 **Notice: This project is still in beta, under active development. Features and compatibility may change.**
 
-* [Usage](#usage)
-   * [Tracing nginx](#tracing-nginx)
-      * [Quick start/Example](#quick-start-with-docker-example)
-      * [Guide](#guide)
-* [Development](#building)
+- [Datadog OpenTracing C++ Client](#datadog-opentracing-c-client)
+  - [Usage](#usage)
+    - [Tracing C++ Applications](#tracing-c-applications)
+      - [Getting Started](#getting-started)
+      - [Installation](#installation)
+        - [Compile against dd-opentracing-cpp](#compile-against-dd-opentracing-cpp)
+        - [Dynamic Loading](#dynamic-loading)
+      - [Advanced Usage](#advanced-usage)
+        - [OpenTracing](#opentracing)
+        - [Manual Instrumentation](#manual-instrumentation)
+        - [Custom Tagging](#custom-tagging)
+        - [Distributed Tracing](#distributed-tracing)
+        - [Priority Sampling](#priority-sampling)
+        - [Logging](#logging)
+        - [Debugging](#debugging)
+    - [Tracing Nginx](#tracing-nginx)
+      - [Quick-start with Docker example](#quick-start-with-docker-example)
+      - [Guide](#guide)
+    - [Tracing Envoy & Istio](#tracing-envoy--istio)
+  - [Building](#building)
 
 ## Usage
 
@@ -27,7 +42,7 @@ Datadog tracing can be enabled in one of two ways:
 * Compile against dd-opentracing-cpp, where the Datadog lib is compiled in and configured in code
 * Dynamic loading, where the Datadog OpenTracing library is loaded at run-time and configured via JSON
 
-##### Compile with dd-opentracing-cpp
+##### Compile against dd-opentracing-cpp
 
 ```bash
 # Download and install dd-opentracing-cpp library.
@@ -147,7 +162,13 @@ g++ -o tracer_example tracer_example.cpp -lopentracing
 ./tracer_example
 ```
 
-#### Manual Instrumentation
+#### Advanced Usage
+
+##### OpenTracing
+
+The Datadog C++ tracer currently can only be used through the OpenTracing API. The usage instructions in this document all describe generic OpenTracing functionality.
+
+##### Manual Instrumentation
 
 To manually instrument your code, install using one of the above methods and then use the tracer object to create Spans.
 
@@ -164,7 +185,7 @@ To manually instrument your code, install using one of the above methods and the
 } // ... or when they are destructed (root_span finishes here).
 ```
 
-##### Adding tags to a span
+##### Custom Tagging
 
 Add tags directly to a Span object by calling Span.SetTag(). For example:
 
@@ -179,7 +200,43 @@ Values are of [variable type](https://github.com/opentracing/opentracing-cpp/blo
 
 ##### Distributed Tracing
 
-Distributed tracing can be accomplished by [using the Inject and Extract methods on the tracer](https://github.com/opentracing/opentracing-cpp/#inject-span-context-into-a-textmapwriter), which accept a generic `Carrier` type (usually a string:string map of HTTP header key/values). Priority sampling (enabled by default) should be on to ensure uniform delivery of spans.
+Distributed tracing can be accomplished by [using the Inject and Extract methods on the tracer](https://github.com/opentracing/opentracing-cpp/#inject-span-context-into-a-textmapwriter), which accept [generic `Reader` and `Writer` types](https://github.com/opentracing/opentracing-cpp/blob/master/include/opentracing/propagation.h). Priority sampling (enabled by default) should be on to ensure uniform delivery of spans.
+
+```cpp
+// Allows writing propagation headers to a simple map<string, string>.
+// Copied from https://github.com/opentracing/opentracing-cpp/blob/master/mocktracer/test/propagation_test.cpp
+struct HTTPHeadersCarrier : HTTPHeadersReader, HTTPHeadersWriter {
+  HTTPHeadersCarrier(std::unordered_map<std::string, std::string>& text_map_)
+      : text_map(text_map_) {}
+
+  expected<void> Set(string_view key, string_view value) const override {
+    text_map[key] = value;
+    return {};
+  }
+
+  expected<void> ForeachKey(
+      std::function<expected<void>(string_view key, string_view value)> f)
+      const override {
+    for (const auto& key_value : text_map) {
+      auto result = f(key_value.first, key_value.second);
+      if (!result) return result;
+    }
+    return {};
+  }
+
+  std::unordered_map<std::string, std::string>& text_map;
+};
+
+void example() {
+  auto tracer = ...
+  std::unordered_map<std::string, std::string> headers;
+  HTTPHeadersCarrier carrier(headers);
+
+  auto span = tracer->StartSpan("operation_name");
+  tracer->Inject(span->context(), carrier);
+  // `headers` now populated with the headers needed to propagate the span.
+}
+```
 
 ##### Priority Sampling
 
@@ -191,6 +248,21 @@ auto span = tracer->StartSpan("operation_name");
 span->SetTag("sampling.priority", 1); // Keep this span.
 auto another_span = tracer->StartSpan("operation_name");
 another_span->SetTag("sampling.priority", 0); // Discard this span.
+```
+
+##### Logging
+
+Coming soon!
+
+##### Debugging
+
+The release binary libraries are all compiled with debug symbols added to the optimized release. It is possible to use gdb or lldb to debug the library and to read core dumps. If you are building the library from source, pass the argument `-DCMAKE_BUILD_TYPE=RelWithDebInfo` to cmake to compile an optimized build with debug symbols.
+
+```bash
+cd .build
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make
+make install
 ```
 
 ### Tracing Nginx
