@@ -136,7 +136,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
   return SpanContext::deserialize(reader, opts_.extract);
 }
 
-void Tracer::Close() noexcept {}
+void Tracer::Close() noexcept { buffer_->flush(std::chrono::seconds(5)); }
 
 }  // namespace opentracing
 }  // namespace datadog

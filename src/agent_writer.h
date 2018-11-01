@@ -34,9 +34,9 @@ class AgentWriter : public Writer {
 
   void write(Trace trace) override;
 
-  // Send all buffered Traces to the destination now. Will block until sending is complete. This
-  // isn't on the main Writer API because real code should not need to call this.
-  void flush();
+  // Send all buffered Traces to the destination now. Will block until sending is complete, or
+  // timeout passes.
+  void flush(std::chrono::milliseconds timeout) override;
 
   // Permanently stops writing Traces. Calls to write() and flush() will do nothing.
   void stop();
@@ -68,7 +68,7 @@ class AgentWriter : public Writer {
   // Locks access to the traces_ queue and the stop_writing_ and flush_worker_ signals.
   mutable std::mutex mutex_;
   // Notifies worker thread when there are new traces in the queue or it should stop.
-  std::condition_variable condition_;
+  mutable std::condition_variable condition_;
   // These two bools, stop_writing_ and flush_worker_, act as signals. They are the predicates on
   // which the condition_ variable acts.
   // If set to true, stops worker. Locked by mutex_;
