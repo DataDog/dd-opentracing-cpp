@@ -59,6 +59,7 @@ class WritingSpanBuffer : public SpanBuffer {
   OptionalSamplingPriority assignSamplingPriority(const std::shared_ptr<SampleProvider>& sampler,
                                                   const SpanData* span) override;
 
+  // Causes the Writer to flush, but does not send any PendingTraces.
   void flush(std::chrono::milliseconds timeout) override;
 
  private:
