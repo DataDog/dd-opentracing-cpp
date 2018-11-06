@@ -24,7 +24,7 @@
       - [Quick-start with Docker example](#quick-start-with-docker-example)
       - [Guide](#guide)
     - [Tracing Envoy & Istio](#tracing-envoy--istio)
-  - [Building](#building)
+  - [Contributor Info](#contributor-info)
 
 ## Usage
 
@@ -73,7 +73,7 @@ Include `<datadog/opentracing.h>` and create the tracer:
 #include <string>
 
 int main(int argc, char* argv[]) {
-  datadog::opentracing::TracerOptions tracer_options{"dd-agent", 8126, "compiled-in example"};
+  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "compiled-in example"};
   auto tracer = datadog::opentracing::makeTracer(tracer_options);
 
   // Create some spans.
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
   // Read in the tracer's configuration.
   std::string tracer_config = R"({
       "service": "dynamic-load example",
-      "agent_host": "dd-agent",
+      "agent_host": "localhost",
       "agent_port": 8126
     })";
 
@@ -382,7 +382,7 @@ You also need to provide a JSON-formatted text config file that sets options for
 
 Coming soon!
 
-## Building
+## Contributor Info
 
 **Dependencies**
 
