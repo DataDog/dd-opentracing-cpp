@@ -4,17 +4,270 @@
 
 **Notice: This project is still in beta, under active development. Features and compatibility may change.**
 
-* [Usage](#usage)
-   * [Tracing nginx](#tracing-nginx)
-      * [Quick start/Example](#quick-start-with-docker-example)
-      * [Guide](#guide)
-* [Development](#building)
+- [Datadog OpenTracing C++ Client](#datadog-opentracing-c-client)
+  - [Usage](#usage)
+    - [Tracing C++ Applications](#tracing-c-applications)
+      - [Getting Started](#getting-started)
+      - [Compatibility](#compatibility)
+      - [Installation](#installation)
+        - [Compile against dd-opentracing-cpp](#compile-against-dd-opentracing-cpp)
+        - [Dynamic Loading](#dynamic-loading)
+      - [Advanced Usage](#advanced-usage)
+        - [OpenTracing](#opentracing)
+        - [Manual Instrumentation](#manual-instrumentation)
+        - [Custom Tagging](#custom-tagging)
+        - [Distributed Tracing](#distributed-tracing)
+        - [Priority Sampling](#priority-sampling)
+        - [Logging](#logging)
+        - [Debugging](#debugging)
+    - [Tracing Nginx](#tracing-nginx)
+      - [Quick-start with Docker example](#quick-start-with-docker-example)
+      - [Guide](#guide)
+    - [Tracing Envoy & Istio](#tracing-envoy--istio)
+  - [Contributor Info](#contributor-info)
 
 ## Usage
 
-### Tracing C++ Code
+### Tracing C++ Applications
 
-Support coming soon.
+#### Getting Started
+
+To begin tracing applications written in any language, first [install and configure the Datadog Agent](https://docs.datadoghq.com/tracing/setup).
+
+You will need to compile against [OpenTracing-cpp](https://github.com/opentracing/opentracing-cpp).
+
+#### Compatibility
+
+dd-opentracing-cpp needs C++14 to build, but if you use [dynamic loading](#dynamic-loading) then you are instead limited by OpenTracing's requirement for [C++11 or later](https://github.com/opentracing/opentracing-cpp/#cc98).
+
+Supported platforms are: Linux & Mac. If you need Windows support, please let us know.
+
+#### Installation
+
+Datadog tracing can be enabled in one of two ways:
+
+* Compile against dd-opentracing-cpp, where the Datadog lib is compiled in and configured in code
+* Dynamic loading, where the Datadog OpenTracing library is loaded at run-time and configured via JSON
+
+##### Compile against dd-opentracing-cpp
+
+```bash
+# Download and install dd-opentracing-cpp library.
+wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz -O dd-opentracing-cpp.tar.gz
+tar zxvf dd-opentracing-cpp.tar.gz
+mkdir dd-opentracing-cpp-0.3.5/.build
+cd dd-opentracing-cpp-0.3.5/.build
+# Download and install the correct version of opentracing-cpp, & other deps.
+../scripts/install_dependencies.sh
+cmake ..
+make
+make install
+```
+
+Include `<datadog/opentracing.h>` and create the tracer:
+
+```cpp
+// tracer_example.cpp
+#include <datadog/opentracing.h>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+  datadog::opentracing::TracerOptions tracer_options{"localhost", 8126, "compiled-in example"};
+  auto tracer = datadog::opentracing::makeTracer(tracer_options);
+
+  // Create some spans.
+  {
+    auto span_a = tracer->StartSpan("A");
+    span_a->SetTag("tag", 123);
+    auto span_b = tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    span_b->SetTag("tag", "value");
+  }
+
+  tracer->Close();
+  return 0;
+}
+```
+
+Just link against libdd_opentracing and libopentracing (making sure that they are both in your LD_LIBRARY_PATH):
+
+```bash
+g++ -o tracer_example tracer_example.cpp -ldd_opentracing -lopentracing
+./tracer_example
+```
+
+##### Dynamic Loading
+
+```bash
+# Download and install OpenTracing-cpp
+wget https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz -O opentracing-cpp.tar.gz
+tar zxvf opentracing-cpp.tar.gz
+mkdir opentracing-cpp-1.5.0/.build
+cd opentracing-cpp-1.5.0/.build
+cmake ..
+make
+make install
+# Install dd-opentracing-cpp shared plugin.
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
+gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
+```
+
+Include `<opentracing/dynamic_load.h>` and load the tracer from libdd_opentracing_plugin.so:
+
+```cpp
+// tracer_example.cpp
+#include <opentracing/dynamic_load.h>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+  // Load the tracer library.
+  std::string error_message;
+  auto handle_maybe = opentracing::DynamicallyLoadTracingLibrary(
+      "/usr/local/lib/libdd_opentracing_plugin.so", error_message);
+  if (!handle_maybe) {
+    std::cerr << "Failed to load tracer library " << error_message << "\n";
+    return false;
+  }
+
+  // Read in the tracer's configuration.
+  std::string tracer_config = R"({
+      "service": "dynamic-load example",
+      "agent_host": "localhost",
+      "agent_port": 8126
+    })";
+
+  // Construct a tracer.
+  auto& tracer_factory = handle_maybe->tracer_factory();
+  auto tracer_maybe = tracer_factory.MakeTracer(tracer_config.c_str(), error_message);
+  if (!tracer_maybe) {
+    std::cerr << "Failed to create tracer " << error_message << "\n";
+    return false;
+  }
+  auto& tracer = *tracer_maybe;
+
+  // Create some spans.
+  {
+    auto span_a = tracer->StartSpan("A");
+    span_a->SetTag("tag", 123);
+    auto span_b = tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    span_b->SetTag("tag", "value");
+  }
+
+  tracer->Close();
+  return 0;
+}
+```
+
+Just link against libopentracing (making sure that libopentracing.so is in your LD_LIBRARY_PATH):
+
+```bash
+g++ -o tracer_example tracer_example.cpp -lopentracing
+./tracer_example
+```
+
+#### Advanced Usage
+
+##### OpenTracing
+
+The Datadog C++ tracer currently can only be used through the OpenTracing API. The usage instructions in this document all describe generic OpenTracing functionality.
+
+##### Manual Instrumentation
+
+To manually instrument your code, install using one of the above methods and then use the tracer object to create Spans.
+
+```cpp
+{
+  // Create a root span.
+  auto root_span = tracer->StartSpan("operation_name");
+  // Create a child span.
+  auto child_span = tracer->StartSpan(
+      "operation_name",
+      {opentracing::ChildOf(&root_span->context())});
+  // Spans can be finished at a specific time ...
+  child_span->Finish();
+} // ... or when they are destructed (root_span finishes here).
+```
+
+##### Custom Tagging
+
+Add tags directly to a Span object by calling Span.SetTag(). For example:
+
+```cpp
+auto tracer = ...
+auto span = tracer->StartSpan("operation_name");
+span->SetTag("key must be string", "Values are variable types");
+span->SetTag("key must be string", 1234);
+```
+
+Values are of [variable type](https://github.com/opentracing/opentracing-cpp/blob/master/include/opentracing/value.h) and can be complex objects. Values are serialized as JSON, with the exception of a string value being serialized bare (without extra quotation marks).
+
+##### Distributed Tracing
+
+Distributed tracing can be accomplished by [using the Inject and Extract methods on the tracer](https://github.com/opentracing/opentracing-cpp/#inject-span-context-into-a-textmapwriter), which accept [generic `Reader` and `Writer` types](https://github.com/opentracing/opentracing-cpp/blob/master/include/opentracing/propagation.h). Priority sampling (enabled by default) should be on to ensure uniform delivery of spans.
+
+```cpp
+// Allows writing propagation headers to a simple map<string, string>.
+// Copied from https://github.com/opentracing/opentracing-cpp/blob/master/mocktracer/test/propagation_test.cpp
+struct HTTPHeadersCarrier : HTTPHeadersReader, HTTPHeadersWriter {
+  HTTPHeadersCarrier(std::unordered_map<std::string, std::string>& text_map_)
+      : text_map(text_map_) {}
+
+  expected<void> Set(string_view key, string_view value) const override {
+    text_map[key] = value;
+    return {};
+  }
+
+  expected<void> ForeachKey(
+      std::function<expected<void>(string_view key, string_view value)> f)
+      const override {
+    for (const auto& key_value : text_map) {
+      auto result = f(key_value.first, key_value.second);
+      if (!result) return result;
+    }
+    return {};
+  }
+
+  std::unordered_map<std::string, std::string>& text_map;
+};
+
+void example() {
+  auto tracer = ...
+  std::unordered_map<std::string, std::string> headers;
+  HTTPHeadersCarrier carrier(headers);
+
+  auto span = tracer->StartSpan("operation_name");
+  tracer->Inject(span->context(), carrier);
+  // `headers` now populated with the headers needed to propagate the span.
+}
+```
+
+##### Priority Sampling
+
+Priority sampling is enabled by default, and can be disabled in the TracerOptions. You can mark a span to be kept or discarded by setting the tag `sampling.priority`. A value of `0` means reject/don't sample and any value greater than 0 means keep/sample.
+
+```cpp
+auto tracer = ...
+auto span = tracer->StartSpan("operation_name");
+span->SetTag("sampling.priority", 1); // Keep this span.
+auto another_span = tracer->StartSpan("operation_name");
+another_span->SetTag("sampling.priority", 0); // Discard this span.
+```
+
+##### Logging
+
+Coming soon!
+
+##### Debugging
+
+The release binary libraries are all compiled with debug symbols added to the optimized release. It is possible to use gdb or lldb to debug the library and to read core dumps. If you are building the library from source, pass the argument `-DCMAKE_BUILD_TYPE=RelWithDebInfo` to cmake to compile an optimized build with debug symbols.
+
+```bash
+cd .build
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make
+make install
+```
 
 ### Tracing Nginx
 
@@ -55,7 +308,7 @@ Each of these can be downloaded and used precompiled.
 wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.7.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
 tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 # Install Datadog OpenTracing
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.3/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -129,7 +382,7 @@ You also need to provide a JSON-formatted text config file that sets options for
 
 Coming soon!
 
-## Building
+## Contributor Info
 
 **Dependencies**
 
