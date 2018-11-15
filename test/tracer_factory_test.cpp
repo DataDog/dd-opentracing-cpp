@@ -218,4 +218,140 @@ TEST_CASE("tracer") {
       REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
     }
   }
+
+  SECTION("injected environment variables") {
+    SECTION("DD_AGENT_HOST overrides default") {
+      ::setenv("DD_AGENT_HOST", "injected-hostname", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_AGENT_HOST");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "injected-hostname");
+      REQUIRE(tracer->opts.agent_port == 8126);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+
+    SECTION("DD_AGENT_HOST overrides configuration") {
+      ::setenv("DD_AGENT_HOST", "injected-hostname", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "agent_host": "configured-hostname"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_AGENT_HOST");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "injected-hostname");
+      REQUIRE(tracer->opts.agent_port == 8126);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+    SECTION("empty DD_AGENT_HOST retains default") {
+      ::setenv("DD_AGENT_HOST", "", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_AGENT_HOST");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "localhost");
+      REQUIRE(tracer->opts.agent_port == 8126);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+    SECTION("DD_TRACE_AGENT_PORT overrides default") {
+      ::setenv("DD_TRACE_AGENT_PORT", "1234", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_AGENT_PORT");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "localhost");
+      REQUIRE(tracer->opts.agent_port == 1234);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+
+    SECTION("DD_TRACE_AGENT_PORT overrides configuration") {
+      ::setenv("DD_TRACE_AGENT_PORT", "1234", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "agent_port": 8126
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_AGENT_PORT");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "localhost");
+      REQUIRE(tracer->opts.agent_port == 1234);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+    SECTION("empty DD_TRACE_AGENT_PORT retains default") {
+      ::setenv("DD_TRACE_AGENT_PORT", "", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_AGENT_PORT");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.agent_host == "localhost");
+      REQUIRE(tracer->opts.agent_port == 8126);
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.type == "web");
+    }
+    SECTION("invalid DD_TRACE_AGENT_PORT value returns an error") {
+      ::setenv("DD_TRACE_AGENT_PORT", "misconfigured", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_AGENT_PORT");
+
+      REQUIRE(error == "Value for DD_TRACE_AGENT_PORT is invalid");
+      REQUIRE(!result);
+      REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+    }
+  }
 }
