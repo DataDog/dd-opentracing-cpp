@@ -112,6 +112,25 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     error_message = "configuration has an argument with an incorrect type";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
+
+  // Agent host and port environment variables override defaults and config.
+  auto agent_host = std::getenv("DD_AGENT_HOST");
+  if (agent_host != nullptr && std::strlen(agent_host) > 0) {
+    options.agent_host = agent_host;
+  }
+  auto trace_agent_port = std::getenv("DD_TRACE_AGENT_PORT");
+  if (trace_agent_port != nullptr && std::strlen(trace_agent_port) > 0) {
+    try {
+      options.agent_port = std::stoi(trace_agent_port);
+    } catch (const std::invalid_argument &ia) {
+      error_message = "Value for DD_TRACE_AGENT_PORT is invalid";
+      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    } catch (const std::out_of_range &oor) {
+      error_message = "Value for DD_TRACE_AGENT_PORT is out of range";
+      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    }
+  }
+
   std::shared_ptr<SampleProvider> sampler = sampleProviderFromOptions(options);
   auto writer = std::shared_ptr<Writer>{
       new AgentWriter(options.agent_host, options.agent_port,
