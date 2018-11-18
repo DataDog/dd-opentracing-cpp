@@ -1,4 +1,5 @@
 #include <datadog/opentracing.h>
+#include <opentracing/ext/tags.h>
 #include <pthread.h>
 #include <cstdlib>
 #include <random>
@@ -79,18 +80,25 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   // Check early if we need to discard. Check at span Finish if we need to sample (since users can
   // set this).
   if (sampler_->discard(span_context)) {
-    return std::unique_ptr<ot::Span>{new NoopSpan{shared_from_this(), span_id, trace_id, parent_id,
-                                                  std::move(span_context), options}};
+    return std::unique_ptr<ot::Span>{
+        new NoopSpan{shared_from_this(), span_id, trace_id, parent_id, std::move(span_context)}};
   }
-  std::unique_ptr<ot::Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_,
-                                          span_id, trace_id, parent_id, std::move(span_context),
-                                          get_time_(), opts_.service, opts_.type, operation_name,
-                                          operation_name, opts_.operation_name_override}};
+  std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_, span_id,
+                                      trace_id, parent_id, std::move(span_context), get_time_(),
+                                      opts_.service, opts_.type, operation_name, operation_name,
+                                      opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;
+  for (auto &tag : options.tags) {
+    if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {
+      // Do not apply this tag if sampling priority is already assigned.
+      continue;
+    }
+    span->SetTag(tag.first, tag.second);
+  }
   if (is_trace_root && opts_.environment != "") {
     span->SetTag(environment_tag, opts_.environment);
   }
-  return span;
+  return std::move(span);
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;
