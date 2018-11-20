@@ -19,7 +19,7 @@ class NoopSpan : public DatadogSpan {
  public:
   // Creates a new NoopSpan, usually called by Tracer::StartSpanWithOptions.
   NoopSpan(std::shared_ptr<const Tracer> tracer, uint64_t span_id, uint64_t trace_id,
-           uint64_t parent_id, SpanContext context, const ot::StartSpanOptions &options);
+           uint64_t parent_id, SpanContext context);
   NoopSpan() = delete;
   NoopSpan(NoopSpan &&other);
   ~NoopSpan() override = default;

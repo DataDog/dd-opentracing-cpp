@@ -7,8 +7,7 @@ namespace datadog {
 namespace opentracing {
 
 NoopSpan::NoopSpan(std::shared_ptr<const Tracer> tracer, uint64_t span_id, uint64_t trace_id,
-                   uint64_t parent_id, SpanContext context,
-                   const ot::StartSpanOptions & /* options */)
+                   uint64_t parent_id, SpanContext context)
     : tracer_(std::move(tracer)),
       span_id_(span_id),
       trace_id_(trace_id),
