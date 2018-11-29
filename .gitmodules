@@ -1,0 +1,5 @@
+[submodule "nginx-opentracing"]
+	path = nginx-opentracing
+	url = https://github.com/opentracing-contrib/nginx-opentracing
+	ignore = dirty
+
