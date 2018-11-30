@@ -63,7 +63,7 @@ class TraceEncoder {
   virtual ~TraceEncoder() {}
 
   // Returns the Datadog Agent endpoint that traces should be sent to.
-  virtual const std::string &path() = 0;
+  virtual const std::string& path() = 0;
   virtual std::size_t pendingTraces() = 0;
   virtual void clearTraces() = 0;
   // Returns the HTTP headers that are required for the collection of traces.
@@ -71,18 +71,23 @@ class TraceEncoder {
   // Returns the encoded payload from the collection of traces.
   virtual const std::string payload() = 0;
   // Receives and handles the response from the Agent.
-  virtual void handleResponse(const std::string &response) = 0;
+  virtual void handleResponse(const std::string& response) = 0;
 };
 
 // makeTracer returns an opentracing::Tracer that submits traces to the Datadog Agent.
 // This should be used when control over the HTTP requests to the Datadog Agent is not required.
-std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options);
+std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions& options);
 // makeTracerAndEncoder initializes an opentracing::Tracer and provides an encoder
 // to use when submitting traces to the Datadog Agent.
 // This should be used in applications that need to also control the HTTP requests to the Datadog
 // Agent. eg. Envoy
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTracerAndEncoder(
-    const TracerOptions &options);
+    const TracerOptions& options);
+
+int OpenTracingMakeTracerFactoryFunction(const char* opentracing_version,
+                                         const char* opentracing_abi_version,
+                                         const void** error_category, void* error_message,
+                                         void** tracer_factory);
 
 }  // namespace opentracing
 }  // namespace datadog
