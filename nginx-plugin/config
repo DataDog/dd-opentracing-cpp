@@ -28,7 +28,7 @@ ngx_module_srcs=" \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/span_context_querier.cpp \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/utility.cpp \
 "
-ngx_module_libs="-lstdc++ -ldd_opentracing"
+ngx_module_libs="-lstdc++ -ldd_opentracing -lopentracing"
 
 . auto/module
 

@@ -70,6 +70,11 @@ static ngx_int_t opentracing_init_worker(ngx_cycle_t *cycle) noexcept try {
   const auto rcode = datadog::opentracing::OpenTracingMakeTracerFactoryFunction(
       OPENTRACING_VERSION, OPENTRACING_ABI_VERSION, &error_category,
       static_cast<void *>(&error_message), &tracer_factory);
+  if (rcode != 0) {
+    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "Failed to load construct tracer: %s ",
+                  error_message.c_str());
+    return NGX_ERROR;
+  }
 
   // Construct a tracer
   errno = 0;
