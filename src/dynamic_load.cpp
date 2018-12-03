@@ -1,7 +1,11 @@
+#include <datadog/opentracing.h>
 #include <opentracing/dynamic_load.h>
 #include <iostream>
 #include "tracer.h"
 #include "tracer_factory.h"
+
+namespace datadog {
+namespace opentracing {
 
 int OpenTracingMakeTracerFactoryFunction(const char* opentracing_version,
                                          const char* opentracing_abi_version,
@@ -18,15 +22,18 @@ int OpenTracingMakeTracerFactoryFunction(const char* opentracing_version,
   if (std::strcmp(opentracing_abi_version, OPENTRACING_ABI_VERSION) != 0) {
     std::cerr << "version mismatch: " << std::string(opentracing_abi_version)
               << " != " << std::string(OPENTRACING_ABI_VERSION) << std::endl;
-    *error_category = static_cast<const void*>(&opentracing::dynamic_load_error_category());
-    return opentracing::incompatible_library_versions_error.value();
+    *error_category = static_cast<const void*>(&::opentracing::dynamic_load_error_category());
+    return ::opentracing::incompatible_library_versions_error.value();
   }
 
-  *tracer_factory = new datadog::opentracing::TracerFactory<datadog::opentracing::Tracer>{};
+  *tracer_factory = new TracerFactory<Tracer>{};
   return 0;
 } catch (const std::bad_alloc&) {
   *error_category = static_cast<const void*>(&std::generic_category());
   return static_cast<int>(std::errc::not_enough_memory);
 }
 
-OPENTRACING_DECLARE_IMPL_FACTORY(OpenTracingMakeTracerFactoryFunction)
+}  // namespace opentracing
+}  // namespace datadog
+
+OPENTRACING_DECLARE_IMPL_FACTORY(datadog::opentracing::OpenTracingMakeTracerFactoryFunction)

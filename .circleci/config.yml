@@ -9,7 +9,8 @@ jobs:
   build:
     <<: *defaults
     environment:
-      CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      NGINX_VERSIONS: 1.14.1 1.12.2
     steps:
       - checkout
       - run:
@@ -37,7 +38,16 @@ jobs:
             cd .build
             cmake $CMAKE_ARGS ..
             make
+            make install
             cp libdd_opentracing_plugin.so /tmp/build/libdd_opentracing_plugin.so
+            cp libdd_opentracing.so /tmp/build/libdd_opentracing.so
+      - run:
+          name: Build NGINX plugins
+          command: |
+            for $NGINX_VERSION in $NGINX_VERSIONS
+            do
+              ./scripts/build_nginx_plugin.sh
+            done
       - run:
           name: Build (with bazel)
           command: |
@@ -86,8 +96,7 @@ jobs:
     docker:
       - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_0
     environment:
-      NGINX_VERSION: 1.14.0
-      NGINX_OPENTRACING_VERSION: 0.7.0
+      NGINX_VERSION: 1.14.1
     steps:
       - checkout
       - attach_workspace:
@@ -107,10 +116,11 @@ jobs:
           command: |
             # Install the Datadog plugin
             NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
-            cp ./build/libdd_opentracing_plugin.so /usr/local/lib/libdd_opentracing_plugin.so
-            # Install the nginx-opentracing plugin
-            wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_OPENTRACING_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
-            tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
+            cp ./build/ngx_http_dd_opentracing_module.so "${NGINX_MODULES}"
+
+
+
+            # FIXME
             # Change the config to use it.
             cd ./test/integration/nginx/
             NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
