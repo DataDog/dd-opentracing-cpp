@@ -11,6 +11,9 @@ jobs:
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       NGINX_VERSIONS: 1.14.1 1.12.2
+      CFLAGS: -march=x86-64 -fPIC
+      CXXFLAGS: -march=x86-64 -fPIC
+      LDFLAGS: -fPIC
     steps:
       - checkout
       - run:
@@ -44,7 +47,7 @@ jobs:
       - run:
           name: Build NGINX plugins
           command: |
-            for $NGINX_VERSION in $NGINX_VERSIONS
+            for NGINX_VERSION in $NGINX_VERSIONS
             do
               ./scripts/build_nginx_plugin.sh
             done
@@ -116,11 +119,7 @@ jobs:
           command: |
             # Install the Datadog plugin
             NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
-            cp ./build/ngx_http_dd_opentracing_module.so "${NGINX_MODULES}"
-
-
-
-            # FIXME
+            tar zxvf ./build/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
             # Change the config to use it.
             cd ./test/integration/nginx/
             NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')

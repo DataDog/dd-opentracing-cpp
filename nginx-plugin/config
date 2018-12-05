@@ -1,4 +1,4 @@
-ngx_addon_name=ngx_http_dd_opentracing_module
+ngx_addon_name=ngx_http_opentracing_module
 ngx_module_type=HTTP
 ngx_module_name=$ngx_addon_name
 ngx_module_incs=
@@ -15,7 +15,7 @@ ngx_module_deps=" \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/utility.h \
 "
 ngx_module_srcs=" \
-  $ngx_addon_dir/src/ngx_http_dd_opentracing_module.cpp \
+  $ngx_addon_dir/src/ngx_http_opentracing_module.cpp \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/ngx_script.cpp \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/extract_span_context.cpp \
   $ngx_addon_dir/nginx-opentracing/opentracing/src/discover_span_context_keys.cpp \

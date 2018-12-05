@@ -8,8 +8,8 @@ set -eo pipefail
 #     make && make install
 #     popd
 
-NGINX_VERSION=${NGINX_VERSION:-1.14.0}
-MODULE_DIR=${MODULE_DIR:-/tmp/build/}
+NGINX_VERSION=${NGINX_VERSION:-1.14.1}
+BUILD_DIR=${BUILD_DIR:-/tmp/build/}
 
 rm -rf .nginx-build
 mkdir -p .nginx-build
@@ -40,7 +40,7 @@ make modules
 # redo the linking.
 g++-7 -o ngx_http_dd_opentracing_module.so \
   objs/addon/src/*.o \
-  objs/ngx_http_dd_opentracing_module_modules.o \
+  objs/ngx_http_opentracing_module_modules.o \
   -static-libstdc++ -static-libgcc \
   -Wl,-static \
   -ldd_opentracing \
@@ -49,8 +49,8 @@ g++-7 -o ngx_http_dd_opentracing_module.so \
   -Wl,--version-script="${PWD}/export.map" \
   -shared
 
-# TARGET_NAME=linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
-# tar czf ${TARGET_NAME} ngx_http_dd_opentracing_module.so
-cp ngx_http_dd_opentracing_module.so "${MODULE_DIR}"/
+TARGET_NAME=linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+tar czf ${TARGET_NAME} ngx_http_dd_opentracing_module.so
+cp ${TARGET_NAME} "${BUILD_DIR}"/
 
 popd

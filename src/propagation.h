@@ -12,6 +12,10 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+constexpr const char *headerWhitelist[6]{
+    "x-datadog-trace-id", "x-datadog-parent-id", "x-datadog-sampling-priority",
+    "X-B3-TraceId",       "X-B3-SpanId",         "X-B3-Sampled"};
+
 class SpanBuffer;
 class SampleProvider;
 struct HeadersImpl;

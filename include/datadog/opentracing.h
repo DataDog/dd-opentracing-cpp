@@ -84,11 +84,6 @@ std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions& options);
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTracerAndEncoder(
     const TracerOptions& options);
 
-int OpenTracingMakeTracerFactoryFunction(const char* opentracing_version,
-                                         const char* opentracing_abi_version,
-                                         const void** error_category, void* error_message,
-                                         void** tracer_factory);
-
 }  // namespace opentracing
 }  // namespace datadog
 
