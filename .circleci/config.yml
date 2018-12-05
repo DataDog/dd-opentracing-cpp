@@ -52,9 +52,9 @@ jobs:
       - run:
           name: Build NGINX plugins
           command: |
-            for NGINX_VERSION in $NGINX_VERSIONS
+            for V in $NGINX_VERSIONS
             do
-              BUILD_DIR=/tmp/build/ ./scripts/build_nginx_plugin.sh
+              NGINX_VERSION="$V" BUILD_DIR=/tmp/build/ ./scripts/build_nginx_plugin.sh
               if ! [ "$BUILD_ALL_NGINX_VERSIONS" ]
               then
                 break # Only build the first version, for integration testing.
