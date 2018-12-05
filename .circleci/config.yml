@@ -12,7 +12,7 @@ jobs:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       # If BUILD_ALL_NGINX_VERSIONS is set, builds all NGINX versions. Otherwise, builds just the first
       # version to use it for integration testing.
-      NGINX_VERSIONS: 1.14.1 1.12.2
+      NGINX_VERSIONS: 1.14.1 1.12.2 1.13.12 1.15.0
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
       LDFLAGS: -fPIC
