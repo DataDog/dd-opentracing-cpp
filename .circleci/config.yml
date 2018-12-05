@@ -11,6 +11,9 @@ jobs:
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       NGINX_VERSIONS: 1.14.1 1.12.2
+      # If set to 1, builds all NGINX versions. Otherwise, builds just the first
+      # version to use it for integration testing.
+      BUILD_ALL_NGINX_VERSIONS: 0
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
       LDFLAGS: -fPIC
@@ -52,7 +55,11 @@ jobs:
           command: |
             for NGINX_VERSION in $NGINX_VERSIONS
             do
-              ./scripts/build_nginx_plugin.sh
+              BUILD_DIR=/tmp/build/ ./scripts/build_nginx_plugin.sh
+              if [ "$BUILD_ALL_NGINX_VERSIONS" = 0 ]
+              then
+                break # Only build the first version, for integration testing.
+              fi
             done
       - run:
           name: Build (with bazel)

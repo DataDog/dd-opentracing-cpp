@@ -65,7 +65,10 @@ echo "Waiting on CircleCI build..."
 
 # Start a build job on CircleCI
 BUILD_NUM=$(curl -s -X POST --header "Content-Type: application/json" -d '{
-  "tag": "'$VERSION'"
+  "tag": "'$VERSION'",
+  "build_parameters": {
+    "BUILD_ALL_NGINX_VERSIONS": "1"
+  }
 }
 ' https://circleci.com/api/v1.1/project/github/DataDog/dd-opentracing-cpp?circle-token=${CIRCLE_CI_TOKEN} | jq '.build_num') 
 
