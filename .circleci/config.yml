@@ -29,6 +29,9 @@ jobs:
               fi
             done
       - run:
+          name: Init submodules
+          command: git submodule update --init --recursive
+      - run:
           name: Build source dependencies
           command: |
             ./scripts/install_dependencies.sh
