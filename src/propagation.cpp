@@ -61,10 +61,6 @@ constexpr struct {
 
 } propagation_headers;
 
-// Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
-// interop.
-const ot::string_view baggage_prefix = "ot-baggage-";
-
 // Key names for binary serialization in JSON
 const std::string json_trace_id_key = "trace_id";
 const std::string json_parent_id_key = "parent_id";
