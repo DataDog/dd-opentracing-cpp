@@ -2,7 +2,7 @@
 FROM ubuntu:18.04
 
 ARG NGINX_VERSION=1.14.1
-ARG DATADOG_PLUGIN_VERSION=0.3.6
+ARG DATADOG_PLUGIN_VERSION=0.3.7
 
 RUN apt-get update && \
   apt-get install -y git gnupg wget tar

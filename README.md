@@ -53,10 +53,10 @@ Datadog tracing can be enabled in one of two ways:
 
 ```bash
 # Download and install dd-opentracing-cpp library.
-wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.6.tar.gz -O dd-opentracing-cpp.tar.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.7.tar.gz -O dd-opentracing-cpp.tar.gz
 tar zxvf dd-opentracing-cpp.tar.gz
-mkdir dd-opentracing-cpp-0.3.6/.build
-cd dd-opentracing-cpp-0.3.6/.build
+mkdir dd-opentracing-cpp-0.3.7/.build
+cd dd-opentracing-cpp-0.3.7/.build
 # Download and install the correct version of opentracing-cpp, & other deps.
 ../scripts/install_dependencies.sh
 cmake ..
@@ -108,7 +108,7 @@ cmake ..
 make
 make install
 # Install dd-opentracing-cpp shared plugin.
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.6/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.7/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -299,7 +299,7 @@ apt-get install nginx=1.14.1-1~bionic # <- Your Ubuntu distro here
 Install the Datadog NGINX module, unpacking it into your NGINX modules folder.
 
 ```bash
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.6/linux-amd64-nginx-1.14.1-ngx_http_module.so.tgz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.7/linux-amd64-nginx-1.14.1-ngx_http_module.so.tgz
 tar zxf linux-amd64-nginx-1.14.1-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 ```
 
