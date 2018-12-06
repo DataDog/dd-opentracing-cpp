@@ -104,7 +104,6 @@ echo "${ARTIFACT_URLS}" | while read ARTIFACT_URL
 # Process and sign artifacts
 gzip libdd_opentracing_plugin.so
 mv libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
-rm libdd_opentracing_plugin.so
 
 for ARTIFACT in ./*; do
   gpg --armor --detach-sign "${ARTIFACT}"
