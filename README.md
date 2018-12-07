@@ -369,7 +369,7 @@ Annotated Datadog config JSON:
 
 ### Tracing Envoy & Istio
 
-See: https://docs.datadoghq.com/integrations/envoy/
+See: https://docs.datadoghq.com/tracing/proxies/envoy
 
 ## Contributor Info
 

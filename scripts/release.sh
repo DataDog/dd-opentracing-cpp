@@ -117,7 +117,7 @@ done
 # Create a github release
 PRERELEASE=$([ $IS_PRERELEASE = true ] && echo "-p" || echo "")
 $GOPATH/bin/hub release create $PRERELEASE \
-  "${assets[@]}"
+  "${assets[@]}" \
   -m "Release $VERSION" $VERSION
 cd ..
 rm -rf .bin
