@@ -20,7 +20,7 @@
         - [Priority Sampling](#priority-sampling)
         - [Logging](#logging)
         - [Debugging](#debugging)
-    - [Tracing Nginx](#tracing-nginx)
+    - [Tracing NGINX](#tracing-nginx)
       - [Quick-start with Docker example](#quick-start-with-docker-example)
       - [Guide](#guide)
     - [Tracing Envoy & Istio](#tracing-envoy--istio)
@@ -53,10 +53,10 @@ Datadog tracing can be enabled in one of two ways:
 
 ```bash
 # Download and install dd-opentracing-cpp library.
-wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.5.tar.gz -O dd-opentracing-cpp.tar.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/archive/v0.3.7.tar.gz -O dd-opentracing-cpp.tar.gz
 tar zxvf dd-opentracing-cpp.tar.gz
-mkdir dd-opentracing-cpp-0.3.5/.build
-cd dd-opentracing-cpp-0.3.5/.build
+mkdir dd-opentracing-cpp-0.3.7/.build
+cd dd-opentracing-cpp-0.3.7/.build
 # Download and install the correct version of opentracing-cpp, & other deps.
 ../scripts/install_dependencies.sh
 cmake ..
@@ -108,7 +108,7 @@ cmake ..
 make
 make install
 # Install dd-opentracing-cpp shared plugin.
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.7/linux-amd64-libdd_opentracing_plugin.so.gz
 gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 ```
 
@@ -269,9 +269,9 @@ make
 make install
 ```
 
-### Tracing Nginx
+### Tracing NGINX
 
-Nginx can be traced using the nginx-opentracing module along with this library.
+NGINX can be traced using the nginx-opentracing module along with this library.
 
 #### Quick-start with Docker example
 
@@ -285,7 +285,7 @@ Nginx can be traced using the nginx-opentracing module along with this library.
 
 Explains how the Docker example works.
 
-Nginx tracing is compatible with the nginx binary package from the official nginx [repositories](http://nginx.org/en/linux_packages.html#stable). eg.
+NGINX tracing is compatible with the nginx binary package from the official [repositories](http://nginx.org/en/linux_packages.html#stable). eg.
 
 ```bash
 wget https://nginx.org/keys/nginx_signing.key
@@ -293,34 +293,25 @@ apt-key add nginx_signing.key
 echo deb https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list
 echo deb-src https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list
 apt-get update
-apt-get install nginx=1.14.0-1~bionic # <- Your Ubuntu distro here
+apt-get install nginx=1.14.1-1~bionic # <- Your Ubuntu distro here
 ```
 
-Two dynamic libraries need to be available:
-
-* ngx_http_opentracing_module.so, provided by [nginx-opentracing](https://github.com/opentracing-contrib/nginx-opentracing/)
-* libdd_opentracing_plugin.so, from this repo
-
-Each of these can be downloaded and used precompiled.
+Install the Datadog NGINX module, unpacking it into your NGINX modules folder.
 
 ```bash
-# Install OpenTracing nginx module
-wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v0.7.0/linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz
-tar zxf linux-amd64-nginx-1.14.0-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
-# Install Datadog OpenTracing
-wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz
-gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
+wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.7/linux-amd64-nginx-1.14.1-ngx_http_module.so.tgz
+tar zxf linux-amd64-nginx-1.14.1-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 ```
 
 Tracing is configured in two locations:
 
-* Your nginx config.
+* Your nginx config
 * A datadog-specific JSON-formatted config file. This can be placed anywhere readable by nginx, and is referenced in the nginx config file.
 
 Annotated nginx config file:
 
 ```nginx
-load_module modules/ngx_http_opentracing_module.so; # Load OpenTracing module
+load_module modules/ngx_http_dd_opentracing_module.so; # Load Datadog module
 
 events {
     worker_connections  1024;
@@ -331,8 +322,8 @@ http {
     opentracing_tag http_user_agent $http_user_agent; # Add a tag to each trace!
     opentracing_trace_locations off; # Emit only one span per request.
 
-    # Load the Datadog tracing implementation, and the given config file.
-    opentracing_load_tracer /usr/local/lib/libdd_opentracing_plugin.so /etc/dd-config.json;
+    # Load the Datadog tracing config file.
+    opentracing_configure_tracer /etc/dd-config.json;
 
     server {
         listen       80;
@@ -376,11 +367,9 @@ Annotated Datadog config JSON:
 }
 ```
 
-You also need to provide a JSON-formatted text config file that sets options for the Datadog tracing.
-
 ### Tracing Envoy & Istio
 
-Coming soon!
+See: https://docs.datadoghq.com/tracing/proxies/envoy
 
 ## Contributor Info
 
@@ -393,8 +382,9 @@ See scripts/install_dependencies.sh
 
 **Build steps**
 
-First install dependencies:
+First init submodules and install dependencies:
 
+    git submodule update --init --recursive
     scripts/install_dependencies.sh
 
 Then:

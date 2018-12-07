@@ -1,9 +1,8 @@
 # Builds and runs a simple nginx server, traced by Datadog
 FROM ubuntu:18.04
 
-ARG NGINX_VERSION=1.14.0
-ARG NGINX_OPENTRACING_VERSION=0.7.0
-ARG DATADOG_PLUGIN_VERSION=0.3.5
+ARG NGINX_VERSION=1.14.1
+ARG DATADOG_PLUGIN_VERSION=0.3.7
 
 RUN apt-get update && \
   apt-get install -y git gnupg wget tar
@@ -15,18 +14,15 @@ RUN wget https://nginx.org/keys/nginx_signing.key && \
   echo deb-src https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list && \
   apt-get update && \
   apt-get install nginx=${NGINX_VERSION}-1~bionic
-# Configure nginx.
+# Configure nginx
 COPY ./examples/nginx-tracing/nginx.conf /etc/nginx/nginx.conf
 COPY ./examples/nginx-tracing/dd-config.json /etc/dd-config.json
 RUN mkdir -p /var/www/
 COPY ./examples/nginx-tracing/index.html /var/www/index.html
 
-# Install OpenTracing
-ADD https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_OPENTRACING_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+# Install Datadog module
+ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
 RUN tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
-# And Datadog OT
-ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
-RUN gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 
 # Test nginx config.
 RUN nginx -t

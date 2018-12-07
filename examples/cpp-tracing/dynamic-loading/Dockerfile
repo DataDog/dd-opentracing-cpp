@@ -12,7 +12,7 @@ RUN wget https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz -O
   make && \
   make install && \
   # Install dd-opentracing-cpp shared plugin.
-  wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.5/linux-amd64-libdd_opentracing_plugin.so.gz && \
+  wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/v0.3.7/linux-amd64-libdd_opentracing_plugin.so.gz && \
   gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing_plugin.so
 
 
