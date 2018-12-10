@@ -3,6 +3,7 @@
 
 # Build folder
 .build/
+.nginx-build/
 
 # Compiled Object files
 *.slo

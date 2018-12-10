@@ -65,7 +65,10 @@ echo "Waiting on CircleCI build..."
 
 # Start a build job on CircleCI
 BUILD_NUM=$(curl -s -X POST --header "Content-Type: application/json" -d '{
-  "tag": "'$VERSION'"
+  "tag": "'$VERSION'",
+  "build_parameters": {
+    "BUILD_ALL_NGINX_VERSIONS": "1"
+  }
 }
 ' https://circleci.com/api/v1.1/project/github/DataDog/dd-opentracing-cpp?circle-token=${CIRCLE_CI_TOKEN} | jq '.build_num') 
 
@@ -101,13 +104,20 @@ echo "${ARTIFACT_URLS}" | while read ARTIFACT_URL
 # Process and sign artifacts
 gzip libdd_opentracing_plugin.so
 mv libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
-gpg --armor --detach-sign linux-amd64-libdd_opentracing_plugin.so.gz
+
+for ARTIFACT in ./*; do
+  gpg --armor --detach-sign "${ARTIFACT}"
+done
+
+assets=()
+for f in ./*; do
+  [ -f "$f" ] && assets+=(-a "$f")
+done
 
 # Create a github release
 PRERELEASE=$([ $IS_PRERELEASE = true ] && echo "-p" || echo "")
 $GOPATH/bin/hub release create $PRERELEASE \
-  -a linux-amd64-libdd_opentracing_plugin.so.gz \
-  -a linux-amd64-libdd_opentracing_plugin.so.gz.asc \
+  "${assets[@]}" \
   -m "Release $VERSION" $VERSION
 cd ..
 rm -rf .bin

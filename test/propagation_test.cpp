@@ -35,6 +35,15 @@ TEST_CASE("SpanContext") {
 
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier, buffer, propagation_styles));
+    std::set<std::string> header_whitelist{std::begin(headerWhitelist), std::end(headerWhitelist)};
+    for (const auto& header : carrier.text_map) {
+      if (header.first.find(baggage_prefix) == 0) {
+        continue;
+      }
+      SECTION("header " + header.first + " must be in header whitelist") {
+        REQUIRE(header_whitelist.find(header.first) != header_whitelist.end());
+      }
+    }
 
     SECTION("can be deserialized") {
       auto sc = SpanContext::deserialize(carrier, propagation_styles);

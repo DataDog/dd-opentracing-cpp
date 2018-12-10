@@ -3,7 +3,7 @@
 # - add install step for dd-opentracing-cpp library
 FROM envoyproxy/envoy:latest
 
-ARG DATADOG_PLUGIN_VERSION=0.3.5
+ARG DATADOG_PLUGIN_VERSION=0.3.7
 
 ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-libdd_opentracing_plugin.so.gz linux-amd64-libdd_opentracing_plugin.so.gz
 RUN gunzip linux-amd64-libdd_opentracing_plugin.so.gz -c > /usr/local/lib/libdd_opentracing.so
