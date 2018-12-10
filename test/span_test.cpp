@@ -181,7 +181,8 @@ TEST_CASE("span") {
               ""};
     span.SetTag("span.type", "new type");
     span.SetTag("resource.name", "new resource");
-    span.SetTag("service.name", "new service");
+    auto service_tag_key = GENERATE(values<std::string>({"service.name", "service"}));
+    span.SetTag(service_tag_key, "new service");
     span.SetTag("tag with no special meaning", "ayy lmao");
 
     span.FinishWithOptions(finish_options);

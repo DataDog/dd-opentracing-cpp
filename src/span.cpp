@@ -18,6 +18,7 @@ namespace {
 const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
+const std::string ot_service_name_tag = "service";  // No constant yet in ::ot::ext
 const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
 }  // namespace
@@ -140,7 +141,11 @@ void Span::FinishWithOptions(
     span_->resource = tag->second;
     span_->meta.erase(tag);
   }
+  // Check for service tag in either datadog_service_name_tag or ot_service_name_tag.
   tag = span_->meta.find(datadog_service_name_tag);
+  if (tag == span_->meta.end()) {
+    tag = span_->meta.find(ot_service_name_tag);
+  }
   if (tag != span_->meta.end()) {
     span_->service = tag->second;
     span_->meta.erase(tag);
