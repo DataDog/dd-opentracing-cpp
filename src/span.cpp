@@ -145,6 +145,11 @@ void Span::FinishWithOptions(
     span_->service = tag->second;
     span_->meta.erase(tag);
   }
+  tag = span_->meta.find("error");
+  if (tag != span_->meta.end()) {
+      span_->error = std::stoi(tag->second);
+      span_->meta.erase(tag);
+  }
   // Audit and finish span.
   audit(span_.get());
   buffer_->finishSpan(std::move(span_), sampler_);
