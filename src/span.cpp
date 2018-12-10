@@ -22,7 +22,7 @@ const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
 }  // namespace
 
-const std::string environment_tag = "environment";
+const std::string environment_tag = "env";
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
                    std::string name, uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
