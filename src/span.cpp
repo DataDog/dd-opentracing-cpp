@@ -19,6 +19,7 @@ const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
+const std::string datadog_error_tag = "error";
 const std::string operation_name_tag = "operation";
 }  // namespace
 
