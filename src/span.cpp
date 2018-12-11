@@ -148,8 +148,8 @@ void Span::FinishWithOptions(
   }
   tag = span_->meta.find(datadog_error_tag);
   if (tag != span_->meta.end()) {
-      span_->error = std::stoi(tag->second);
-      span_->meta.erase(tag);
+    span_->error = std::stoi(tag->second);
+    span_->meta.erase(tag);
   }
   // Audit and finish span.
   audit(span_.get());
