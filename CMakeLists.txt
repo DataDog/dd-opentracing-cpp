@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.1)
 
 project(dd-opentracing-cpp)
 
+set(SOVERSION 0)
+
+# Introduce variables:
+# * CMAKE_INSTALL_LIBDIR
+# * CMAKE_INSTALL_BINDIR
+# * CMAKE_INSTALL_INCLUDEDIR
+include(GNUInstallDirs)
+
 option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
@@ -65,7 +73,7 @@ include_directories(SYSTEM ${OPENTRACING_INCLUDE_DIR} ${CURL_INCLUDE_DIRS})
 include_directories(include)
 
 # Code
-install(DIRECTORY include/datadog DESTINATION include)
+install(DIRECTORY include/datadog DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 add_compile_options(-Wall -Wextra -Werror -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
 
@@ -76,10 +84,11 @@ if(BUILD_SHARED)
   add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing)
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
+  set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
 
   install(TARGETS dd_opentracing
-          LIBRARY DESTINATION lib
-          ARCHIVE DESTINATION lib)
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
 ## Static lib
@@ -90,8 +99,8 @@ if(BUILD_STATIC)
   target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES} datadog)
 
   install(TARGETS dd_opentracing-static
-          LIBRARY DESTINATION lib
-          ARCHIVE DESTINATION lib)
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
 ## Plugin
@@ -108,7 +117,7 @@ if(BUILD_PLUGIN)
                         -static-libgcc
                         -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/export.map)
   install(TARGETS dd_opentracing_plugin
-          LIBRARY DESTINATION lib)
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
 # Tests
