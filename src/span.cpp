@@ -145,7 +145,7 @@ void Span::FinishWithOptions(
     span_->service = tag->second;
     span_->meta.erase(tag);
   }
-  tag = span_->meta.find("error");
+  tag = span_->meta.find(datadog_error_tag);
   if (tag != span_->meta.end()) {
       span_->error = std::stoi(tag->second);
       span_->meta.erase(tag);
