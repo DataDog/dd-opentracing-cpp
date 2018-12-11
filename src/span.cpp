@@ -19,10 +19,11 @@ const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
+const std::string datadog_error_tag = "error";
 const std::string operation_name_tag = "operation";
 }  // namespace
 
-const std::string environment_tag = "environment";
+const std::string environment_tag = "env";
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
                    std::string name, uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
@@ -143,6 +144,11 @@ void Span::FinishWithOptions(
   tag = span_->meta.find(datadog_service_name_tag);
   if (tag != span_->meta.end()) {
     span_->service = tag->second;
+    span_->meta.erase(tag);
+  }
+  tag = span_->meta.find(datadog_error_tag);
+  if (tag != span_->meta.end()) {
+    span_->error = std::stoi(tag->second);
     span_->meta.erase(tag);
   }
   // Audit and finish span.
