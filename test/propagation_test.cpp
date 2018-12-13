@@ -37,7 +37,20 @@ TEST_CASE("SpanContext") {
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier, buffer, propagation_styles, priority_sampling));
 
-    // header whitelist test here
+    SECTION("headers match the header whitelist") {
+      std::set<std::string> headers_got;
+      for (auto header : carrier.text_map) {
+        if (header.first.find(baggage_prefix) == 0) {
+          continue;
+        }
+        headers_got.insert(header.first);
+      } // This was still less LoC than using std::transformer. Somehow EVEN JAVA gets this right these days...
+      std::set<std::string> headers_want;
+      for (auto header : getPropagationHeaderNames(propagation_styles, priority_sampling)) {
+        headers_want.insert(header);
+      }
+      REQUIRE(headers_got == headers_want);
+    }
 
     SECTION("can be deserialized") {
       auto sc = SpanContext::deserialize(carrier, propagation_styles);
