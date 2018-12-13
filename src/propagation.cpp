@@ -86,6 +86,19 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 
 }  // namespace
 
+std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
+                                                       bool prioritySamplingEnabled) {
+  std::vector<ot::string_view> headers;
+  for (auto &style : styles) {
+    headers.push_back(propagation_headers[style].trace_id_header);
+    headers.push_back(propagation_headers[style].span_id_header);
+    if (prioritySamplingEnabled) {  // FIXME[willgittoes-dd], ensure this elsewhere
+      headers.push_back(propagation_headers[style].sampling_priority_header);
+    }
+  }
+  return headers;
+}
+
 OptionalSamplingPriority asSamplingPriority(int i) {
   if (i < static_cast<int>(SamplingPriority::MinimumValue) ||
       i > static_cast<int>(SamplingPriority::MaximumValue)) {
@@ -192,8 +205,8 @@ SpanContext SpanContext::withId(uint64_t id) const {
 }
 
 ot::expected<void> SpanContext::serialize(std::ostream &writer,
-                                          const std::shared_ptr<SpanBuffer> pending_traces) const
-    try {
+                                          const std::shared_ptr<SpanBuffer> pending_traces,
+                                          bool prioritySamplingEnabled) const try {
   // check ostream state
   if (!writer.good()) {
     return ot::make_unexpected(std::make_error_code(std::errc::io_error));
@@ -204,7 +217,7 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
   j[json_trace_id_key] = std::to_string(trace_id_);
   j[json_parent_id_key] = std::to_string(id_);
   OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
-  if (sampling_priority != nullptr) {
+  if (sampling_priority != nullptr && prioritySamplingEnabled) {
     j[json_sampling_priority_key] = static_cast<int>(*sampling_priority);
   }
   j[json_baggage_key] = baggage_;
@@ -222,10 +235,12 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
                                           const std::shared_ptr<SpanBuffer> pending_traces,
-                                          std::set<PropagationStyle> styles) const try {
+                                          std::set<PropagationStyle> styles,
+                                          bool prioritySamplingEnabled) const try {
   ot::expected<void> result;
   for (PropagationStyle style : styles) {
-    result = serialize(writer, pending_traces, propagation_headers[style]);
+    result =
+        serialize(writer, pending_traces, propagation_headers[style], prioritySamplingEnabled);
     if (!result) {
       return result;
     }
@@ -237,7 +252,8 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
                                           const std::shared_ptr<SpanBuffer> pending_traces,
-                                          const HeadersImpl &headers_impl) const {
+                                          const HeadersImpl &headers_impl,
+                                          bool prioritySamplingEnabled) const {
   std::lock_guard<std::mutex> lock{mutex_};
   auto result = writer.Set(headers_impl.trace_id_header, headers_impl.encode_id(trace_id_));
   if (!result) {
@@ -248,18 +264,20 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
     return result;
   }
 
-  OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
-  if (sampling_priority != nullptr) {
-    result = writer.Set(headers_impl.sampling_priority_header,
-                        headers_impl.encode_sampling_priority(*sampling_priority));
-    if (!result) {
-      return result;
-    }
-  } else if (nginx_opentracing_compatibility_hack_) {
-    // See the comment in the header file on nginx_opentracing_compatibility_hack_.
-    result = writer.Set(headers_impl.sampling_priority_header, "1");
-    if (!result) {
-      return result;
+  if (prioritySamplingEnabled) {
+    OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
+    if (sampling_priority != nullptr) {
+      result = writer.Set(headers_impl.sampling_priority_header,
+                          headers_impl.encode_sampling_priority(*sampling_priority));
+      if (!result) {
+        return result;
+      }
+    } else if (nginx_opentracing_compatibility_hack_) {
+      // See the comment in the header file on nginx_opentracing_compatibility_hack_.
+      result = writer.Set(headers_impl.sampling_priority_header, "1");
+      if (!result) {
+        return result;
+      }
     }
   }
 

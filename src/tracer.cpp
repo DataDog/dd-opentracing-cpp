@@ -109,7 +109,7 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc, std::ostream &write
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_);
+  return span_context->serialize(writer, buffer_, opts_.priority_sampling);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
@@ -118,7 +118,7 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject);
+  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
@@ -127,7 +127,7 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject);
+  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &reader) const {

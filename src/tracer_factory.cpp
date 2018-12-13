@@ -29,28 +29,8 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(json styles) {
 }
 }  // namespace
 
-// Accepts configuration in JSON format, with the following keys:
-// "service": Required. A string, the name of the service.
-// "agent_host": A string, defaults to localhost.
-// "agent_port": A number, defaults to 8126.
-// "type": A string, defaults to web.
-// "environment": A string, defaults to "". The environment this trace belongs to.
-//     eg. "" (env:none), "staging", "prod"
-// "sample_rate": A double, defaults to 1.0.
-// "dd.priority.sampling": A boolean, true by default. If true disables client-side sampling (thus
-//     ignoring sample_rate) and enables distributed priority sampling, where traces are sampled
-//     based on a combination of user-assigned priorities and configuration from the agent.
-// "operation_name_override": A string, if not empty it overrides the operation name (and the
-//     overridden operation name is recorded in the tag "operation").
-// "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
-//     to ["Datadog", "B3"]. The type of headers to use to propagate distributed traces.
-// "propagation_style_inject": A list of strings, each string is one of "Datadog", "B3". Defaults
-//     to ["Datadog"]. The type of headers to use to receive distributed traces.
-//
-// Extra keys will be ignored.
-template <class TracerImpl>
-ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
-    const char *configuration, std::string &error_message) const noexcept try {
+ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
+                                              std::string &error_message) {
   TracerOptions options{"localhost", 8126, "", "web", "", 1.0};
   json config;
   try {
@@ -130,6 +110,36 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
       return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
     }
   }
+  return options;
+}
+
+// Accepts configuration in JSON format, with the following keys:
+// "service": Required. A string, the name of the service.
+// "agent_host": A string, defaults to localhost.
+// "agent_port": A number, defaults to 8126.
+// "type": A string, defaults to web.
+// "environment": A string, defaults to "". The environment this trace belongs to.
+//     eg. "" (env:none), "staging", "prod"
+// "sample_rate": A double, defaults to 1.0.
+// "dd.priority.sampling": A boolean, true by default. If true disables client-side sampling (thus
+//     ignoring sample_rate) and enables distributed priority sampling, where traces are sampled
+//     based on a combination of user-assigned priorities and configuration from the agent.
+// "operation_name_override": A string, if not empty it overrides the operation name (and the
+//     overridden operation name is recorded in the tag "operation").
+// "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
+//     to ["Datadog", "B3"]. The type of headers to use to propagate distributed traces.
+// "propagation_style_inject": A list of strings, each string is one of "Datadog", "B3". Defaults
+//     to ["Datadog"]. The type of headers to use to receive distributed traces.
+//
+// Extra keys will be ignored.
+template <class TracerImpl>
+ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
+    const char *configuration, std::string &error_message) const noexcept try {
+  auto maybe_options = optionsFromConfig(configuration, error_message);
+  if (!maybe_options) {
+    return ot::make_unexpected(maybe_options.error());
+  }
+  TracerOptions options = maybe_options.value();
 
   std::shared_ptr<SampleProvider> sampler = sampleProviderFromOptions(options);
   auto writer = std::shared_ptr<Writer>{
