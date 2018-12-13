@@ -197,7 +197,7 @@ static ngx_int_t get_tracer_config(ngx_log_t *log, const std::string &config_fil
   std::ifstream in{config_file};
   if (!in.good()) {
     ngx_log_error(NGX_LOG_ERR, log, errno, "Failed to open tracer configuration file %s",
-                  config_file);
+                  config_file.c_str());
     return NGX_ERROR;
   }
 
@@ -205,7 +205,7 @@ static ngx_int_t get_tracer_config(ngx_log_t *log, const std::string &config_fil
       std::string{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
   if (!in.good()) {
     ngx_log_error(NGX_LOG_ERR, log, errno, "Failed to read tracer configuration file %s",
-                  &config_file);
+                  config_file.c_str());
     return NGX_ERROR;
   }
 

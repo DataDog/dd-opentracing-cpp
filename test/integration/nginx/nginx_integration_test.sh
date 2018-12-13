@@ -178,3 +178,28 @@ then
   echo "Test 4 failed: Unexpected error in nginx logs:"
   cat ${NGINX_ERROR_LOG}
 fi
+
+reset_test
+# Test 5: Ensure that NGINX errors are reported to Datadog
+wiremock --port 8126 >/dev/null 2>&1 &
+# Wait for wiremock to start
+sleep 5
+# Set wiremock to respond to trace requests
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8126/__admin/mappings/new
+# Start a proxied server to receive distributed traces.
+wiremock --port 8080 >/dev/null 2>&1 & sleep 5
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 500, "body": "This is the sad face" }}' http://localhost:8080/__admin/mappings/new
+run_nginx
+
+curl -s localhost/get_error/ 1> /tmp/curl_log.txt
+
+GOT=$(get_n_traces 1)
+ERROR=$(echo $GOT | jq '.[] | .[] | .error')
+
+if ! [ "$ERROR" = "1" ]
+then
+  echo "Error field not set on trace"
+  exit 1
+fi
+
+reset_test
