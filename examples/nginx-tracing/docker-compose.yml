@@ -13,7 +13,7 @@ services:
       - '/proc/:/host/proc/:ro'
       - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
     environment:
-      - 'DD_API_KEY=YOUR_KEY_HERE'
+      - DD_API_KEY
       - 'DD_APM_ENABLED=true'
     image: 'datadog/agent'
     ports:

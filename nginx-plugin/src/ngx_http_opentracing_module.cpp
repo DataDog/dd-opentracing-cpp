@@ -202,14 +202,14 @@ static ngx_int_t opentracing_init_worker(ngx_cycle_t *cycle) noexcept try {
   std::ifstream in{config_file};
   if (!in.good()) {
     ngx_log_error(NGX_LOG_ERR, cycle->log, errno, "Failed to open tracer configuration file %s",
-                  config_file);
+                  config_file.c_str());
     return NGX_ERROR;
   }
 
   std::string tracer_config{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
   if (!in.good()) {
     ngx_log_error(NGX_LOG_ERR, cycle->log, errno, "Failed to read tracer configuration file %s",
-                  &config_file);
+                  config_file.c_str());
     return NGX_ERROR;
   }
 
