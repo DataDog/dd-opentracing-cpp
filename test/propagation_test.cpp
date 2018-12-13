@@ -37,14 +37,19 @@ TEST_CASE("SpanContext") {
   SECTION("can be serialized") {
     REQUIRE(context.serialize(carrier, buffer, propagation_styles, priority_sampling));
 
+    // NGINX tracing harness requires that headers injected into requests are on a whitelist.
     SECTION("headers match the header whitelist") {
       std::set<std::string> headers_got;
       for (auto header : carrier.text_map) {
+        // It's fine to have headers not on the list, so these ot-baggage-xxx headers are safely
+        // ignored. However we still want to test exact equality between whitelist and
+        // headers-we-actually-need.
         if (header.first.find(baggage_prefix) == 0) {
           continue;
         }
         headers_got.insert(header.first);
-      } // This was still less LoC than using std::transformer. Somehow EVEN JAVA gets this right these days...
+      }  // This was still less LoC than using std::transformer. Somehow EVEN JAVA gets this right
+         // these days...
       std::set<std::string> headers_want;
       for (auto header : getPropagationHeaderNames(propagation_styles, priority_sampling)) {
         headers_want.insert(header);
