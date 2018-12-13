@@ -148,8 +148,14 @@ void Span::FinishWithOptions(
   }
   tag = span_->meta.find(datadog_error_tag);
   if (tag != span_->meta.end()) {
-    span_->error = std::stoi(tag->second);
-    span_->meta.erase(tag);
+    // tag->second is the JSON-serialized value of the variadic type given to SetTag. If it's
+    // clearly falsey then set the error flag.
+    if (tag->second == "0" || tag->second == "" || tag->second == "false") {
+      span_->error = 0;
+    } else {
+      span_->error = 1;
+    }
+    // Don't erase the tag, in case it is populated with interesting information.
   }
   // Audit and finish span.
   audit(span_.get());
