@@ -32,10 +32,10 @@ TEST_CASE("SpanContext") {
       GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
                std::set<PropagationStyle>{PropagationStyle::B3},
                std::set<PropagationStyle>{PropagationStyle::Datadog, PropagationStyle::B3});
-  auto distributed_tracing = GENERATE(false, true);
+  auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
-    REQUIRE(context.serialize(carrier, buffer, propagation_styles, distributed_tracing));
+    REQUIRE(context.serialize(carrier, buffer, propagation_styles, priority_sampling));
 
     // header whitelist test here
 
@@ -45,7 +45,7 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      if (distributed_tracing) {
+      if (priority_sampling) {
         auto priority = received_context->getPropagatedSamplingPriority();
         REQUIRE(priority != nullptr);
         REQUIRE(*priority == SamplingPriority::SamplerKeep);
@@ -66,7 +66,7 @@ TEST_CASE("SpanContext") {
           // deserialization sets it.
           MockTextMapCarrier carrier2{};
           REQUIRE(received_context->serialize(carrier2, buffer, propagation_styles,
-                                              distributed_tracing));
+                                              priority_sampling));
           carrier2.Set("more junk", "ayy lmao");
           auto sc2 = SpanContext::deserialize(carrier2, propagation_styles);
           auto received_context2 = dynamic_cast<SpanContext*>(sc2->get());
@@ -79,14 +79,14 @@ TEST_CASE("SpanContext") {
   SECTION("serialise fails") {
     SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
-      auto err = context.serialize(carrier, buffer, propagation_styles, distributed_tracing);
+      auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
 
     SECTION("when setting parent id fails") {
       carrier.set_fails_after = 1;
-      auto err = context.serialize(carrier, buffer, propagation_styles, distributed_tracing);
+      auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
@@ -197,10 +197,10 @@ TEST_CASE("Binary Span Context") {
   SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  auto distributed_tracing = GENERATE(false, true);
+  auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
-    REQUIRE(context.serialize(carrier, buffer, distributed_tracing));
+    REQUIRE(context.serialize(carrier, buffer, priority_sampling));
 
     SECTION("can be deserialized") {
       auto sc = SpanContext::deserialize(carrier);
@@ -208,7 +208,7 @@ TEST_CASE("Binary Span Context") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      if (distributed_tracing) {
+      if (priority_sampling) {
         auto priority = received_context->getPropagatedSamplingPriority();
         REQUIRE(priority != nullptr);
         REQUIRE(*priority == SamplingPriority::SamplerKeep);
@@ -220,7 +220,7 @@ TEST_CASE("Binary Span Context") {
   SECTION("serialise fails") {
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
-      auto err = context.serialize(carrier, buffer, distributed_tracing);
+      auto err = context.serialize(carrier, buffer, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::make_error_code(std::errc::io_error));
       carrier.clear(carrier.goodbit);
