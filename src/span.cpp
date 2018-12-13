@@ -19,7 +19,6 @@ const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
 const std::string http_url_tag = "http.url";
-const std::string datadog_error_tag = "error";
 const std::string operation_name_tag = "operation";
 }  // namespace
 
@@ -146,10 +145,16 @@ void Span::FinishWithOptions(
     span_->service = tag->second;
     span_->meta.erase(tag);
   }
-  tag = span_->meta.find(datadog_error_tag);
+  tag = span_->meta.find(::ot::ext::error);
   if (tag != span_->meta.end()) {
-    span_->error = std::stoi(tag->second);
-    span_->meta.erase(tag);
+    // tag->second is the JSON-serialized value of the variadic type given to SetTag. If it's
+    // clearly falsey then set the error flag.
+    if (tag->second == "0" || tag->second == "" || tag->second == "false") {
+      span_->error = 0;
+    } else {
+      span_->error = 1;
+    }
+    // Don't erase the tag, in case it is populated with interesting information.
   }
   // Audit and finish span.
   audit(span_.get());

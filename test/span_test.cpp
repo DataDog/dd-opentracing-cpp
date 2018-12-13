@@ -196,6 +196,42 @@ TEST_CASE("span") {
     REQUIRE(result->type == "new type");
   }
 
+  SECTION("error tag sets error") {
+    auto span_id = get_id();
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        SpanContext{span_id, span_id, {}},
+              get_time(), "",      "",       "",
+              "",         ""};
+
+    struct ErrorTagTestCase {
+      ot::Value value;
+      uint32_t span_error;
+      std::string span_tag;
+    };
+
+    auto error_tag_test_case = GENERATE(values<ErrorTagTestCase>({
+        {"0", 0, "0"},
+        {0, 0, "0"},
+        {"", 0, ""},
+        {"false", 0, "false"},
+        {false, 0, "false"},
+        {"1", 1, "1"},
+        {1, 1, "1"},
+        {"any random truth-ish string or value lol", 1,
+         "any random truth-ish string or value lol"},
+        {std::vector<ot::Value>{"hi", 420, true}, 1, "[\"hi\",420,true]"},
+        {"true", 1, "true"},
+        {true, 1, "true"},
+    }));
+
+    span.SetTag("error", error_tag_test_case.value);
+    span.FinishWithOptions(finish_options);
+    auto& result = buffer->traces(100).finished_spans->at(0);
+
+    REQUIRE(result->error == error_tag_test_case.span_error);
+    REQUIRE(result->meta["error"] == error_tag_test_case.span_tag);
+  }
+
   SECTION("operation name can be overridden") {
     auto span_id = get_id();
     Span span{nullptr,
