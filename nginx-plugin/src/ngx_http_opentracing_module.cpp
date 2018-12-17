@@ -19,7 +19,9 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <memory>
 #include <utility>
 
 namespace datadog {
@@ -188,45 +190,75 @@ static ngx_http_module_t opentracing_module_ctx = {
 // all-in-one Datadog NGINX tracer.
 //#############################################################################
 
-static ngx_int_t opentracing_init_worker(ngx_cycle_t *cycle) noexcept try {
-  auto main_conf = static_cast<opentracing_main_conf_t *>(
-      ngx_http_cycle_get_module_main_conf(cycle, ngx_http_opentracing_module));
-  if (!main_conf || !main_conf->tracer_conf_file.data) {
-    return NGX_OK;
-  }
-  datadog::opentracing::TracerFactory<datadog::opentracing::Tracer> tracer_factory{};
-
-  // Construct a tracer
+// Loads the contents of the tracer config file into the tracer_config argument.
+static ngx_int_t get_tracer_config(ngx_log_t *log, const std::string &config_file,
+                                   std::string &tracer_config) noexcept try {
   errno = 0;
-  std::string config_file = to_string(main_conf->tracer_conf_file);
   std::ifstream in{config_file};
   if (!in.good()) {
-    ngx_log_error(NGX_LOG_ERR, cycle->log, errno, "Failed to open tracer configuration file %s",
+    ngx_log_error(NGX_LOG_ERR, log, errno, "Failed to open tracer configuration file %s",
                   config_file.c_str());
     return NGX_ERROR;
   }
 
-  std::string tracer_config{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+  tracer_config =
+      std::string{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
   if (!in.good()) {
-    ngx_log_error(NGX_LOG_ERR, cycle->log, errno, "Failed to read tracer configuration file %s",
+    ngx_log_error(NGX_LOG_ERR, log, errno, "Failed to read tracer configuration file %s",
                   config_file.c_str());
     return NGX_ERROR;
+  }
+
+  return NGX_OK;
+} catch (const std::exception &e) {
+  ngx_log_error(NGX_LOG_ERR, log, 0, "failed to get tracer config: %s", e.what());
+  return NGX_ERROR;
+}
+
+static ngx_int_t create_tracer(ngx_log_t *log, const std::string &config_file,
+                               std::shared_ptr<opentracing::v2::Tracer> &tracer) noexcept try {
+  datadog::opentracing::TracerFactory<datadog::opentracing::Tracer> tracer_factory{};
+
+  std::string tracer_config;
+  auto result = get_tracer_config(log, config_file, tracer_config);
+  if (result != NGX_OK) {
+    return result;
   }
 
   std::string error_message;
   auto tracer_maybe = tracer_factory.MakeTracer(tracer_config.c_str(), error_message);
   if (!tracer_maybe) {
     if (!error_message.empty()) {
-      ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "Failed to construct tracer: %s",
-                    error_message.c_str());
+      ngx_log_error(NGX_LOG_ERR, log, 0, "Failed to construct tracer: %s", error_message.c_str());
     } else {
-      ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "Failed to construct tracer: %s",
+      ngx_log_error(NGX_LOG_ERR, log, 0, "Failed to construct tracer: %s",
                     tracer_maybe.error().message().c_str());
     }
     return NGX_ERROR;
   }
 
-  opentracing::Tracer::InitGlobal(std::move(*tracer_maybe));
+  tracer = std::move(tracer_maybe.value());
+  return NGX_OK;
+} catch (const std::exception &e) {
+  ngx_log_error(NGX_LOG_ERR, log, 0, "failed to create tracer: %s", e.what());
+  return NGX_ERROR;
+}
+
+static ngx_int_t opentracing_init_worker(ngx_cycle_t *cycle) noexcept try {
+  auto main_conf = static_cast<opentracing_main_conf_t *>(
+      ngx_http_cycle_get_module_main_conf(cycle, ngx_http_opentracing_module));
+  if (!main_conf || !main_conf->tracer_conf_file.data) {
+    return NGX_OK;
+  }
+  std::string config_file = to_string(main_conf->tracer_conf_file);
+
+  std::shared_ptr<opentracing::v2::Tracer> tracer;
+  ngx_int_t result = create_tracer(cycle->log, config_file, tracer);
+  if (result != NGX_OK) {
+    return result;
+  }
+
+  opentracing::Tracer::InitGlobal(std::move(tracer));
   return NGX_OK;
 } catch (const std::exception &e) {
   ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "failed to initialize tracer: %s", e.what());
@@ -244,18 +276,37 @@ char *configure_tracer(ngx_conf_t *cf, ngx_command_t *command, void *conf) noexc
   main_conf->tracer_library = ngx_string("libdd_opentracing.a");
 
   // In order for span context propagation to work, the keys used by a tracer
-  // need to be known ahead of time.
-  // NGINX-OpenTracing normally uses the heuristic of sending a dummy trace, but we can
-  // explicitly list them instead.
-  main_conf->span_context_keys = ngx_array_create(cf->pool,
-                                                  (sizeof(datadog::opentracing::headerWhitelist) /
-                                                   sizeof(*datadog::opentracing::headerWhitelist)),
-                                                  sizeof(opentracing::string_view));
+  // need to be known ahead of time. We need to load the tracer config options to know what
+  // propagation headers will be used.
+  std::string tracer_config;
+  auto result = get_tracer_config(cf->log, to_string(main_conf->tracer_conf_file), tracer_config);
+  if (result != NGX_OK) {
+    return static_cast<char *>(NGX_CONF_ERROR);
+  }
+  std::string error_message;
+  auto options_maybe =
+      datadog::opentracing::optionsFromConfig(tracer_config.c_str(), error_message);
+  if (!options_maybe) {
+    if (!error_message.empty()) {
+      ngx_log_error(NGX_LOG_ERR, cf->log, 0, "Failed to load tracer config: %s",
+                    error_message.c_str());
+    } else {
+      ngx_log_error(NGX_LOG_ERR, cf->log, 0, "Failed to load tracer config: %s",
+                    options_maybe.error().message().c_str());
+    }
+    return static_cast<char *>(NGX_CONF_ERROR);
+  }
+  datadog::opentracing::TracerOptions opts = options_maybe.value();
+
+  // Loading of tracer config options succeeded, now set the header whitelist.
+  std::vector<opentracing::string_view> headerWhitelist =
+      datadog::opentracing::getPropagationHeaderNames(opts.inject, opts.priority_sampling);
+  main_conf->span_context_keys =
+      ngx_array_create(cf->pool, headerWhitelist.size(), sizeof(opentracing::string_view));
   if (main_conf->span_context_keys == nullptr) {
     throw std::bad_alloc{};
   }
-
-  for (auto key : datadog::opentracing::headerWhitelist) {
+  for (auto key : headerWhitelist) {
     auto element =
         static_cast<opentracing::string_view *>(ngx_array_push(main_conf->span_context_keys));
     *element = key;

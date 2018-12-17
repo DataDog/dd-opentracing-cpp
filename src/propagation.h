@@ -16,9 +16,10 @@ namespace opentracing {
 // interop.
 const ot::string_view baggage_prefix = "ot-baggage-";
 
-constexpr const char *headerWhitelist[6]{
-    "x-datadog-trace-id", "x-datadog-parent-id", "x-datadog-sampling-priority",
-    "X-B3-TraceId",       "X-B3-SpanId",         "X-B3-Sampled"};
+// Returns a list of strings, where each string is a header that will be used for propagating
+// traces.
+std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
+                                                       bool prioritySamplingEnabled);
 
 class SpanBuffer;
 class SampleProvider;
@@ -68,10 +69,12 @@ class SpanContext : public ot::SpanContext {
 
   // Serializes the context into the given writer.
   ot::expected<void> serialize(std::ostream &writer,
-                               const std::shared_ptr<SpanBuffer> pending_traces) const;
+                               const std::shared_ptr<SpanBuffer> pending_traces,
+                               bool prioritySamplingEnabled) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces,
-                               std::set<PropagationStyle> styles) const;
+                               std::set<PropagationStyle> styles,
+                               bool prioritySamplingEnabled) const;
 
   SpanContext withId(uint64_t id) const;
 
@@ -92,7 +95,8 @@ class SpanContext : public ot::SpanContext {
       const ot::TextMapReader &reader, const HeadersImpl &headers_impl);
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces,
-                               const HeadersImpl &headers_impl) const;
+                               const HeadersImpl &headers_impl,
+                               bool prioritySamplingEnabled) const;
 
   // Terrible, terrible hack; to get around:
   // https://github.com/opentracing-contrib/nginx-opentracing/blob/master/opentracing/src/discover_span_context_keys.cpp#L49-L50

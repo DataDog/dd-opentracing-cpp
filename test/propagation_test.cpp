@@ -32,17 +32,29 @@ TEST_CASE("SpanContext") {
       GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
                std::set<PropagationStyle>{PropagationStyle::B3},
                std::set<PropagationStyle>{PropagationStyle::Datadog, PropagationStyle::B3});
+  auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
-    REQUIRE(context.serialize(carrier, buffer, propagation_styles));
-    std::set<std::string> header_whitelist{std::begin(headerWhitelist), std::end(headerWhitelist)};
-    for (const auto& header : carrier.text_map) {
-      if (header.first.find(baggage_prefix) == 0) {
-        continue;
+    REQUIRE(context.serialize(carrier, buffer, propagation_styles, priority_sampling));
+
+    // NGINX tracing harness requires that headers injected into requests are on a whitelist.
+    SECTION("headers match the header whitelist") {
+      std::set<std::string> headers_got;
+      for (auto header : carrier.text_map) {
+        // It's fine to have headers not on the list, so these ot-baggage-xxx headers are safely
+        // ignored. However we still want to test exact equality between whitelist and
+        // headers-we-actually-need.
+        if (header.first.find(baggage_prefix) == 0) {
+          continue;
+        }
+        headers_got.insert(header.first);
+      }  // This was still less LoC than using std::transformer. Somehow EVEN JAVA gets this right
+         // these days...
+      std::set<std::string> headers_want;
+      for (auto header : getPropagationHeaderNames(propagation_styles, priority_sampling)) {
+        headers_want.insert(header);
       }
-      SECTION("header " + header.first + " must be in header whitelist") {
-        REQUIRE(header_whitelist.find(header.first) != header_whitelist.end());
-      }
+      REQUIRE(headers_got == headers_want);
     }
 
     SECTION("can be deserialized") {
@@ -51,9 +63,11 @@ TEST_CASE("SpanContext") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto priority = received_context->getPropagatedSamplingPriority();
-      REQUIRE(priority != nullptr);
-      REQUIRE(*priority == SamplingPriority::SamplerKeep);
+      if (priority_sampling) {
+        auto priority = received_context->getPropagatedSamplingPriority();
+        REQUIRE(priority != nullptr);
+        REQUIRE(*priority == SamplingPriority::SamplerKeep);
+      }
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
 
       SECTION("even with extra keys") {
@@ -69,7 +83,8 @@ TEST_CASE("SpanContext") {
           // Can't compare to original SpanContext 'context', because has_propagated_ is unset and
           // deserialization sets it.
           MockTextMapCarrier carrier2{};
-          REQUIRE(received_context->serialize(carrier2, buffer, propagation_styles));
+          REQUIRE(received_context->serialize(carrier2, buffer, propagation_styles,
+                                              priority_sampling));
           carrier2.Set("more junk", "ayy lmao");
           auto sc2 = SpanContext::deserialize(carrier2, propagation_styles);
           auto received_context2 = dynamic_cast<SpanContext*>(sc2->get());
@@ -82,14 +97,14 @@ TEST_CASE("SpanContext") {
   SECTION("serialise fails") {
     SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
-      auto err = context.serialize(carrier, buffer, propagation_styles);
+      auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
 
     SECTION("when setting parent id fails") {
       carrier.set_fails_after = 1;
-      auto err = context.serialize(carrier, buffer, propagation_styles);
+      auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
@@ -156,7 +171,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
   SpanContext context{420, 123, {}};
 
-  REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}));
+  REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
 
   auto sc = SpanContext::deserialize(carrier, {PropagationStyle::B3});
   auto received_context = dynamic_cast<SpanContext*>(sc->get());
@@ -200,9 +215,10 @@ TEST_CASE("Binary Span Context") {
   SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
-    REQUIRE(context.serialize(carrier, buffer));
+    REQUIRE(context.serialize(carrier, buffer, priority_sampling));
 
     SECTION("can be deserialized") {
       auto sc = SpanContext::deserialize(carrier);
@@ -210,9 +226,11 @@ TEST_CASE("Binary Span Context") {
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
       REQUIRE(received_context->traceId() == 123);
-      auto priority = received_context->getPropagatedSamplingPriority();
-      REQUIRE(priority != nullptr);
-      REQUIRE(*priority == SamplingPriority::SamplerKeep);
+      if (priority_sampling) {
+        auto priority = received_context->getPropagatedSamplingPriority();
+        REQUIRE(priority != nullptr);
+        REQUIRE(*priority == SamplingPriority::SamplerKeep);
+      }
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
     }
   }
@@ -220,7 +238,7 @@ TEST_CASE("Binary Span Context") {
   SECTION("serialise fails") {
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
-      auto err = context.serialize(carrier, buffer);
+      auto err = context.serialize(carrier, buffer, priority_sampling);
       REQUIRE(!err);
       REQUIRE(err.error() == std::make_error_code(std::errc::io_error));
       carrier.clear(carrier.goodbit);

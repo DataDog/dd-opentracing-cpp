@@ -20,6 +20,7 @@ NGINX_CONF_PATH=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--con
 NGINX_CONF=$(cat ${NGINX_CONF_PATH})
 TRACER_CONF_PATH=/etc/dd-config.json
 TRACER_CONF=$(cat ${TRACER_CONF_PATH})
+NGINX_ERROR_LOG=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--error-log-path=\([^ ]*\).*/\1/p')
 
 function run_nginx() {
   eval "nginx -g \"daemon off;\" 1>/tmp/nginx_log.txt &"
@@ -35,6 +36,7 @@ function reset_test() {
   echo ${TRACER_CONF} > ${TRACER_CONF_PATH}
   echo "" > /tmp/curl_log.txt
   echo "" > /tmp/nginx_log.txt
+  echo "" > ${NGINX_ERROR_LOG}
 }
 
 function get_n_traces() {
@@ -108,8 +110,6 @@ fi
 
 reset_test
 # TEST 3: Check that creating a root span doesn't produce an error
-NGINX_ERROR_LOG=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--error-log-path=\([^ ]*\).*/\1/p')
-echo "" > ${NGINX_ERROR_LOG}
 run_nginx
 curl -s localhost?[1-5] 1> /tmp/curl_log.txt
 
@@ -172,6 +172,12 @@ then
   exit 1
 fi
 
+# Check that there were no errors.
+if ! [ "$(cat ${NGINX_ERROR_LOG} | wc -w)" = 0 ]
+then
+  echo "Test 4 failed: Unexpected error in nginx logs:"
+  cat ${NGINX_ERROR_LOG}
+fi
 
 reset_test
 # Test 5: Ensure that NGINX errors are reported to Datadog
