@@ -22,9 +22,11 @@ enum class PropagationStyle {
 };
 
 struct TracerOptions {
-  // Hostname or IP address of the Datadog agent.
+  // Hostname or IP address of the Datadog agent. Can also be set by the environment variable
+  // DD_AGENT_HOST.
   std::string agent_host = "localhost";
-  // Port on which the Datadog agent is running.
+  // Port on which the Datadog agent is running. Can also be set by the environment variable
+  // DD_TRACE_AGENT_PORT
   uint32_t agent_port = 8126;
   // The name of the service being traced.
   // See:
@@ -49,9 +51,11 @@ struct TracerOptions {
   // If not empty, the given string overrides the operation name (and the overridden operation name
   // is recorded in the tag "operation").
   std::string operation_name_override = "";
-  // The style of propagation headers to accept/extract.
+  // The style of propagation headers to accept/extract. Can also be set by the environment
+  // variable DD_PROPAGATION_STYLE_EXTRACT.
   std::set<PropagationStyle> extract{PropagationStyle::Datadog};
-  // The style of propagation headers to emit/inject.
+  // The style of propagation headers to emit/inject. Can also be set by the environment variable
+  // DD_PROPAGATION_STYLE_INJECT.
   std::set<PropagationStyle> inject{PropagationStyle::Datadog};
 };
 
