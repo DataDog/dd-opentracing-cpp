@@ -2,34 +2,29 @@ cc_library(
     name = "dd_opentracing_cpp",
     srcs = [
         "src/clock.h",
+        "src/encoder.cpp",
+        "src/encoder.h",
         "src/noopspan.cpp",
         "src/noopspan.h",
         "src/opentracing_external.cpp",
         "src/propagation.cpp",
         "src/propagation.h",
-        "src/encoder.cpp",
-        "src/encoder.h",
         "src/sample.cpp",
         "src/sample.h",
-        "src/span_buffer.cpp",
-        "src/span_buffer.h",
         "src/span.cpp",
         "src/span.h",
+        "src/span_buffer.cpp",
+        "src/span_buffer.h",
         "src/tracer.cpp",
         "src/tracer.h",
+        "src/tracer_options.cpp",
+        "src/tracer_options.h",
         "src/writer.cpp",
         "src/writer.h",
         ":version_number.h",
     ],
     hdrs = [
         "include/datadog/opentracing.h",
-    ],
-    strip_include_prefix = "include",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//:3rd_party_nlohmann",
-        "@io_opentracing_cpp//:opentracing",
-        "@com_github_msgpack_msgpack_c//:msgpack",
     ],
     copts = [
         "-Wall",
@@ -40,16 +35,23 @@ cc_library(
         "-Wold-style-cast",
         "-std=c++14",
     ],
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:3rd_party_nlohmann",
+        "@com_github_msgpack_msgpack_c//:msgpack",
+        "@io_opentracing_cpp//:opentracing",
+    ],
 )
 
 genrule(
     name = "generate_version_number_h",
     srcs = glob([
-         "CMakeLists.txt",
-         "src/*",
+        "CMakeLists.txt",
+        "src/*",
     ]),
     outs = [
-      "version_number.h"
+        "version_number.h",
     ],
     cmd = """
     TEMP_DIR=$$(mktemp -d)
