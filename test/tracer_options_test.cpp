@@ -13,8 +13,6 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const ch
     REQUIRE(std::string(lhs.error()) == std::string(rhs.error()));
     return;
   }
-  // Did someone add a field to TracerOptions and forget to update this test?
-  REQUIRE(sizeof(TracerOptions) == 200);
   // Compare TracerOptions.
   REQUIRE(lhs->agent_host == rhs->agent_host);
   REQUIRE(lhs->agent_port == rhs->agent_port);
