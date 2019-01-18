@@ -97,7 +97,7 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 // "operation_name_override": A string, if not empty it overrides the operation name (and the
 //     overridden operation name is recorded in the tag "operation").
 // "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
-//     to ["Datadog", "B3"]. The type of headers to use to propagate distributed traces.
+//     to ["Datadog"]. The type of headers to use to propagate distributed traces.
 // "propagation_style_inject": A list of strings, each string is one of "Datadog", "B3". Defaults
 //     to ["Datadog"]. The type of headers to use to receive distributed traces.
 //

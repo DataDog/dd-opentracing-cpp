@@ -50,7 +50,7 @@ struct TracerOptions {
   // is recorded in the tag "operation").
   std::string operation_name_override = "";
   // The style of propagation headers to accept/extract.
-  std::set<PropagationStyle> extract{PropagationStyle::Datadog, PropagationStyle::B3};
+  std::set<PropagationStyle> extract{PropagationStyle::Datadog};
   // The style of propagation headers to emit/inject.
   std::set<PropagationStyle> inject{PropagationStyle::Datadog};
 };
