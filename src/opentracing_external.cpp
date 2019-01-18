@@ -8,6 +8,7 @@
 #include <datadog/opentracing.h>
 #include "sample.h"
 #include "tracer.h"
+#include "tracer_options.h"
 #include "writer.h"
 
 namespace ot = opentracing;
@@ -17,12 +18,21 @@ namespace opentracing {
 
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTracerAndEncoder(
     const TracerOptions &options) {
-  std::shared_ptr<SampleProvider> sampler = sampleProviderFromOptions(options);
+  auto maybe_options = applyTracerOptionsFromEnvironment(options);
+  if (!maybe_options) {
+    std::cerr << "Error applying TracerOptions from environment variables: "
+              << maybe_options.error() << std::endl
+              << "Tracer will be started without options from the environment" << std::endl;
+    maybe_options = options;
+  }
+  TracerOptions opts = maybe_options.value();
+
+  std::shared_ptr<SampleProvider> sampler = sampleProviderFromOptions(opts);
   auto xwriter = std::make_shared<ExternalWriter>(sampler);
   auto encoder = xwriter->encoder();
   std::shared_ptr<Writer> writer = xwriter;
   return std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>>{
-      std::shared_ptr<ot::Tracer>{new Tracer{options, writer, sampler}}, encoder};
+      std::shared_ptr<ot::Tracer>{new Tracer{opts, writer, sampler}}, encoder};
 }
 
 }  // namespace opentracing
