@@ -4,30 +4,12 @@
 #include <nlohmann/json.hpp>
 #include "agent_writer.h"
 #include "tracer.h"
+#include "tracer_options.h"
 
 using json = nlohmann::json;
 
 namespace datadog {
 namespace opentracing {
-
-namespace {
-ot::expected<std::set<PropagationStyle>> asPropagationStyle(json styles) {
-  std::set<PropagationStyle> propagation_styles;
-  for (auto &style : styles) {
-    if (style == "Datadog") {
-      propagation_styles.insert(PropagationStyle::Datadog);
-    } else if (style == "B3") {
-      propagation_styles.insert(PropagationStyle::B3);
-    } else {
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-    }
-  }
-  if (propagation_styles.size() == 0) {
-    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-  }
-  return propagation_styles;
-}
-}  // namespace
 
 ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
                                               std::string &error_message) {
@@ -93,30 +75,20 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
 
-  // Agent host and port environment variables override defaults and config.
-  auto agent_host = std::getenv("DD_AGENT_HOST");
-  if (agent_host != nullptr && std::strlen(agent_host) > 0) {
-    options.agent_host = agent_host;
+  auto maybe_options = applyTracerOptionsFromEnvironment(options);
+  if (!maybe_options) {
+    error_message = maybe_options.error();
+    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
-  auto trace_agent_port = std::getenv("DD_TRACE_AGENT_PORT");
-  if (trace_agent_port != nullptr && std::strlen(trace_agent_port) > 0) {
-    try {
-      options.agent_port = std::stoi(trace_agent_port);
-    } catch (const std::invalid_argument &ia) {
-      error_message = "Value for DD_TRACE_AGENT_PORT is invalid";
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-    } catch (const std::out_of_range &oor) {
-      error_message = "Value for DD_TRACE_AGENT_PORT is out of range";
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-    }
-  }
-  return options;
+  return maybe_options.value();
 }
 
 // Accepts configuration in JSON format, with the following keys:
 // "service": Required. A string, the name of the service.
-// "agent_host": A string, defaults to localhost.
-// "agent_port": A number, defaults to 8126.
+// "agent_host": A string, defaults to localhost. Can also be set by the environment variable
+//     DD_AGENT_HOST
+// "agent_port": A number, defaults to 8126. "type": A string, defaults to web. Can also be set by
+//     the environment variable DD_TRACE_AGENT_PORT
 // "type": A string, defaults to web.
 // "environment": A string, defaults to "". The environment this trace belongs to.
 //     eg. "" (env:none), "staging", "prod"
@@ -127,9 +99,11 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 // "operation_name_override": A string, if not empty it overrides the operation name (and the
 //     overridden operation name is recorded in the tag "operation").
 // "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
-//     to ["Datadog", "B3"]. The type of headers to use to propagate distributed traces.
+//     to ["Datadog"]. The type of headers to use to propagate distributed traces. Can also be set
+//     by the environment variable DD_PROPAGATION_STYLE_EXTRACT.
 // "propagation_style_inject": A list of strings, each string is one of "Datadog", "B3". Defaults
-//     to ["Datadog"]. The type of headers to use to receive distributed traces.
+//     to ["Datadog"]. The type of headers to use to receive distributed traces. Can also be set by
+//     the environment variable DD_PROPAGATION_STYLE_INJECT.
 //
 // Extra keys will be ignored.
 template <class TracerImpl>
