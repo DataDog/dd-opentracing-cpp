@@ -255,7 +255,7 @@ TEST_CASE("span") {
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
-    REQUIRE(result->resource == "overridden operation name");
+    REQUIRE(result->resource == "original resource");
     REQUIRE(result->service == "original service");
     REQUIRE(result->type == "original type");
   }

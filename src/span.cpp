@@ -126,7 +126,6 @@ void Span::FinishWithOptions(
   if (operation_name_override_ != "") {
     span_->meta[operation_name_tag] = span_->name;
     span_->name = operation_name_override_;
-    span_->resource = operation_name_override_;
   }
   // Apply special tags.
   // If we add any more cases; then abstract this. For now, KISS.
