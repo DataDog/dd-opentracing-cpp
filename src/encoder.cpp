@@ -60,7 +60,7 @@ void AgentHttpEncoder::handleResponse(const std::string& response) {
       }
       sampler_->configure(config[priority_sampling_key]);
     } catch (const json::parse_error&) {
-      std::cerr << "Unable to parse response from agent" << std::endl;
+      std::cerr << "Unable to parse response from agent. Response was: " << response << std::endl;
       return;
     }
   }

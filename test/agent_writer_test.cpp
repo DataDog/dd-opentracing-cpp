@@ -93,7 +93,9 @@ TEST_CASE("writer") {
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush(std::chrono::seconds(10));
-    REQUIRE(error_message.str() == "Unable to parse response from agent\n");
+    REQUIRE(error_message.str() ==
+            ("Unable to parse response from agent. Response was: "
+             "// What?! This isn't JSON! Everyone knows real JSON doesn't have comments...\n"));
     std::cerr.rdbuf(stderr);  // Restore stderr.
     REQUIRE(sampler->config == "");
   }
