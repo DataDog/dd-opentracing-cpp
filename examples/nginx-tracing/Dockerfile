@@ -1,8 +1,7 @@
 # Builds and runs a simple nginx server, traced by Datadog
 FROM ubuntu:18.04
 
-ARG NGINX_VERSION=1.14.1
-ARG DATADOG_PLUGIN_VERSION=0.3.7
+ARG NGINX_VERSION=1.14.2
 
 RUN apt-get update && \
   apt-get install -y git gnupg wget tar
@@ -21,7 +20,11 @@ RUN mkdir -p /var/www/
 COPY ./examples/nginx-tracing/index.html /var/www/index.html
 
 # Install Datadog module
-ADD https://github.com/DataDog/dd-opentracing-cpp/releases/download/v${DATADOG_PLUGIN_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
+RUN get_latest_release() { \
+  wget -qO- "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'; \
+  } && \
+  DD_OPENTRACING_CPP_VERSION="$(get_latest_release DataDog/dd-opentracing-cpp)" && \
+  wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/${DD_OPENTRACING_CPP_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
 RUN tar zxf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C /usr/lib/nginx/modules
 
 # Test nginx config.

@@ -24,7 +24,7 @@ This will build and launch
 To interact with these services, a docker container needs to be connected on the network created by docker-compose.
 
 ```sh-session
-$ docker run --net=envoytracing_envoymesh --rm -i -t busybox
+$ docker run --net=envoy-tracing_envoymesh --rm -i -t busybox
 / # wget -q -O- http://front-envoy/service/1
 Hello from behind Envoy (service 1)! hostname: 6060fcea4f2a resolvedhostname: 192.168.16.4
 / # wget -q -O- http://front-envoy/service/2
