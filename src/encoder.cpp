@@ -16,6 +16,8 @@ const std::string header_dd_meta_lang = "Datadog-Meta-Lang";
 const std::string header_dd_meta_lang_version = "Datadog-Meta-Lang-Version";
 const std::string header_dd_meta_tracer_version = "Datadog-Meta-Tracer-Version";
 const std::string header_dd_trace_count = "X-Datadog-Trace-Count";
+
+const size_t RESPONSE_ERROR_REGION_SIZE = 50;
 }  // namespace
 
 AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<SampleProvider> sampler)
@@ -59,8 +61,17 @@ void AgentHttpEncoder::handleResponse(const std::string& response) {
         return;  // No priority sampling info.
       }
       sampler_->configure(config[priority_sampling_key]);
-    } catch (const json::parse_error&) {
-      std::cerr << "Unable to parse response from agent" << std::endl;
+    } catch (const json::parse_error& error) {
+      size_t start = (error.byte > (RESPONSE_ERROR_REGION_SIZE / 2))
+                         ? error.byte - (RESPONSE_ERROR_REGION_SIZE / 2)
+                         : 0;
+      size_t size = std::min(response.length() - start, RESPONSE_ERROR_REGION_SIZE);
+      std::string prefix = (start > 0) ? "..." : "";
+      std::string suffix = ((start + size) < response.length()) ? "..." : "";
+      std::string response_region = response.substr(start, size);
+      std::cerr << "Unable to parse response from agent." << std::endl
+                << "Error was: " << error.what() << std::endl
+                << "Error near: " << prefix << response_region << suffix << std::endl;
       return;
     }
   }
