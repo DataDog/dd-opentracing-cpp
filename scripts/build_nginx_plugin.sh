@@ -8,7 +8,7 @@ set -eo pipefail
 #     make && make install
 #     popd
 
-NGINX_VERSION=${NGINX_VERSION:-1.14.1}
+NGINX_VERSION=${NGINX_VERSION:-1.14.2}
 BUILD_DIR=${BUILD_DIR:-/tmp/build/}
 
 rm -rf .nginx-build

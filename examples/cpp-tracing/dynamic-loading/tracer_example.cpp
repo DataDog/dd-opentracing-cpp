@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
       "/usr/local/lib/libdd_opentracing_plugin.so", error_message);
   if (!handle_maybe) {
     std::cerr << "Failed to load tracer library " << error_message << "\n";
-    return false;
+    return 1;
   }
 
   // Read in the tracer's configuration.
@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
   auto tracer_maybe = tracer_factory.MakeTracer(tracer_config.c_str(), error_message);
   if (!tracer_maybe) {
     std::cerr << "Failed to create tracer " << error_message << "\n";
-    return false;
+    return 1;
   }
   auto& tracer = *tracer_maybe;
 
