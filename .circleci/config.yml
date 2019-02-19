@@ -10,9 +10,6 @@ jobs:
     <<: *defaults
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      # If BUILD_ALL_NGINX_VERSIONS is set, builds all NGINX versions. Otherwise, builds just the first
-      # version to use it for integration testing.
-      NGINX_VERSIONS: 1.14.2 1.12.2 1.15.8
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
       LDFLAGS: -fPIC
@@ -31,9 +28,6 @@ jobs:
               fi
             done
       - run:
-          name: Init submodules
-          command: git submodule update --init --recursive
-      - run:
           name: Build source dependencies
           command: |
             ./scripts/install_dependencies.sh
@@ -49,17 +43,6 @@ jobs:
             make install
             cp libdd_opentracing_plugin.so /tmp/build/libdd_opentracing_plugin.so
             cp libdd_opentracing.so /tmp/build/libdd_opentracing.so
-      - run:
-          name: Build NGINX plugins
-          command: |
-            for V in $NGINX_VERSIONS
-            do
-              NGINX_VERSION="$V" BUILD_DIR=/tmp/build/ ./scripts/build_nginx_plugin.sh
-              if ! [ "$BUILD_ALL_NGINX_VERSIONS" ]
-              then
-                break # Only build the first version, for integration testing.
-              fi
-            done
       - run:
           name: Build (with bazel)
           command: |
@@ -108,7 +91,8 @@ jobs:
     docker:
       - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_0
     environment:
-      NGINX_VERSION: 1.14.2
+      NGINX_VERSION: 1.14.0
+      OPENTRACING_NGINX_VERSION: 0.8.0
     steps:
       - checkout
       - attach_workspace:
@@ -126,9 +110,12 @@ jobs:
       - run:
           name: Integration test
           command: |
-            # Install the Datadog plugin
+            # Install OpenTracing module
+            wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${OPENTRACING_NGINX_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
             NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
-            tar zxvf ./build/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
+            tar zxvf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
+            # Install the Datadog plugin
+            cp ./build/libdd_opentracing_plugin.so "/usr/local/lib/libdd_opentracing_plugin.so"
             # Change the config to use it.
             cd ./test/integration/nginx/
             NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')

@@ -1,6 +1,7 @@
 # Creates an image with nginx and the Datadog OpenTracing nginx module installed.
 # Runs a simple integration test.
-ARG NGINX_VERSION=1.14.2
+ARG NGINX_VERSION=1.14.0
+ARG OPENTRACING_NGINX_VERSION=0.8.0
 
 # The nginx testbed. Build this image first since we don't want it rebuilt if just the code changes.
 FROM ubuntu:18.04 as nginx-testbed
@@ -23,6 +24,12 @@ RUN CODENAME=$(lsb_release -s -c) && \
   echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
   apt-get update && \
   apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
+
+# Install nginx-opentracing
+ARG OPENTRACING_NGINX_VERSION
+RUN wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${OPENTRACING_NGINX_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz && \
+  NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p') && \
+  tar zxvf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
 
 # Build the Datadog nginx module.
 FROM ubuntu:18.04 as build
@@ -47,21 +54,16 @@ COPY ./CMakeLists.txt ./dd-opentracing-cpp/CMakeLists.txt
 RUN rm -rf dd-opentracing-cpp/.build
 RUN mkdir -p dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
-RUN cmake -DBUILD_STATIC=ON -DBUILD_TESTING=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+RUN cmake -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_TESTING=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 RUN make
 RUN make install
 WORKDIR ..
-
-COPY ./nginx-plugin ./nginx-plugin
-ARG NGINX_VERSION
-RUN BUILD_DIR=/tmp ./scripts/build_nginx_plugin.sh
 
 # Build the final testbed.
 FROM nginx-testbed
 
 # Install Datadog OpenTracing
-COPY --from=build /tmp/linux-amd64-nginx-*-ngx_http_module.so.tgz  /tmp
-RUN tar zxvf /tmp/linux-amd64-nginx-*-ngx_http_module.so.tgz -C /etc/nginx/modules/
+COPY --from=build /root/dd-opentracing-cpp/.build/libdd_opentracing_plugin.so /usr/local/lib/libdd_opentracing_plugin.so
 
 # Add OpenTracing directives to nginx config
 COPY ./test/integration/nginx/nginx.conf /tmp/nginx.conf
