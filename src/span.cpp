@@ -18,7 +18,6 @@ namespace {
 const std::string datadog_span_type_tag = "span.type";
 const std::string datadog_resource_name_tag = "resource.name";
 const std::string datadog_service_name_tag = "service.name";
-const std::string http_url_tag = "http.url";
 const std::string operation_name_tag = "operation";
 }  // namespace
 
@@ -106,7 +105,7 @@ std::regex &PATH_MIXED_ALPHANUMERICS() {
 // If you want to add any more steps to this function, we should use a more
 // sophisticated architecture. For now, YAGNI.
 void audit(SpanData *span) {
-  auto http_tag = span->meta.find(http_url_tag);
+  auto http_tag = span->meta.find(ot::ext::http_url);
   if (http_tag != span->meta.end()) {
     http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
   }

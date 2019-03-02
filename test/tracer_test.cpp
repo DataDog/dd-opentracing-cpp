@@ -50,7 +50,7 @@ TEST_CASE("tracer") {
 
   SECTION("span context is propagated") {
     MockTextMapCarrier carrier;
-    SpanContext context{420, 69, {{"ayy", "lmao"}, {"hi", "haha"}}};
+    SpanContext context{420, 69, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     auto success = tracer->Inject(context, carrier);
     REQUIRE(success);
     auto span_context_maybe = tracer->Extract(carrier);

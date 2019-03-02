@@ -9,6 +9,7 @@ namespace opentracing {
 
 namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
+const std::string datadog_origin_tag = "_dd.origin";
 }  // namespace
 
 void PendingTrace::finish() {
@@ -25,6 +26,9 @@ void PendingTrace::finish() {
           /* local root span of a distributed trace */
           all_spans.find(span->parent_id) == all_spans.end()) {
         span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
+        if (!origin.empty()) {
+          span->meta[datadog_origin_tag] = origin;
+        }
         break;
       }
     }
@@ -37,12 +41,15 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   uint64_t trace_id = context.traceId();
   auto trace = traces_.find(trace_id);
-  if (trace == traces_.end()) {
+  if (trace == traces_.end() || trace->second.all_spans.empty()) {
     traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
     trace = traces_.find(trace_id);
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
     trace->second.sampling_priority_locked = p != nullptr;
     trace->second.sampling_priority = std::move(p);
+    if (!context.origin().empty()) {
+      trace->second.origin = context.origin();
+    }
   }
   trace->second.all_spans.insert(context.id());
 }

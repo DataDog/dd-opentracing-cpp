@@ -48,7 +48,7 @@ OptionalSamplingPriority asSamplingPriority(int i);
 
 class SpanContext : public ot::SpanContext {
  public:
-  SpanContext(uint64_t id, uint64_t trace_id,
+  SpanContext(uint64_t id, uint64_t trace_id, std::string origin,
               std::unordered_map<std::string, std::string> &&baggage);
 
   // Enables a hack, see the comment below on nginx_opentracing_compatibility_hack_.
@@ -89,6 +89,8 @@ class SpanContext : public ot::SpanContext {
   // nullptr, in which case either there has been no propagation or the up-stream tracer did not
   // set a sampling priority.
   OptionalSamplingPriority getPropagatedSamplingPriority() const;
+  // Returns the propagated "origin". It returns an empty string if no origin was provided.
+  const std::string origin() const;
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -120,6 +122,7 @@ class SpanContext : public ot::SpanContext {
 
   uint64_t id_;
   uint64_t trace_id_;
+  std::string origin_;
 
   mutable std::mutex mutex_;
   std::unordered_map<std::string, std::string> baggage_;

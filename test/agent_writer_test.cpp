@@ -245,7 +245,7 @@ TEST_CASE("writer") {
   SECTION("writes happen periodically") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
-    auto write_interval = std::chrono::seconds(2);
+    auto write_interval = std::chrono::milliseconds(200);
     AgentWriter writer{std::move(handle_ptr),
                        write_interval,
                        max_queued_traces,
@@ -260,7 +260,7 @@ TEST_CASE("writer") {
       for (uint64_t i = 1; i <= 7; i++) {
         writer.write(make_trace(
             {TestSpanData{"web", "service", "resource", "service.name", i, 1, 0, 69, 420, 0}}));
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
     });
     // Wait until data is written.
@@ -282,8 +282,8 @@ TEST_CASE("writer") {
   SECTION("failed agent comms") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     MockHandle* handle = handle_ptr.get();
-    std::vector<std::chrono::milliseconds> retry_periods{std::chrono::milliseconds(500),
-                                                         std::chrono::milliseconds(2500)};
+    std::vector<std::chrono::milliseconds> retry_periods{std::chrono::milliseconds(50),
+                                                         std::chrono::milliseconds(99)};
     AgentWriter writer{std::move(handle_ptr),
                        only_send_traces_when_we_flush,
                        max_queued_traces,
