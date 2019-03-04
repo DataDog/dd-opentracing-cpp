@@ -89,7 +89,7 @@ jobs:
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
     docker:
-      - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_0
+      - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_1
     environment:
       NGINX_VERSION: 1.14.0
       OPENTRACING_NGINX_VERSION: 0.8.0

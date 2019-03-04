@@ -7,7 +7,7 @@ ARG OPENTRACING_NGINX_VERSION=0.8.0
 FROM ubuntu:18.04 as nginx-testbed
 
 RUN apt-get update && \
-  apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq
+  apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq iproute2
 
 # Get Wiremock
 RUN wget http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar -O wiremock-standalone-2.18.0.jar
@@ -73,6 +73,7 @@ COPY ./test/integration/nginx/dd-config.json /etc/dd-config.json
 RUN mkdir -p /var/www/
 COPY ./test/integration/nginx/index.html /var/www/index.html
 
-COPY ./test/integration/nginx/nginx_integration_test.sh ./nginx_integration_test.sh
-COPY ./test/integration/nginx/expected.json ./expected.json
-CMD [ "./nginx_integration_test.sh"]
+COPY ./test/integration/nginx/nginx_integration_test.sh ./
+COPY ./test/integration/nginx/expected_*.json ./
+RUN go get github.com/jakm/msgpack-cli
+CMD [ "bash", "-x", "./nginx_integration_test.sh"]
