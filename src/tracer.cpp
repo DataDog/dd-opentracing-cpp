@@ -59,7 +59,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   // Get a new span id.
   auto span_id = get_id_();
 
-  SpanContext span_context = SpanContext{span_id, span_id, {}};
+  SpanContext span_context = SpanContext{span_id, span_id, "", {}};
   // See the comment in propagation.h on nginx_opentracing_compatibility_hack_.
   if (operation_name == "dummySpan") {
     span_context = SpanContext::NginxOpenTracingCompatibilityHackSpanContext(span_id, span_id, {});

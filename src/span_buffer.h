@@ -26,6 +26,7 @@ struct PendingTrace {
   std::unordered_set<uint64_t> all_spans;
   OptionalSamplingPriority sampling_priority;
   bool sampling_priority_locked = false;
+  std::string origin;
 };
 
 // Keeps track of Spans until there is a complete trace.

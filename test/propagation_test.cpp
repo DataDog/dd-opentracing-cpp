@@ -26,7 +26,7 @@ TEST_CASE("SpanContext") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
       GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
@@ -116,21 +116,26 @@ TEST_CASE("deserialise fails") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
     std::set<PropagationStyle> styles;
     std::string x_datadog_trace_id;
     std::string x_datadog_parent_id;
     std::string x_datadog_sampling_priority;
+    std::string x_datadog_origin;
   };
 
-  auto test_case = GENERATE(values<PropagationStyleTestCase>(
-      {{{PropagationStyle::Datadog},
-        "x-datadog-trace-id",
-        "x-datadog-parent-id",
-        "x-datadog-sampling-priority"},
-       {{PropagationStyle::B3}, "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled"}}));
+  auto test_case = GENERATE(values<PropagationStyleTestCase>({{{PropagationStyle::Datadog},
+                                                               "x-datadog-trace-id",
+                                                               "x-datadog-parent-id",
+                                                               "x-datadog-sampling-priority",
+                                                               "x-datadog-origin"},
+                                                              {{PropagationStyle::B3},
+                                                               "X-B3-TraceId",
+                                                               "X-B3-SpanId",
+                                                               "X-B3-Sampled",
+                                                               "x-datadog-origin"}}));
 
   SECTION("when there are missing keys") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
@@ -156,6 +161,15 @@ TEST_CASE("deserialise fails") {
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
+
+  SECTION("when origin provided without sampling priority") {
+    carrier.Set(test_case.x_datadog_trace_id, "123");
+    carrier.Set(test_case.x_datadog_parent_id, "456");
+    carrier.Set(test_case.x_datadog_origin, "madeuporigin");
+    auto err = SpanContext::deserialize(carrier, test_case.styles);
+    REQUIRE(!err);
+    REQUIRE(err.error() == ot::span_context_corrupted_error);
+  }
 }
 
 TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
@@ -169,7 +183,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
-  SpanContext context{420, 123, {}};
+  SpanContext context{420, 123, "", {}};
 
   REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
 
@@ -212,12 +226,12 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
 TEST_CASE("Binary Span Context") {
   std::stringstream carrier{};
   auto buffer = std::make_shared<MockBuffer>();
-  SpanContext context{420, 123, {{"ayy", "lmao"}, {"hi", "haha"}}};
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
+    SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     REQUIRE(context.serialize(carrier, buffer, priority_sampling));
 
     SECTION("can be deserialized") {
@@ -231,11 +245,13 @@ TEST_CASE("Binary Span Context") {
         REQUIRE(priority != nullptr);
         REQUIRE(*priority == SamplingPriority::SamplerKeep);
       }
+
       REQUIRE(getBaggage(received_context) == dict{{"ayy", "lmao"}, {"hi", "haha"}});
     }
   }
 
   SECTION("serialise fails") {
+    SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
       auto err = context.serialize(carrier, buffer, priority_sampling);
@@ -262,6 +278,13 @@ TEST_CASE("Binary Span Context") {
 
     SECTION("when the sampling priority is whack") {
       carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
+      auto err = SpanContext::deserialize(carrier);
+      REQUIRE(!err);
+      REQUIRE(err.error() == ot::span_context_corrupted_error);
+    }
+
+    SECTION("when sampling priority is missing but origin is set") {
+      carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"origin\": \"synthetics\" }";
       auto err = SpanContext::deserialize(carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
@@ -481,5 +504,71 @@ TEST_CASE("sampling behaviour") {
     REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
+  }
+}
+
+TEST_CASE("origin header propagation") {
+  auto sampler = std::make_shared<MockSampler>();
+  auto buffer = std::make_shared<MockBuffer>();
+  buffer->traces()[123].sampling_priority =
+      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  SpanContext context{420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
+
+  std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId, sampler}};
+  ot::Tracer::InitGlobal(tracer);
+
+  SECTION("the origin header is injected") {
+    MockTextMapCarrier carrier;
+    auto ok = tracer->Inject(context, carrier);
+
+    REQUIRE(ok);
+    REQUIRE(carrier.text_map["x-datadog-origin"] == "madeuporigin");
+  }
+
+  SECTION("the propagated origin header can be extracted") {
+    std::stringstream carrier;
+    auto ok = tracer->Inject(context, carrier);
+    REQUIRE(ok);
+
+    auto span_context_maybe = tracer->Extract(carrier);
+    REQUIRE(span_context_maybe);
+
+    // A child span inherits the origin from the parent.
+    auto span = tracer->StartSpan("child", {ChildOf(span_context_maybe->get())});
+
+    MockTextMapCarrier tmc;
+    ok = tracer->Inject(span->context(), tmc);
+    REQUIRE(ok);
+    REQUIRE(tmc.text_map["x-datadog-origin"] == "madeuporigin");
+
+    span->Finish();
+  }
+
+  SECTION("the local root span is tagged with _dd.origin") {
+    std::stringstream carrier;
+    auto ok = tracer->Inject(context, carrier);
+    REQUIRE(ok);
+
+    auto span_context_maybe = tracer->Extract(carrier);
+    REQUIRE(span_context_maybe);
+
+    // A child span inherits the origin from the parent.
+    auto spanA = tracer->StartSpan("toplevel", {ChildOf(span_context_maybe->get())});
+    auto spanB = tracer->StartSpan("midlevel", {ChildOf(&spanA->context())});
+    auto spanC = tracer->StartSpan("bottomlevel", {ChildOf(&spanB->context())});
+    spanC->Finish();
+    spanB->Finish();
+    spanA->Finish();
+
+    auto& spans = buffer->traces(123).finished_spans;
+    REQUIRE(spans->size() == 3);
+    // The local root span should have the tag
+    auto& meta = spans->at(2)->meta;
+    REQUIRE(meta["_dd.origin"] == "madeuporigin");
+    // The other spans should not have the tag
+    meta = spans->at(0)->meta;
+    REQUIRE(meta.find("_dd.origin") == meta.end());
+    meta = spans->at(1)->meta;
+    REQUIRE(meta.find("_dd.origin") == meta.end());
   }
 }

@@ -1,0 +1,23 @@
+[
+  [
+    {
+      "error": 0,
+      "meta": {
+        "_dd.origin": "synthetics",
+        "component": "nginx",
+        "http.method": "GET",
+        "http.status_code": "200",
+        "http.status_line": "200 OK",
+        "http.url": "http://localhost/proxy/?",
+        "operation": "GET /proxy/"
+      },
+      "metrics": {
+        "_sampling_priority_v1": 1
+      },
+      "name": "nginx.handle",
+      "resource": "/proxy/",
+      "service": "nginx",
+      "type": "web"
+    }
+  ]
+]

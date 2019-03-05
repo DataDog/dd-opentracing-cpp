@@ -13,7 +13,7 @@ TEST_CASE("span buffer") {
   auto buffer = std::make_shared<WritingSpanBuffer>(writer_ptr);
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
-    return SpanContext{span.span_id, span.trace_id, {}};
+    return SpanContext{span.span_id, span.trace_id, "", {}};
   };
 
   SECTION("can write a single-span trace") {
