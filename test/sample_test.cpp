@@ -223,7 +223,6 @@ TEST_CASE("priority sampler \"integration\" test") {
     REQUIRE(traces->size() == total);
     for (const auto &trace : *traces) {
       REQUIRE(trace.size() == 1);
-      std::cout << json(trace[0].metrics).dump() << std::endl;
       REQUIRE(trace[0].metrics.find("_sampling_priority_v1") != trace[0].metrics.end());
       OptionalSamplingPriority p =
           asSamplingPriority(trace[0].metrics.find("_sampling_priority_v1")->second);

@@ -54,7 +54,7 @@ constexpr struct {
   HeadersImpl b3{"X-B3-TraceId",
                  "X-B3-SpanId",
                  "X-B3-Sampled",
-                 "x-datadog-origin",
+                 nullptr,
                  16,
                  asHex,
                  clampB3SamplingPriorityValue};
@@ -94,15 +94,18 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 
 }  // namespace
 
-std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
+std::vector<ot::string_view> getPropagationHeaderNames(const std::vector<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled) {
   std::vector<ot::string_view> headers;
   for (auto &style : styles) {
-    headers.push_back(propagation_headers[style].trace_id_header);
-    headers.push_back(propagation_headers[style].span_id_header);
+    auto &prop_headers = propagation_headers[style];
+    headers.push_back(prop_headers.trace_id_header);
+    headers.push_back(prop_headers.span_id_header);
     if (prioritySamplingEnabled) {  // FIXME[willgittoes-dd], ensure this elsewhere
-      headers.push_back(propagation_headers[style].sampling_priority_header);
-      headers.push_back(propagation_headers[style].origin_header);
+      headers.push_back(prop_headers.sampling_priority_header);
+      if (prop_headers.origin_header != nullptr) {
+        headers.push_back(prop_headers.origin_header);
+      }
     }
   }
   return headers;
@@ -255,7 +258,7 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
                                           const std::shared_ptr<SpanBuffer> pending_traces,
-                                          std::set<PropagationStyle> styles,
+                                          std::vector<PropagationStyle> styles,
                                           bool prioritySamplingEnabled) const try {
   ot::expected<void> result;
   for (PropagationStyle style : styles) {
@@ -292,7 +295,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
       if (!result) {
         return result;
       }
-      if (!origin_.empty()) {
+      if (headers_impl.origin_header != nullptr && !origin_.empty()) {
         result = writer.Set(headers_impl.origin_header, origin_);
         if (!result) {
           return result;
@@ -384,24 +387,20 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
-    const ot::TextMapReader &reader, std::set<PropagationStyle> styles) try {
-  std::unique_ptr<ot::SpanContext> context = nullptr;
+    const ot::TextMapReader &reader, std::vector<PropagationStyle> styles) try {
+  if (styles.size() == 1) {
+    return SpanContext::deserialize(reader, propagation_headers[*styles.begin()]);
+  }
   for (PropagationStyle style : styles) {
     auto result = SpanContext::deserialize(reader, propagation_headers[style]);
     if (!result) {
-      return ot::make_unexpected(result.error());
+      continue;
     }
     if (result.value() != nullptr) {
-      if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
-                                    *dynamic_cast<SpanContext *>(context.get())) {
-        std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
-                  << std::endl;
-        return ot::make_unexpected(ot::span_context_corrupted_error);
-      }
-      context = std::move(result.value());
+      return std::move(result.value());
     }
   }
-  return context;
+  return ot::make_unexpected(ot::invalid_span_context_error);
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
@@ -463,6 +462,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     // Origin header should only be set if sampling priority is also set.
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
+
   auto context = std::make_unique<SpanContext>(parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));

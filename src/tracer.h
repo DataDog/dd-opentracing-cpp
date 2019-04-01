@@ -67,6 +67,8 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
 
  private:
   const TracerOptions opts_;
+  std::vector<PropagationStyle> injectors_;
+  std::vector<PropagationStyle> extractors_;
   // Keeps finished spans until their entire trace is finished.
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;

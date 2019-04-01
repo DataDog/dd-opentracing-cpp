@@ -39,18 +39,76 @@ uint64_t getId() {
   return distribution(TlsRandomNumberGenerator::generator());
 }
 
+namespace {
+
+const char *datadog_prop_style_inject = "DD_PROPAGATION_STYLE_INJECT";
+const char *datadog_prop_style_extract = "DD_PROPAGATION_STYLE_EXTRACT";
+
+std::vector<PropagationStyle> getPropagatorsFromEnv(const char *env_var) {
+  auto styles = std::getenv(env_var);
+  if (styles == nullptr || std::strlen(styles) > 0) {
+    return {};
+  }
+  // Treat value as comma-separated tokens.
+  std::vector<std::string> tokens;
+  std::string token;
+  std::istringstream ss(styles);
+  while (std::getline(ss, token, ',')) {
+    // Convert to lowercase.
+    std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+    tokens.push_back(token);
+  }
+  std::vector<PropagationStyle> propagation_styles;
+  for (const std::string &v : tokens) {
+    if (v == "datadog") {
+      propagation_styles.push_back(PropagationStyle::Datadog);
+    } else if (v == "b3") {
+      propagation_styles.push_back(PropagationStyle::B3);
+    } else {
+      // Silently ignore unexpected values.
+    }
+  }
+  return propagation_styles;
+}
+}  // namespace
+
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
     : opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
-      sampler_(sampler) {}
+      sampler_(sampler) {
+  auto injectStyles = getPropagatorsFromEnv(datadog_prop_style_inject);
+  if (!injectStyles.empty()) {
+    injectors_ = injectStyles;
+  } else {
+    injectors_.assign(opts_.inject.begin(), opts_.inject.end());
+  }
+  auto extractStyles = getPropagatorsFromEnv(datadog_prop_style_extract);
+  if (!extractStyles.empty()) {
+    extractors_ = extractStyles;
+  } else {
+    extractors_.assign(opts_.extract.begin(), opts_.extract.end());
+  }
+}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
     : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
   buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{writer}};
+  auto injectStyles = getPropagatorsFromEnv(datadog_prop_style_inject);
+  if (!injectStyles.empty()) {
+    injectors_ = injectStyles;
+  } else {
+    injectors_.assign(opts_.inject.begin(), opts_.inject.end());
+  }
+  auto extractStyles = getPropagatorsFromEnv(datadog_prop_style_extract);
+  if (!extractStyles.empty()) {
+    extractors_ = extractStyles;
+  } else {
+    extractors_.assign(opts_.extract.begin(), opts_.extract.end());
+  }
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -118,7 +176,7 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
+  return span_context->serialize(writer, buffer_, injectors_, opts_.priority_sampling);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
@@ -127,7 +185,7 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
+  return span_context->serialize(writer, buffer_, injectors_, opts_.priority_sampling);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &reader) const {
@@ -136,12 +194,12 @@ ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &rea
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::TextMapReader &reader) const {
-  return SpanContext::deserialize(reader, opts_.extract);
+  return SpanContext::deserialize(reader, extractors_);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::HTTPHeadersReader &reader) const {
-  return SpanContext::deserialize(reader, opts_.extract);
+  return SpanContext::deserialize(reader, extractors_);
 }
 
 void Tracer::Close() noexcept { buffer_->flush(std::chrono::seconds(5)); }

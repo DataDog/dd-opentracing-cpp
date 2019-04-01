@@ -4,8 +4,8 @@
 #include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
 #include <mutex>
-#include <set>
 #include <unordered_map>
+#include <vector>
 
 namespace ot = opentracing;
 
@@ -18,7 +18,7 @@ const ot::string_view baggage_prefix = "ot-baggage-";
 
 // Returns a list of strings, where each string is a header that will be used for propagating
 // traces.
-std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
+std::vector<ot::string_view> getPropagationHeaderNames(const std::vector<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 
 class SpanBuffer;
@@ -73,7 +73,7 @@ class SpanContext : public ot::SpanContext {
                                bool prioritySamplingEnabled) const;
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces,
-                               std::set<PropagationStyle> styles,
+                               std::vector<PropagationStyle> styles,
                                bool prioritySamplingEnabled) const;
 
   SpanContext withId(uint64_t id) const;
@@ -81,7 +81,7 @@ class SpanContext : public ot::SpanContext {
   // Returns a new context from the given reader.
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader, std::set<PropagationStyle> styles);
+      const ot::TextMapReader &reader, std::vector<PropagationStyle> styles);
 
   uint64_t id() const;
   uint64_t traceId() const;

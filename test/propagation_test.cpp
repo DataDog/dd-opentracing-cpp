@@ -29,9 +29,9 @@ TEST_CASE("SpanContext") {
   SpanContext context{420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
-      GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
-               std::set<PropagationStyle>{PropagationStyle::B3},
-               std::set<PropagationStyle>{PropagationStyle::Datadog, PropagationStyle::B3});
+      GENERATE(std::vector<PropagationStyle>{PropagationStyle::Datadog},
+               std::vector<PropagationStyle>{PropagationStyle::B3},
+               std::vector<PropagationStyle>{PropagationStyle::Datadog, PropagationStyle::B3});
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
@@ -119,26 +119,23 @@ TEST_CASE("deserialise fails") {
   SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
-    std::set<PropagationStyle> styles;
-    std::string x_datadog_trace_id;
-    std::string x_datadog_parent_id;
-    std::string x_datadog_sampling_priority;
-    std::string x_datadog_origin;
+    std::vector<PropagationStyle> styles;
+    std::string trace_id_header;
+    std::string parent_id_header;
+    std::string sampling_priority_header;
+    std::string origin_header;
   };
 
-  auto test_case = GENERATE(values<PropagationStyleTestCase>({{{PropagationStyle::Datadog},
-                                                               "x-datadog-trace-id",
-                                                               "x-datadog-parent-id",
-                                                               "x-datadog-sampling-priority",
-                                                               "x-datadog-origin"},
-                                                              {{PropagationStyle::B3},
-                                                               "X-B3-TraceId",
-                                                               "X-B3-SpanId",
-                                                               "X-B3-Sampled",
-                                                               "x-datadog-origin"}}));
+  auto test_case = GENERATE(values<PropagationStyleTestCase>(
+      {{{PropagationStyle::Datadog},
+        "x-datadog-trace-id",
+        "x-datadog-parent-id",
+        "x-datadog-sampling-priority",
+        "x-datadog-origin"},
+       {{PropagationStyle::B3}, "X-B3-TraceId", "X-B3-SpanId", "X-B3-Sampled", ""}}));
 
   SECTION("when there are missing keys") {
-    carrier.Set(test_case.x_datadog_trace_id, "123");
+    carrier.Set(test_case.trace_id_header, "123");
     carrier.Set("but where is parent-id??", "420");
     auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
@@ -146,30 +143,66 @@ TEST_CASE("deserialise fails") {
   }
 
   SECTION("when there are formatted keys") {
-    carrier.Set(test_case.x_datadog_trace_id, "The madman! This isn't even a number!");
-    carrier.Set(test_case.x_datadog_parent_id, "420");
+    carrier.Set(test_case.trace_id_header, "The madman! This isn't even a number!");
+    carrier.Set(test_case.parent_id_header, "420");
     auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
   SECTION("when the sampling priority is whack") {
-    carrier.Set(test_case.x_datadog_trace_id, "123");
-    carrier.Set(test_case.x_datadog_parent_id, "456");
-    carrier.Set(test_case.x_datadog_sampling_priority, "420");
+    carrier.Set(test_case.trace_id_header, "123");
+    carrier.Set(test_case.parent_id_header, "456");
+    carrier.Set(test_case.sampling_priority_header, "420");
     auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
+  // Origin headers only apply to Datadog propagation style.
+  if (test_case.origin_header.empty()) {
+    return;
+  }
+
   SECTION("when origin provided without sampling priority") {
-    carrier.Set(test_case.x_datadog_trace_id, "123");
-    carrier.Set(test_case.x_datadog_parent_id, "456");
-    carrier.Set(test_case.x_datadog_origin, "madeuporigin");
+    carrier.Set(test_case.trace_id_header, "123");
+    carrier.Set(test_case.parent_id_header, "456");
+    if (!test_case.origin_header.empty()) {
+      carrier.Set(test_case.origin_header, "madeuporigin");
+    }
     auto err = SpanContext::deserialize(carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
+}
+
+TEST_CASE("deserialize uses first matching propagation style") {
+  MockTextMapCarrier carrier{};
+  carrier.Set("x-datadog-trace-id", "420");
+  carrier.Set("x-datadog-parent-id", "421");
+  carrier.Set("x-datadog-sampling-priority", "1");
+  carrier.Set("X-B3-TraceId", "1A6");
+  carrier.Set("X-B3-SpanId", "1A7");
+  carrier.Set("X-B3-Sampled", "1");
+
+  struct DeserializeTestCase {
+    std::vector<PropagationStyle> styles;
+    uint64_t trace_id;
+    uint64_t parent_id;
+    std::string origin;
+    std::unordered_map<std::string, std::string> baggage;
+  };
+
+  auto test_case = GENERATE(values<DeserializeTestCase>(
+      {{{PropagationStyle::Datadog, PropagationStyle::B3}, 420, 421, "", {}},
+       {{PropagationStyle::B3, PropagationStyle::Datadog}, 422, 423, "", {}}}));
+
+  auto sc = SpanContext::deserialize(carrier, test_case.styles);
+  auto actual_sc = dynamic_cast<SpanContext*>(sc->get());
+  REQUIRE(actual_sc);
+  // SpanContext expected_sc{test_case.trace_id, test_case.parent_id, test_case.origin,
+  // std::move(test_case.baggage)};
+  REQUIRE(actual_sc->traceId() == test_case.trace_id);
 }
 
 TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
@@ -195,32 +228,6 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   auto received_priority = received_context->getPropagatedSamplingPriority();
   REQUIRE(received_priority != nullptr);
   REQUIRE(*received_priority == priority.second);
-}
-
-TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
-  MockTextMapCarrier carrier{};
-  carrier.Set("x-datadog-trace-id", "420");
-  carrier.Set("x-datadog-parent-id", "421");
-  carrier.Set("x-datadog-sampling-priority", "1");
-  carrier.Set("X-B3-TraceId", "1A4");
-  carrier.Set("X-B3-SpanId", "1A5");
-  carrier.Set("X-B3-Sampled", "1");
-
-  auto test_case = GENERATE(
-      values<std::pair<std::string, std::string>>({{"x-datadog-trace-id", "666"},
-                                                   {"x-datadog-parent-id", "666"},
-                                                   {"x-datadog-sampling-priority", "2"},
-                                                   {"X-B3-TraceId", "29A"},
-                                                   {"X-B3-SpanId", "29A"},
-                                                   {"X-B3-Sampled", "0"},
-                                                   // Invalid values for B3 but not for Datadog.
-                                                   {"X-B3-Sampled", "-1"},
-                                                   {"X-B3-Sampled", "2"}}));
-  carrier.Set(test_case.first, test_case.second);
-
-  auto err = SpanContext::deserialize(carrier, {PropagationStyle::Datadog, PropagationStyle::B3});
-  REQUIRE(!err);
-  REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
 TEST_CASE("Binary Span Context") {
