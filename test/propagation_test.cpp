@@ -1,4 +1,6 @@
 #include "../src/propagation.h"
+#include <datadog/tags.h>
+#include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
 #include <string>
 #include "../src/span.h"
@@ -8,6 +10,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
+namespace tags = datadog::tags;
 namespace ot = opentracing;
 
 using dict = std::unordered_map<std::string, std::string>;
@@ -504,6 +507,27 @@ TEST_CASE("sampling behaviour") {
     REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
     REQUIRE(trace[1]->metrics["_sampling_priority_v1"] ==
             static_cast<int>(SamplingPriority::SamplerKeep));
+  }
+}
+
+TEST_CASE("force tracing behaviour") {
+  auto sampler = std::make_shared<MockSampler>();
+  auto writer = std::make_shared<MockWriter>(sampler);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer);
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  ot::Tracer::InitGlobal(tracer);
+
+  auto priority = GENERATE(values<std::pair<std::string, SamplingPriority>>(
+      {{tags::manual_keep, SamplingPriority::UserKeep},
+       {tags::manual_drop, SamplingPriority::UserDrop}}));
+
+  SECTION("set sampling priority via manual.* tags") {
+    auto span = ot::Tracer::Global()->StartSpan("operation_name");
+    span->SetTag(priority.first, {});
+    auto p = static_cast<Span*>(span.get())->getSamplingPriority();
+    REQUIRE(p);
+    REQUIRE(*p == priority.second);
   }
 }
 
