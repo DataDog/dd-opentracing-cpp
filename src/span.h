@@ -10,8 +10,6 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-extern const std::string environment_tag;
-
 class Tracer;
 class SampleProvider;
 class SpanBuffer;
@@ -50,7 +48,7 @@ struct SpanData {
   int64_t duration;
   int32_t error;
   std::unordered_map<std::string, std::string> meta;  // Aka, tags.
-  std::unordered_map<std::string, int> metrics;
+  std::unordered_map<std::string, double> metrics;
 
   uint64_t traceId() const;
   uint64_t spanId() const;

@@ -1,4 +1,6 @@
 #include "../src/span.h"
+#include <datadog/tags.h>
+#include <opentracing/ext/tags.h>
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <thread>
@@ -8,6 +10,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
+namespace tags = datadog::tags;
 using json = nlohmann::json;
 
 TEST_CASE("span") {
@@ -97,12 +100,12 @@ TEST_CASE("span") {
                 span_id,    span_id,    0,        SpanContext{span_id, span_id, "", {}},
                 get_time(), "",         "",       "",
                 "",         ""};
-      span.SetTag("http.url", test_case.first);
+      span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(span_id).finished_spans->back();
-      REQUIRE(result->meta.find("http.url")->second == test_case.second);
+      REQUIRE(result->meta.find(ot::ext::http_url)->second == test_case.second);
     }
   }
 
@@ -179,9 +182,10 @@ TEST_CASE("span") {
               "original span name",
               "original resource",
               ""};
-    span.SetTag("span.type", "new type");
-    span.SetTag("resource.name", "new resource");
-    span.SetTag("service.name", "new service");
+    span.SetTag(tags::service_name, "new service");
+    span.SetTag(tags::span_type, "new type");
+    span.SetTag(tags::resource_name, "new resource");
+    span.SetTag(tags::analytics_event, true);
     span.SetTag("tag with no special meaning", "ayy lmao");
 
     span.FinishWithOptions(finish_options);
@@ -191,9 +195,10 @@ TEST_CASE("span") {
     REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
                                 {"tag with no special meaning", "ayy lmao"}});
     REQUIRE(result->name == "original span name");
-    REQUIRE(result->resource == "new resource");
     REQUIRE(result->service == "new service");
     REQUIRE(result->type == "new type");
+    REQUIRE(result->resource == "new resource");
+    REQUIRE(result->metrics == std::unordered_map<std::string, double>{{"_dd1.sr.eausr", 1}});
   }
 
   SECTION("error tag sets error") {
@@ -341,7 +346,7 @@ TEST_CASE("span") {
 
       auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
-              std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
+              std::unordered_map<std::string, double>{{"_sampling_priority_v1", 1}});
     }
 
     SECTION("non-root spans may be sampled, as long as the trace is not yet distributed") {
@@ -380,7 +385,7 @@ TEST_CASE("span") {
 
       auto& result = buffer->traces(42).finished_spans->at(0);
       REQUIRE(result->metrics ==
-              std::unordered_map<std::string, int>{{"_sampling_priority_v1", 1}});
+              std::unordered_map<std::string, double>{{"_sampling_priority_v1", 1}});
     }
 
     SECTION("spans with an existing sampling priority may not be given a new one at Finish") {
@@ -401,7 +406,7 @@ TEST_CASE("span") {
 
       auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
-              std::unordered_map<std::string, int>{{"_sampling_priority_v1", -1}});
+              std::unordered_map<std::string, double>{{"_sampling_priority_v1", -1}});
     }
   }
 }

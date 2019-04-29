@@ -1,4 +1,5 @@
 #include <datadog/opentracing.h>
+#include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <pthread.h>
 #include <cstdlib>
@@ -8,6 +9,7 @@
 #include "tracer.h"
 
 namespace ot = opentracing;
+namespace tags = datadog::tags;
 
 namespace datadog {
 namespace opentracing {
@@ -96,7 +98,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     span->SetTag(tag.first, tag.second);
   }
   if (is_trace_root && opts_.environment != "") {
-    span->SetTag(environment_tag, opts_.environment);
+    span->SetTag(tags::environment, opts_.environment);
   }
   return std::move(span);
 } catch (const std::bad_alloc &) {
