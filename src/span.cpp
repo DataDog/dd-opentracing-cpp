@@ -153,12 +153,25 @@ void Span::FinishWithOptions(
   tag = span_->meta.find(tags::analytics_event);
   if (tag != span_->meta.end()) {
     // tag->second is the JSON-serialized value of the variadic type given to SetTag.
-    // Apply only truthy or falsey values.
+    // Apply boolean, valid integer and valid double's.
     if (tag->second == "true" || tag->second == "1") {
       span_->metrics[event_sample_rate_metric] = 1.0;
     } else if (tag->second == "false" || tag->second == "0" || tag->second == "") {
       span_->metrics[event_sample_rate_metric] = 0.0;
+    } else {
+      // Check if the value is a double between 0.0 and 1.0 (inclusive).
+      try {
+        double value = std::stod(tag->second);
+        if (value >= 0.0 && value <= 1.0) {
+          span_->metrics[event_sample_rate_metric] = value;
+        }
+      } catch (const std::invalid_argument &ia) {
+        // Ignore invalid value.
+      } catch (const std::out_of_range &oor) {
+        // Ignore values not in range.
+      }
     }
+
     span_->meta.erase(tag);
   }
   // Audit and finish span.

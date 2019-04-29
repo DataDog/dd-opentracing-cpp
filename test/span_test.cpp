@@ -201,6 +201,46 @@ TEST_CASE("span") {
     REQUIRE(result->metrics == std::unordered_map<std::string, double>{{"_dd1.sr.eausr", 1}});
   }
 
+  SECTION("values for analytics_event tag") {
+    auto span_id = get_id();
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
+              get_time(), "",      "",       "",
+              "",         ""};
+
+    struct AnalyticsEventTagTestCase {
+      ot::Value tag_value;
+      bool expected;
+      double metric_value;
+    };
+    auto test_case =
+        GENERATE(values<AnalyticsEventTagTestCase>({{true, true, 1.0},
+                                                    {false, true, 0.0},
+                                                    {1, true, 1.0},
+                                                    {0, true, 0.0},
+                                                    {1.0, true, 1.0},
+                                                    {0.5, true, 0.5},
+                                                    {0.0, true, 0.0},
+                                                    {"", true, 0.0},
+                                                    {-1, false, 0},
+                                                    {2, false, 0},
+                                                    {-0.1, false, 0},
+                                                    {1.1, false, 0},
+                                                    {"not a number at all", false, 0}}));
+
+    span.SetTag(tags::analytics_event, test_case.tag_value);
+    span.FinishWithOptions(finish_options);
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto metric = result->metrics.find("_dd1.sr.eausr");
+
+    if (test_case.expected) {
+      REQUIRE(metric != result->metrics.end());
+      REQUIRE(metric->second == test_case.metric_value);
+    } else {
+      REQUIRE(metric == result->metrics.end());
+    }
+  }
+
   SECTION("error tag sets error") {
     auto span_id = get_id();
     Span span{nullptr,    buffer,  get_time, sampler,
