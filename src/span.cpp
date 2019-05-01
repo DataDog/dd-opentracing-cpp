@@ -1,4 +1,5 @@
 #include "span.h"
+#include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -8,20 +9,15 @@
 #include "span_buffer.h"
 #include "tracer.h"
 
-namespace ot = opentracing;
+namespace tags = datadog::tags;
 using json = nlohmann::json;
 
 namespace datadog {
 namespace opentracing {
 
 namespace {
-const std::string datadog_span_type_tag = "span.type";
-const std::string datadog_resource_name_tag = "resource.name";
-const std::string datadog_service_name_tag = "service.name";
-const std::string operation_name_tag = "operation";
+const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 }  // namespace
-
-const std::string environment_tag = "env";
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
                    std::string name, uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
@@ -43,7 +39,7 @@ uint64_t SpanData::traceId() const { return trace_id; }
 uint64_t SpanData::spanId() const { return span_id; }
 
 const std::string SpanData::env() const {
-  const auto &env = meta.find(environment_tag);
+  const auto &env = meta.find(tags::environment);
   if (env == meta.end()) {
     return "";
   }
@@ -123,22 +119,22 @@ void Span::FinishWithOptions(
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
   // Override operation name if needed.
   if (operation_name_override_ != "") {
-    span_->meta[operation_name_tag] = span_->name;
+    span_->meta[tags::operation_name] = span_->name;
     span_->name = operation_name_override_;
   }
   // Apply special tags.
   // If we add any more cases; then abstract this. For now, KISS.
-  auto tag = span_->meta.find(datadog_span_type_tag);
+  auto tag = span_->meta.find(tags::span_type);
   if (tag != span_->meta.end()) {
     span_->type = tag->second;
     span_->meta.erase(tag);
   }
-  tag = span_->meta.find(datadog_resource_name_tag);
+  tag = span_->meta.find(tags::resource_name);
   if (tag != span_->meta.end()) {
     span_->resource = tag->second;
     span_->meta.erase(tag);
   }
-  tag = span_->meta.find(datadog_service_name_tag);
+  tag = span_->meta.find(tags::service_name);
   if (tag != span_->meta.end()) {
     span_->service = tag->second;
     span_->meta.erase(tag);
@@ -153,6 +149,30 @@ void Span::FinishWithOptions(
       span_->error = 1;
     }
     // Don't erase the tag, in case it is populated with interesting information.
+  }
+  tag = span_->meta.find(tags::analytics_event);
+  if (tag != span_->meta.end()) {
+    // tag->second is the JSON-serialized value of the variadic type given to SetTag.
+    // Apply boolean, valid integer and valid double's.
+    if (tag->second == "true" || tag->second == "1") {
+      span_->metrics[event_sample_rate_metric] = 1.0;
+    } else if (tag->second == "false" || tag->second == "0" || tag->second == "") {
+      span_->metrics[event_sample_rate_metric] = 0.0;
+    } else {
+      // Check if the value is a double between 0.0 and 1.0 (inclusive).
+      try {
+        double value = std::stod(tag->second);
+        if (value >= 0.0 && value <= 1.0) {
+          span_->metrics[event_sample_rate_metric] = value;
+        }
+      } catch (const std::invalid_argument &ia) {
+        // Ignore invalid value.
+      } catch (const std::out_of_range &oor) {
+        // Ignore values not in range.
+      }
+    }
+
+    span_->meta.erase(tag);
   }
   // Audit and finish span.
   audit(span_.get());
