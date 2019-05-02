@@ -17,6 +17,7 @@ namespace opentracing {
 
 namespace {
 const std::string event_sample_rate_metric = "_dd1.sr.eausr";
+const std::string datadog_hostname_tag = "_dd.hostname";
 }  // namespace
 
 SpanData::SpanData(std::string type, std::string service, ot::string_view resource,
@@ -60,7 +61,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
            TimeProvider get_time, std::shared_ptr<SampleProvider> sampler, uint64_t span_id,
            uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
            std::string span_service, std::string span_type, std::string span_name,
-           std::string resource, std::string operation_name_override)
+           std::string resource, std::string operation_name_override, const std::string hostname)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
@@ -68,6 +69,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
       context_(std::move(context)),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
+      hostname_(hostname),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -173,6 +175,10 @@ void Span::FinishWithOptions(
     }
 
     span_->meta.erase(tag);
+  }
+  // Report hostname if enabled and value was found.
+  if (!hostname_.empty()) {
+    span_->meta[datadog_hostname_tag] = std::string(hostname_);
   }
   // Audit and finish span.
   audit(span_.get());

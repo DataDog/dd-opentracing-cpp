@@ -33,7 +33,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
     span.FinishWithOptions(finish_options);
 
     auto& result = buffer->traces(100).finished_spans->at(0);
@@ -47,7 +47,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
     REQUIRE(buffer->traces().size() == 1);
     REQUIRE(buffer->traces().find(100) != buffer->traces().end());
     REQUIRE(buffer->traces(100).finished_spans->size() == 0);
@@ -59,7 +59,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
     advanceSeconds(time, 10);
     span.FinishWithOptions(finish_options);
 
@@ -99,7 +99,7 @@ TEST_CASE("span") {
       Span span{nullptr,    buffer_ptr, get_time, sampler,
                 span_id,    span_id,    0,        SpanContext{span_id, span_id, "", {}},
                 get_time(), "",         "",       "",
-                "",         ""};
+                "",         "",         ""};
       span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
@@ -114,7 +114,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++) {
       threads.emplace_back([&]() { span.FinishWithOptions(finish_options); });
@@ -130,7 +130,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
 
     span.SetTag("bool", true);
     span.SetTag("double", 6.283185);
@@ -181,6 +181,7 @@ TEST_CASE("span") {
               "original type",
               "original span name",
               "original resource",
+              "",
               ""};
     span.SetTag(tags::service_name, "new service");
     span.SetTag(tags::span_type, "new type");
@@ -206,7 +207,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
 
     struct AnalyticsEventTagTestCase {
       ot::Value tag_value;
@@ -246,7 +247,7 @@ TEST_CASE("span") {
     Span span{nullptr,    buffer,  get_time, sampler,
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
-              "",         ""};
+              "",         "",      ""};
 
     struct ErrorTagTestCase {
       ot::Value value;
@@ -292,7 +293,8 @@ TEST_CASE("span") {
               "original type",
               "original span name",
               "original resource",
-              "overridden operation name"};
+              "overridden operation name",
+              ""};
 
     span.FinishWithOptions(finish_options);
 
@@ -320,7 +322,8 @@ TEST_CASE("span") {
               "original type",
               "original span name",
               "original resource",
-              "overridden operation name"};
+              "overridden operation name",
+              ""};
 
     span.SetTag("resource.name", "new resource");
     span.FinishWithOptions(finish_options);
@@ -349,6 +352,7 @@ TEST_CASE("span") {
               "original type",
               "original span name",
               "original resource",
+              "",
               ""};
     span.SetOperationName("operation name");
 
@@ -381,7 +385,7 @@ TEST_CASE("span") {
       Span span{nullptr,    buffer, get_time, priority_sampler,
                 100,        100,    0,        SpanContext{100, 100, "", {}},
                 get_time(), "",     "",       "",
-                "",         ""};
+                "",         "",     ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(100).finished_spans->at(0);
@@ -396,7 +400,8 @@ TEST_CASE("span") {
                 42,         SpanContext{100, 42, "", {}},  // Non-distributed SpanContext
                 get_time(), "",
                 "",         "",
-                "",         ""};
+                "",         "",
+                ""};
       span.FinishWithOptions(finish_options);
 
       REQUIRE(*buffer->traces(42).sampling_priority == SamplingPriority::SamplerKeep);
@@ -420,7 +425,8 @@ TEST_CASE("span") {
                 42,         std::move(*static_cast<SpanContext*>(context.value().get())),
                 get_time(), "",
                 "",         "",
-                "",         ""};
+                "",         "",
+                ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(42).finished_spans->at(0);
@@ -441,12 +447,37 @@ TEST_CASE("span") {
                 0,          std::move(*static_cast<SpanContext*>(context.value().get())),
                 get_time(), "",
                 "",         "",
-                "",         ""};
+                "",         "",
+                ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
               std::unordered_map<std::string, double>{{"_sampling_priority_v1", -1}});
     }
+  }
+
+  SECTION("non-empty hostnames are reported via a tag") {
+    auto span_id = get_id();
+    Span span{nullptr,
+              buffer,
+              get_time,
+              sampler,
+              span_id,
+              span_id,
+              0,
+              SpanContext{span_id, span_id, "", {}},
+              get_time(),
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              "",
+              "myhostname"};
+
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    REQUIRE(result->meta["_dd.hostname"] == "myhostname");
   }
 }
