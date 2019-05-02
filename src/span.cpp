@@ -309,8 +309,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   }
 
   // Normally special tags are processed at Span Finish, but this cannot be done for
-  // sampling.priority because if no sampling is set before the Span Finishes then one is
+  // sampling tags because if no sampling is set before the Span Finishes then one is
   // assigned immutably.
+  // The sampling tags are "sampling.priority", "manual.keep" and "manual.drop".
   // Doesn't need to be in the same mutex lock as above.
   if (key == ::ot::ext::sampling_priority) {
     // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
@@ -328,6 +329,10 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     } catch (const std::out_of_range &oor) {
       std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
     }
+  } else if (key == tags::manual_keep) {
+    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+  } else if (key == tags::manual_drop) {
+    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
   }
 }
 
