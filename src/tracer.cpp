@@ -98,7 +98,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   if (is_trace_root && opts_.environment != "") {
     span->SetTag(environment_tag, opts_.environment);
   }
-  return std::move(span);
+  return span;
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;
