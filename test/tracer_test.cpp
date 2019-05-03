@@ -75,4 +75,24 @@ TEST_CASE("tracer") {
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
   }
+
+  SECTION("hostname is added as a tag") {
+    buffer->setHostname("testhostname");
+    auto root_span = tracer->StartSpanWithOptions("/root", span_options);
+    auto child_span = tracer->StartSpan("/child", {ChildOf(&root_span->context())});
+    root_span->SetTag("foo", "bar");
+    child_span->SetTag("baz", "bing");
+    const ot::FinishSpanOptions finish_options;
+    child_span->FinishWithOptions(finish_options);
+    root_span->FinishWithOptions(finish_options);
+    buffer->setHostname("");
+
+    // Tag should exist with the correct value on the root / local-root span.
+    auto& root_result = buffer->traces(100).finished_spans->at(1);
+    REQUIRE(root_result->meta["_dd.hostname"] == "testhostname");
+
+    // Tag should not exist on the child span(s).
+    auto& child_result = buffer->traces(100).finished_spans->at(0);
+    REQUIRE(child_result->meta.find("_dd.hostname") == child_result->meta.end());
+  }
 }

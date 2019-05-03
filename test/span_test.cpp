@@ -456,28 +456,4 @@ TEST_CASE("span") {
               std::unordered_map<std::string, double>{{"_sampling_priority_v1", -1}});
     }
   }
-
-  SECTION("non-empty hostnames are reported via a tag") {
-    auto span_id = get_id();
-    Span span{nullptr,
-              buffer,
-              get_time,
-              sampler,
-              span_id,
-              span_id,
-              0,
-              SpanContext{span_id, span_id, "", {}},
-              get_time(),
-              "original service",
-              "original type",
-              "original span name",
-              "original resource",
-              "",
-              "myhostname"};
-
-    span.FinishWithOptions(finish_options);
-
-    auto& result = buffer->traces(100).finished_spans->at(0);
-    REQUIRE(result->meta["_dd.hostname"] == "myhostname");
-  }
 }

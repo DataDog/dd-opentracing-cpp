@@ -10,6 +10,7 @@ namespace opentracing {
 namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
 const std::string datadog_origin_tag = "_dd.origin";
+const std::string datadog_hostname_tag = "_dd.hostname";
 }  // namespace
 
 void PendingTrace::finish() {
@@ -17,25 +18,30 @@ void PendingTrace::finish() {
     std::cerr << "finish called on trace with no spans" << std::endl;
     return;  // I don't know why this would ever happen.
   }
-  // Check for sampling.
-  if (sampling_priority != nullptr) {
-    // Set the metric for the root span.
-    for (auto& span : *finished_spans) {
-      if (/* root span */
-          span->parent_id == 0 ||
-          /* local root span of a distributed trace */
-          all_spans.find(span->parent_id) == all_spans.end()) {
+  // Apply changes to root / local-root spans.
+  for (auto& span : *finished_spans) {
+    if (/* root span */
+        span->parent_id == 0 ||
+        /* local root span of a distributed trace */
+        all_spans.find(span->parent_id) == all_spans.end()) {
+      // Check for sampling.
+      if (sampling_priority != nullptr) {
         span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
         if (!origin.empty()) {
           span->meta[datadog_origin_tag] = origin;
         }
-        break;
       }
+      if (!hostname.empty()) {
+        span->meta[datadog_hostname_tag] = hostname;
+      }
+      break;
     }
   }
 }
 
-WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<Writer> writer) : writer_(writer) {}
+WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<Writer> writer,
+                                     WritingSpanBufferOptions options)
+    : writer_(writer), options_(options) {}
 
 void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
@@ -49,6 +55,9 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
     trace->second.sampling_priority = std::move(p);
     if (!context.origin().empty()) {
       trace->second.origin = context.origin();
+    }
+    if (!options_.hostname.empty()) {
+      trace->second.hostname = options_.hostname;
     }
   }
   trace->second.all_spans.insert(context.id());

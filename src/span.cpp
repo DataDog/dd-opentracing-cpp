@@ -176,10 +176,6 @@ void Span::FinishWithOptions(
 
     span_->meta.erase(tag);
   }
-  // Report hostname if enabled and value was found.
-  if (!hostname_.empty()) {
-    span_->meta[datadog_hostname_tag] = std::string(hostname_);
-  }
   // Audit and finish span.
   audit(span_.get());
   buffer_->finishSpan(std::move(span_), sampler_);

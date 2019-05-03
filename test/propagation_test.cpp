@@ -305,7 +305,7 @@ TEST_CASE("Binary Span Context") {
 TEST_CASE("sampling behaviour") {
   auto sampler = std::make_shared<MockSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
   ot::Tracer::InitGlobal(tracer);
@@ -513,7 +513,7 @@ TEST_CASE("sampling behaviour") {
 TEST_CASE("force tracing behaviour") {
   auto sampler = std::make_shared<MockSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
   ot::Tracer::InitGlobal(tracer);

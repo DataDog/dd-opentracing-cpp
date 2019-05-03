@@ -74,7 +74,8 @@ struct MockWriter : public Writer {
 
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>())){};
+      : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>()),
+                          WritingSpanBufferOptions{}){};
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.
@@ -84,6 +85,8 @@ struct MockBuffer : public WritingSpanBuffer {
   std::unordered_map<uint64_t, PendingTrace>& traces() { return traces_; };
 
   PendingTrace& traces(uint64_t id) { return traces_[id]; };
+
+  void setHostname(std::string hostname) { options_.hostname = hostname; };
 
   void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
 };

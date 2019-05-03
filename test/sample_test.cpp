@@ -188,7 +188,7 @@ TEST_CASE("priority sampler \"integration\" test") {
   auto writer = std::make_shared<AgentWriter>(
       std::move(handle_ptr), only_send_traces_when_we_flush, 11000 /* max queued traces */,
       std::vector<std::chrono::milliseconds>{}, "hostname", 6319, sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
 
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
   const ot::StartSpanOptions span_options;

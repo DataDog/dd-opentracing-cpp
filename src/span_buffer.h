@@ -27,6 +27,7 @@ struct PendingTrace {
   OptionalSamplingPriority sampling_priority;
   bool sampling_priority_locked = false;
   std::string origin;
+  std::string hostname;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -45,10 +46,14 @@ class SpanBuffer {
   virtual void flush(std::chrono::milliseconds timeout) = 0;
 };
 
+struct WritingSpanBufferOptions {
+  std::string hostname;
+};
+
 // A SpanBuffer that sends completed traces to a Writer.
 class WritingSpanBuffer : public SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<Writer> writer);
+  WritingSpanBuffer(std::shared_ptr<Writer> writer, WritingSpanBufferOptions options);
 
   void registerSpan(const SpanContext& context) override;
   void finishSpan(std::unique_ptr<SpanData> span,
@@ -80,6 +85,7 @@ class WritingSpanBuffer : public SpanBuffer {
   virtual void unbufferAndWriteTrace(uint64_t trace_id);
 
   std::unordered_map<uint64_t, PendingTrace> traces_;
+  WritingSpanBufferOptions options_;
 };
 
 }  // namespace opentracing

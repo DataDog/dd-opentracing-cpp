@@ -72,7 +72,8 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
       get_id_(getId),
       sampler_(sampler),
       hostname_(reportingHostname()) {
-  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{writer}};
+  buffer_ = std::shared_ptr<SpanBuffer>{
+      new WritingSpanBuffer{writer, WritingSpanBufferOptions{reportingHostname()}}};
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
