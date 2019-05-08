@@ -2,6 +2,7 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <cstdlib>
 #include <random>
 
@@ -41,18 +42,38 @@ uint64_t getId() {
   return distribution(TlsRandomNumberGenerator::generator());
 }
 
+std::string reportingHostname() {
+  // This returns the machine name if the DD_TRACE_REPORT_HOSTNAME is set to true.
+  auto report_hostname_opt = std::getenv("DD_TRACE_REPORT_HOSTNAME");
+  if (report_hostname_opt != nullptr && std::strlen(report_hostname_opt) > 0) {
+    if (std::string(report_hostname_opt) == "true") {
+      char buffer[256];
+      if (!::gethostname(buffer, 256)) {
+        return std::string(buffer);
+      }
+    }
+  }
+  return "";
+}
+
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
     : opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
-      sampler_(sampler) {}
+      sampler_(sampler),
+      hostname_(reportingHostname()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
-    : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
-  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{writer}};
+    : opts_(options),
+      get_time_(getRealTime),
+      get_id_(getId),
+      sampler_(sampler),
+      hostname_(reportingHostname()) {
+  buffer_ = std::shared_ptr<SpanBuffer>{
+      new WritingSpanBuffer{writer, WritingSpanBufferOptions{reportingHostname()}}};
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -88,7 +109,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_, span_id,
                                       trace_id, parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
-                                      opts_.operation_name_override}};
+                                      opts_.operation_name_override, hostname_}};
   bool is_trace_root = parent_id == 0;
   for (auto &tag : options.tags) {
     if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {

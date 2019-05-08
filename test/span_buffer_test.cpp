@@ -10,7 +10,7 @@ TEST_CASE("span buffer") {
   auto sampler = std::make_shared<KeepAllSampler>();
   auto writer_ptr = std::make_shared<MockWriter>(sampler);
   MockWriter* writer = writer_ptr.get();
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer_ptr);
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer_ptr, WritingSpanBufferOptions{});
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
     return SpanContext{span.span_id, span.trace_id, "", {}};
