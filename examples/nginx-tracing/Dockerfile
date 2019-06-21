@@ -1,18 +1,18 @@
 # Builds and runs a simple nginx server, traced by Datadog
-FROM ubuntu:18.04
+FROM ubuntu:14.04
 
-ARG NGINX_VERSION=1.14.0
+ARG NGINX_VERSION=1.12.2
 
 RUN apt-get update && \
-  apt-get install -y git gnupg wget tar
+  apt-get install -y git gnupg wget tar apt-transport-https
 
 # Install nginx
 RUN wget https://nginx.org/keys/nginx_signing.key && \
   apt-key add nginx_signing.key && \
-  echo deb https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list && \
-  echo deb-src https://nginx.org/packages/ubuntu/ bionic nginx >> /etc/apt/sources.list && \
+  echo "deb https://nginx.org/packages/ubuntu/ trusty nginx" >> /etc/apt/sources.list.d/nginx.list && \
+  echo "deb-src https://nginx.org/packages/ubuntu/ trusty nginx" >> /etc/apt/sources.list.d/nginx.list && \
   apt-get update && \
-  apt-get install nginx=${NGINX_VERSION}-1~bionic
+  apt-get install nginx=${NGINX_VERSION}-1~trusty
 # Configure nginx
 COPY ./examples/nginx-tracing/nginx.conf /etc/nginx/nginx.conf
 COPY ./examples/nginx-tracing/dd-config.json /etc/dd-config.json
