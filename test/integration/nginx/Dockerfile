@@ -75,5 +75,7 @@ COPY ./test/integration/nginx/index.html /var/www/index.html
 
 COPY ./test/integration/nginx/nginx_integration_test.sh ./
 COPY ./test/integration/nginx/expected_*.json ./
+# TODO(cgilmour): Hack to pin a dep of msgpack-cli
+RUN git clone -b v1.1.2 https://github.com/ugorji/go /root/go/src/github.com/ugorji/go
 RUN go get github.com/jakm/msgpack-cli
 CMD [ "bash", "-x", "./nginx_integration_test.sh"]
