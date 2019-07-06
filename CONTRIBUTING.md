@@ -1,5 +1,15 @@
 # Contributing to dd-opentracing-cpp
 
-As an open source project we welcome contributions of many forms, but due to the experimental beta nature of this repository you should reach out before starting work on any major code changes. This will ensure we avoid duplicating work and help ensure your code can be merged despite our rapidly changing base. If you would like support for a use-case that is not listed, please [contact support][1] to make a request.
+Pull requests for bug fixes are welcome.
+Before submitting new features or changes to current functionality, [open an issue](https://github.com/DataDog/dd-opentracing-cpp/issues/new) and discuss your ideas or propose the changes you wish to make.
+After a resolution is reached, a PR can be submitted for review.
 
-[1]: https://docs.datadoghq.com/help
+## Code Style
+
+C++ code must be formatted using `clang-format`. Before submitting code changes, the following command should be run:
+
+```shell 
+find include src test -iname '*.h' -o -iname '*.cpp' | xargs clang-format-6.0 -i
+```
+
+Other source and documentation files should be consistently formatted, but this is not enforced in CI checks.
