@@ -17,6 +17,11 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     opts.agent_host = agent_host;
   }
 
+  auto environment = std::getenv("DD_ENV");
+  if (environment != nullptr && std::strlen(environment) > 0) {
+    opts.environment = environment;
+  }
+
   auto trace_agent_port = std::getenv("DD_TRACE_AGENT_PORT");
   if (trace_agent_port != nullptr && std::strlen(trace_agent_port) > 0) {
     try {

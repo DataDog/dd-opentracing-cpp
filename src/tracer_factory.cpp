@@ -91,7 +91,8 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 //     the environment variable DD_TRACE_AGENT_PORT
 // "type": A string, defaults to web.
 // "environment": A string, defaults to "". The environment this trace belongs to.
-//     eg. "" (env:none), "staging", "prod"
+//     eg. "" (env:none), "staging", "prod". Can also be set by the environment variable
+//     DD_ENV
 // "sample_rate": A double, defaults to 1.0.
 // "dd.priority.sampling": A boolean, true by default. If true disables client-side sampling (thus
 //     ignoring sample_rate) and enables distributed priority sampling, where traces are sampled
