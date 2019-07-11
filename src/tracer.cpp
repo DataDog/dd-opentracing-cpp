@@ -56,6 +56,36 @@ std::string reportingHostname() {
   return "";
 }
 
+double analyticsRate() {
+  // This returns the analytics rate to apply to spans produced by this tracer.
+  // The value of DD_TRACE_ANALYTICS_ENABLED and/or DD_GLOBAL_ANALYTICS_SAMPLE_RATE
+  // are used in determining the rate.
+  auto global_rate_opt = std::getenv("DD_GLOBAL_ANALYTICS_SAMPLE_RATE");
+  if (global_rate_opt != nullptr) {
+    try {
+      double value = std::stod(global_rate_opt);
+      if (value >= 0.0 && value <= 1.0) {
+        return value;
+      }
+    } catch (const std::invalid_argument &ia) {
+      // Ignore invalid value.
+    } catch (const std::out_of_range &oor) {
+      // Ignore values not in range.
+    }
+  }
+  auto enabled_opt = std::getenv("DD_TRACE_ANALYTICS_ENABLED");
+  if (enabled_opt != nullptr) {
+    auto value = std::string(enabled_opt);
+    if (value == "true" || value == "1") {
+      return 1.0;
+    } else if (value == "false" || value == "0" || value == "") {
+      return 0.0;
+    }
+  }
+  // use NaN to indicate "not set".
+  return std::nan("");
+}
+
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
     : opts_(options),
@@ -63,7 +93,8 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimePr
       get_time_(get_time),
       get_id_(get_id),
       sampler_(sampler),
-      hostname_(reportingHostname()) {}
+      hostname_(reportingHostname()),
+      analytics_rate_(analyticsRate()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
@@ -71,7 +102,8 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
       get_time_(getRealTime),
       get_id_(getId),
       sampler_(sampler),
-      hostname_(reportingHostname()) {
+      hostname_(reportingHostname()),
+      analytics_rate_(analyticsRate()) {
   buffer_ = std::shared_ptr<SpanBuffer>{
       new WritingSpanBuffer{writer, WritingSpanBufferOptions{reportingHostname()}}};
 }
@@ -120,6 +152,9 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   }
   if (is_trace_root && opts_.environment != "") {
     span->SetTag(tags::environment, opts_.environment);
+  }
+  if (!std::isnan(analytics_rate_)) {
+    span->SetTag(tags::analytics_event, analytics_rate_);
   }
   return span;
 } catch (const std::bad_alloc &) {

@@ -96,3 +96,58 @@ TEST_CASE("tracer") {
     REQUIRE(child_result->meta.find("_dd.hostname") == child_result->meta.end());
   }
 }
+
+TEST_CASE("env overrides") {
+  int id = 100;  // Starting span id.
+  // Starting calendar time 2007-03-12 00:00:00
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
+  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
+                 std::chrono::steady_clock::time_point{}};
+  auto buffer = std::make_shared<MockBuffer>();
+  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
+  IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
+  auto sampler = std::make_shared<KeepAllSampler>();
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
+  const ot::StartSpanOptions span_options;
+
+  struct EnvOverrideTest {
+    std::string env;
+    std::string val;
+    double rate;
+  };
+
+  auto env_test = GENERATE(
+      values<EnvOverrideTest>({// Normal cases
+                               {"DD_TRACE_ANALYTICS_ENABLED", "true", 1.0},
+                               {"DD_TRACE_ANALYTICS_ENABLED", "false", 0.0},
+                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "0.5", 0.5},
+                               {"", "", std::nan("")},
+                               // Unexpected values handled gracefully
+                               {"DD_TRACE_ANALYTICS_ENABLED", "yes please", std::nan("")},
+                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "1.1", std::nan("")},
+                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "half", std::nan("")}}));
+
+  SECTION("set correct tags and metrics") {
+    // Setup
+    ::setenv(env_test.env.c_str(), env_test.val.c_str(), 0);
+    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, get_time, get_id, sampler}};
+
+    // Create span
+    auto span = tracer->StartSpanWithOptions("/env-override", span_options);
+    const ot::FinishSpanOptions finish_options;
+    span->FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    // Check the analytics rate matches the expected value.
+    if (std::isnan(env_test.rate)) {
+      REQUIRE(result->meta.find("_dd1.sr.eausr") == result->meta.end());
+    } else {
+      REQUIRE(result->metrics["_dd1.sr.eausr"] == env_test.rate);
+    }
+    // Tear-down
+    ::unsetenv(env_test.env.c_str());
+  }
+}
