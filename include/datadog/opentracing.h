@@ -35,7 +35,8 @@ struct TracerOptions {
   // The type of service being traced.
   // (see above URL for definition)
   std::string type = "web";
-  // The environment this trace belongs to. eg. "" (env:none), "staging", "prod"
+  // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
+  // by the environment variable DD_ENV
   std::string environment = "";
   // Client side sampling. The percentage of traces are sent to the agent, real number in [0, 1].
   // 0 = discard all traces, 1 = keep all traces.
