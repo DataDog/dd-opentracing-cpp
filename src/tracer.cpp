@@ -3,7 +3,6 @@
 #include <opentracing/ext/tags.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <cstdlib>
 #include <random>
 
 #include "noopspan.h"
@@ -92,20 +91,13 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimePr
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
-      sampler_(sampler),
-      hostname_(reportingHostname()),
-      analytics_rate_(analyticsRate()) {}
+      sampler_(sampler) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
-    : opts_(options),
-      get_time_(getRealTime),
-      get_id_(getId),
-      sampler_(sampler),
-      hostname_(reportingHostname()),
-      analytics_rate_(analyticsRate()) {
-  buffer_ = std::shared_ptr<SpanBuffer>{
-      new WritingSpanBuffer{writer, WritingSpanBufferOptions{reportingHostname()}}};
+    : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
+  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{
+      writer, WritingSpanBufferOptions{reportingHostname(), analyticsRate()}}};
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -141,7 +133,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_, span_id,
                                       trace_id, parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
-                                      opts_.operation_name_override, hostname_}};
+                                      opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;
   for (auto &tag : options.tags) {
     if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {
@@ -152,9 +144,6 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   }
   if (is_trace_root && opts_.environment != "") {
     span->SetTag(tags::environment, opts_.environment);
-  }
-  if (!std::isnan(analytics_rate_)) {
-    span->SetTag(tags::analytics_event, analytics_rate_);
   }
   return span;
 } catch (const std::bad_alloc &) {
