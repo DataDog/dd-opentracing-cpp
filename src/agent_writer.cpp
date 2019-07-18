@@ -4,7 +4,6 @@
 #include "sample.h"
 #include "span.h"
 #include "transport.h"
-#include "version_number.h"
 
 namespace datadog {
 namespace opentracing {

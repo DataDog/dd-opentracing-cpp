@@ -2,7 +2,6 @@
 #include <iostream>
 #include "encoder.h"
 #include "span.h"
-#include "version_number.h"
 
 namespace datadog {
 namespace opentracing {

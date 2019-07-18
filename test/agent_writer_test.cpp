@@ -1,7 +1,7 @@
 #include "../src/agent_writer.h"
+#include <datadog/version.h>
 #include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
 #include "mocks.h"
-#include "version_number.h"
 
 #include <ctime>
 
@@ -67,12 +67,13 @@ TEST_CASE("writer") {
                                    {CURLOPT_URL, "http://hostname:6319/v0.4/traces"},
                                    {CURLOPT_TIMEOUT_MS, "2000"},
                                    {CURLOPT_POSTFIELDSIZE, "135"}});
-    REQUIRE(handle->headers == std::map<std::string, std::string>{
-                                   {"Content-Type", "application/msgpack"},
-                                   {"Datadog-Meta-Lang", "cpp"},
-                                   {"Datadog-Meta-Tracer-Version", config::tracer_version},
-                                   {"Datadog-Meta-Lang-Version", config::cpp_version},
-                                   {"X-Datadog-Trace-Count", "1"}});
+    REQUIRE(handle->headers ==
+            std::map<std::string, std::string>{
+                {"Content-Type", "application/msgpack"},
+                {"Datadog-Meta-Lang", "cpp"},
+                {"Datadog-Meta-Tracer-Version", ::datadog::version::tracer_version},
+                {"Datadog-Meta-Lang-Version", ::datadog::version::cpp_version},
+                {"X-Datadog-Trace-Count", "1"}});
   }
 
   SECTION("responses are sent to sampler") {
@@ -324,12 +325,13 @@ TEST_CASE("writer") {
       writer.write(make_trace(
           {TestSpanData{"web", "service", "resource", "service.name", 3, 1, 1, 69, 420, 0}}));
       writer.flush(std::chrono::seconds(10));
-      REQUIRE(handle->headers == std::map<std::string, std::string>{
-                                     {"Content-Type", "application/msgpack"},
-                                     {"Datadog-Meta-Lang", "cpp"},
-                                     {"Datadog-Meta-Tracer-Version", config::tracer_version},
-                                     {"Datadog-Meta-Lang-Version", config::cpp_version},
-                                     {"X-Datadog-Trace-Count", "3"}});
+      REQUIRE(handle->headers ==
+              std::map<std::string, std::string>{
+                  {"Content-Type", "application/msgpack"},
+                  {"Datadog-Meta-Lang", "cpp"},
+                  {"Datadog-Meta-Tracer-Version", ::datadog::version::tracer_version},
+                  {"Datadog-Meta-Lang-Version", ::datadog::version::cpp_version},
+                  {"X-Datadog-Trace-Count", "3"}});
     }
   }
 }
