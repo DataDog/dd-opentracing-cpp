@@ -11,6 +11,7 @@ namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
 const std::string datadog_origin_tag = "_dd.origin";
 const std::string datadog_hostname_tag = "_dd.hostname";
+const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 }  // namespace
 
 void PendingTrace::finish() {
@@ -34,6 +35,10 @@ void PendingTrace::finish() {
       if (!hostname.empty()) {
         span->meta[datadog_hostname_tag] = hostname;
       }
+      if (!std::isnan(analytics_rate) &&
+          span->metrics.find(event_sample_rate_metric) == span->metrics.end()) {
+        span->metrics[event_sample_rate_metric] = analytics_rate;
+      }
       break;
     }
   }
@@ -56,9 +61,8 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
     if (!context.origin().empty()) {
       trace->second.origin = context.origin();
     }
-    if (!options_.hostname.empty()) {
-      trace->second.hostname = options_.hostname;
-    }
+    trace->second.hostname = options_.hostname;
+    trace->second.analytics_rate = options_.analytics_rate;
   }
   trace->second.all_spans.insert(context.id());
 }

@@ -1,6 +1,7 @@
 #ifndef DD_OPENTRACING_SPAN_BUFFER_H
 #define DD_OPENTRACING_SPAN_BUFFER_H
 
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -28,6 +29,7 @@ struct PendingTrace {
   bool sampling_priority_locked = false;
   std::string origin;
   std::string hostname;
+  double analytics_rate;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -48,6 +50,7 @@ class SpanBuffer {
 
 struct WritingSpanBufferOptions {
   std::string hostname;
+  double analytics_rate = std::nan("");
 };
 
 // A SpanBuffer that sends completed traces to a Writer.

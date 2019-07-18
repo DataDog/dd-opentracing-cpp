@@ -3,7 +3,6 @@
 #include <opentracing/ext/tags.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <cstdlib>
 #include <random>
 
 #include "noopspan.h"
@@ -56,24 +55,49 @@ std::string reportingHostname() {
   return "";
 }
 
+double analyticsRate() {
+  // This returns the analytics rate to apply to spans produced by this tracer.
+  // The value of DD_TRACE_ANALYTICS_ENABLED and/or DD_GLOBAL_ANALYTICS_SAMPLE_RATE
+  // are used in determining the rate.
+  auto global_rate_opt = std::getenv("DD_GLOBAL_ANALYTICS_SAMPLE_RATE");
+  if (global_rate_opt != nullptr) {
+    try {
+      double value = std::stod(global_rate_opt);
+      if (value >= 0.0 && value <= 1.0) {
+        return value;
+      }
+    } catch (const std::invalid_argument &ia) {
+      // Ignore invalid value.
+    } catch (const std::out_of_range &oor) {
+      // Ignore values not in range.
+    }
+  }
+  auto enabled_opt = std::getenv("DD_TRACE_ANALYTICS_ENABLED");
+  if (enabled_opt != nullptr) {
+    auto value = std::string(enabled_opt);
+    if (value == "true" || value == "1") {
+      return 1.0;
+    } else if (value == "false" || value == "0" || value == "") {
+      return 0.0;
+    }
+  }
+  // use NaN to indicate "not set".
+  return std::nan("");
+}
+
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
     : opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
-      sampler_(sampler),
-      hostname_(reportingHostname()) {}
+      sampler_(sampler) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
-    : opts_(options),
-      get_time_(getRealTime),
-      get_id_(getId),
-      sampler_(sampler),
-      hostname_(reportingHostname()) {
-  buffer_ = std::shared_ptr<SpanBuffer>{
-      new WritingSpanBuffer{writer, WritingSpanBufferOptions{reportingHostname()}}};
+    : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
+  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{
+      writer, WritingSpanBufferOptions{reportingHostname(), analyticsRate()}}};
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -109,7 +133,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
   std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_, span_id,
                                       trace_id, parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
-                                      opts_.operation_name_override, hostname_}};
+                                      opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;
   for (auto &tag : options.tags) {
     if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {

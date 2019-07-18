@@ -88,6 +88,8 @@ struct MockBuffer : public WritingSpanBuffer {
 
   void setHostname(std::string hostname) { options_.hostname = hostname; };
 
+  void setAnalyticsRate(double rate) { options_.analytics_rate = rate; };
+
   void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
 };
 

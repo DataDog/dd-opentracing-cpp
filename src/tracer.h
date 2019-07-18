@@ -72,7 +72,6 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   TimeProvider get_time_;
   IdProvider get_id_;
   std::shared_ptr<SampleProvider> sampler_;
-  const std::string hostname_;
 };
 
 }  // namespace opentracing
