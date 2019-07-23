@@ -1,8 +1,8 @@
 #include "encoder.h"
+#include <datadog/version.h>
 #include <nlohmann/json.hpp>
 #include "sample.h"
 #include "span.h"
-#include "version_number.h"
 
 using json = nlohmann::json;
 
@@ -26,8 +26,8 @@ AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<SampleProvider> sampler)
   // Set up common headers and default encoder
   common_headers_ = {{header_content_type, "application/msgpack"},
                      {header_dd_meta_lang, "cpp"},
-                     {header_dd_meta_lang_version, config::cpp_version},
-                     {header_dd_meta_tracer_version, config::tracer_version}};
+                     {header_dd_meta_lang_version, ::datadog::version::cpp_version},
+                     {header_dd_meta_tracer_version, ::datadog::version::tracer_version}};
 }
 
 const std::string agent_api_path = "/v0.4/traces";

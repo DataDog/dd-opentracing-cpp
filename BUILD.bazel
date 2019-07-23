@@ -21,9 +21,9 @@ cc_library(
         "src/tracer_options.h",
         "src/writer.cpp",
         "src/writer.h",
-        ":version_number.h",
     ],
     hdrs = [
+        "include/datadog/version.h",
         "include/datadog/opentracing.h",
         "include/datadog/tags.h",
     ],
@@ -43,26 +43,6 @@ cc_library(
         "@com_github_msgpack_msgpack_c//:msgpack",
         "@io_opentracing_cpp//:opentracing",
     ],
-)
-
-genrule(
-    name = "generate_version_number_h",
-    srcs = glob([
-        "CMakeLists.txt",
-        "src/*",
-    ]),
-    outs = [
-        "version_number.h",
-    ],
-    cmd = """
-    TEMP_DIR=$$(mktemp -d)
-    trap -- 'rm -r $$TEMP_DIR' EXIT
-    VERSION_NUMBER_H_OUT=$${PWD}/$(location :version_number.h)
-    CMAKE_ROOT=$$(dirname $${PWD}/$(location :CMakeLists.txt))
-    cd $$TEMP_DIR
-    cmake -DHEADERS_ONLY=ON -L $$CMAKE_ROOT
-    mv version_number.h $$VERSION_NUMBER_H_OUT
-    """,
 )
 
 cc_library(
