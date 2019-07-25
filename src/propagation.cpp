@@ -366,10 +366,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(std::ist
     }
   }
   if (j.find(json_origin_key) != j.end()) {
-    origin = j[json_origin_key];
+    j.at(json_origin_key).get_to(origin);
   }
   if (j.find(json_baggage_key) != j.end()) {
-    baggage = j[json_baggage_key].get<std::unordered_map<std::string, std::string>>();
+    j.at(json_baggage_key).get_to(baggage);
   }
 
   auto context = std::make_unique<SpanContext>(parent_id, trace_id, origin, std::move(baggage));
