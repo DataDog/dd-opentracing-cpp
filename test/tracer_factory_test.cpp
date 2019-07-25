@@ -180,8 +180,24 @@ TEST_CASE("tracer") {
   }
 
   SECTION("handles bad propagation style") {
-    auto bad_value = GENERATE(
-        values<std::string>({"\"i dunno\"", "[]", "[\"Not a real propagation style!\"]"}));
+    struct BadValueTest {
+      std::string value;
+      std::string error_extract;
+      std::string error_inject;
+    };
+
+    std::string incorrect_type = "configuration has an argument with an incorrect type";
+    std::string invalid_value_extract =
+        "Invalid value for propagation_style_extract, must be a list of at least one element with "
+        "value 'Datadog', or 'B3'";
+    std::string invalid_value_inject =
+        "Invalid value for propagation_style_inject, must be a list of at least one element with "
+        "value 'Datadog', or 'B3'";
+
+    auto bad_value = GENERATE_COPY(values<BadValueTest>(
+        {{"\"i dunno\"", incorrect_type, incorrect_type},
+         {"[]", invalid_value_extract, invalid_value_inject},
+         {"[\"Not a real propagation style!\"]", invalid_value_extract, invalid_value_inject}}));
 
     SECTION("extract") {
       std::ostringstream input;
@@ -189,31 +205,26 @@ TEST_CASE("tracer") {
       {
         "service": "my-service",
         "propagation_style_extract": )"
-            << bad_value << R"(
+            << bad_value.value << R"(
       })";
       std::string error = "";
       auto result = factory.MakeTracer(input.str().c_str(), error);
-      REQUIRE(error ==
-              "Invalid value for propagation_style_extract, must be a list of at least one "
-              "element "
-              "with value 'Datadog', or 'B3'");
+      REQUIRE(error == bad_value.error_extract);
       REQUIRE(!result);
       REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
     }
 
-    SECTION("hinject") {
+    SECTION("inject") {
       std::ostringstream input;
       input << R"(
       {
         "service": "my-service",
         "propagation_style_inject": )"
-            << bad_value << R"(
+            << bad_value.value << R"(
       })";
       std::string error = "";
       auto result = factory.MakeTracer(input.str().c_str(), error);
-      REQUIRE(error ==
-              "Invalid value for propagation_style_inject, must be a list of at least one element "
-              "with value 'Datadog', or 'B3'");
+      REQUIRE(error == bad_value.error_inject);
       REQUIRE(!result);
       REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
     }

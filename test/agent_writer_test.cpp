@@ -93,27 +93,28 @@ TEST_CASE("writer") {
 
     auto bad_response_test_case = GENERATE(values<BadResponseTest>(
         {{"// Error at start, short body",
-          ("Unable to parse response from agent.\n"
-           "Error was: [json.exception.parse_error.101] parse error at 1: syntax error - "
-           "invalid literal; last read: '/'\n"
-           "Error near: // Error at start, short body\n")},
+          "Unable to parse response from agent.\n"
+          "Error was: [json.exception.parse_error.101] parse error at line 1, column 1: "
+          "syntax error while parsing value - invalid literal; last read: '/'\n"
+          "Error near: // Error at start, short body\n"},
          {"{\"lol\" // Error near start, error message should have truncated "
           "body. 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9",
           "Unable to parse response from agent.\n"
-          "Error was: [json.exception.parse_error.101] parse error at 8: syntax error - invalid "
-          "literal; last read: '\"lol\" /'; expected ':'\n"
+          "Error was: [json.exception.parse_error.101] parse error at line 1, column 8: syntax "
+          "error while parsing object separator - invalid literal; last read: '\"lol\" /'; "
+          "expected ':'\n"
           "Error near: {\"lol\" // Error near start, error message should h...\n"},
          {"{\"Error near the end, should be truncated. 0 1 2 3 4 5 6 7 8 9 \", oh noes",
           "Unable to parse response from agent.\n"
-          "Error was: [json.exception.parse_error.101] parse error at 65: syntax error - "
-          "unexpected ','; expected ':'\n"
+          "Error was: [json.exception.parse_error.101] parse error at line 1, column 65: syntax "
+          "error while parsing object separator - unexpected ','; expected ':'\n"
           "Error near: ...d. 0 1 2 3 4 5 6 7 8 9 \", oh noes\n"},
          {"{\"Error in the middle, truncated from both ends\" lol 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 "
           "6 7 8 9",
           "Unable to parse response from agent.\n"
-          "Error was: [json.exception.parse_error.101] parse error at 50: syntax error - invalid "
-          "literal; last read: '\"Error in the middle, truncated from both ends\" l'; expected "
-          "':'\n"
+          "Error was: [json.exception.parse_error.101] parse error at line 1, column 50: syntax "
+          "error while parsing object separator - invalid literal; last read: '\"Error in the "
+          "middle, truncated from both ends\" l'; expected ':'\n"
           "Error near: ...uncated from both ends\" lol 0 1 2 3 4 5 6 7 8 9 0 ...\n"}}));
 
     handle->response = bad_response_test_case.response;
@@ -123,8 +124,8 @@ TEST_CASE("writer") {
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush(std::chrono::seconds(10));
-    REQUIRE(error_message.str() == bad_response_test_case.error);
     std::cerr.rdbuf(stderr);  // Restore stderr.
+    REQUIRE(error_message.str() == bad_response_test_case.error);
     REQUIRE(sampler->config == "");
   }
 
