@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include <utility>
 #include "sample.h"
 #include "span_buffer.h"
