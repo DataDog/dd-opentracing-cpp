@@ -27,31 +27,32 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
       error_message = "configuration argument 'service' is missing";
       return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
     }
-    options.service = config["service"];
+    config.at("service").get_to(options.service);
     // Optional.
     if (config.find("agent_host") != config.end()) {
-      options.agent_host = config["agent_host"];
+      config.at("agent_host").get_to(options.agent_host);
     }
     if (config.find("agent_port") != config.end()) {
-      options.agent_port = config["agent_port"];
+      config.at("agent_port").get_to(options.agent_port);
     }
     if (config.find("type") != config.end()) {
-      options.type = config["type"];
+      config.at("type").get_to(options.type);
     }
     if (config.find("environment") != config.end()) {
-      options.environment = config["environment"];
+      config.at("environment").get_to(options.environment);
     }
     if (config.find("sample_rate") != config.end()) {
-      options.sample_rate = config["sample_rate"];
+      config.at("sample_rate").get_to(options.sample_rate);
     }
     if (config.find("dd.priority.sampling") != config.end()) {
-      options.priority_sampling = config["dd.priority.sampling"];
+      config.at("dd.priority.sampling").get_to(options.priority_sampling);
     }
     if (config.find("operation_name_override") != config.end()) {
-      options.operation_name_override = config["operation_name_override"];
+      config.at("operation_name_override").get_to(options.operation_name_override);
     }
     if (config.find("propagation_style_extract") != config.end()) {
-      auto styles = asPropagationStyle(config["propagation_style_extract"]);
+      auto styles = asPropagationStyle(
+          config.at("propagation_style_extract").get<std::vector<std::string>>());
       if (!styles || styles.value().size() == 0) {
         error_message =
             "Invalid value for propagation_style_extract, must be a list of at least one element "
@@ -61,7 +62,8 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
       options.extract = styles.value();
     }
     if (config.find("propagation_style_inject") != config.end()) {
-      auto styles = asPropagationStyle(config["propagation_style_inject"]);
+      auto styles = asPropagationStyle(
+          config.at("propagation_style_inject").get<std::vector<std::string>>());
       if (!styles || styles.value().size() == 0) {
         error_message =
             "Invalid value for propagation_style_inject, must be a list of at least one element "
