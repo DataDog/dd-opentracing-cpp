@@ -39,6 +39,9 @@ int main(int argc, char* argv[]) {
     const char* exchange = "adx";
     auto span = globalTracer->StartSpan("test_span");
     span->SetTag("exchange", exchange);
+    char badly_terminated[4];
+    strncpy(badly_terminated, "test", 4);
+    span->SetTag("tag", badly_terminated);
     auto span_a = globalTracer->StartSpan("A");
     span_a->SetTag("tag", 123);
     auto span_b = globalTracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
