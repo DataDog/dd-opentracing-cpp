@@ -136,7 +136,7 @@ TEST_CASE("span") {
     span.SetTag("double", 6.283185);
     span.SetTag("int64_t", -69);
     span.SetTag("uint64_t", 420);
-    span.SetTag("std::string", std::string("hi there"));
+    span.SetTag("string", std::string("hi there"));
     span.SetTag("nullptr", nullptr);
     span.SetTag("char*", "hi there");
     span.SetTag("list", std::vector<ot::Value>{"hi", 420, true});
@@ -159,10 +159,27 @@ TEST_CASE("span") {
                                 {"double", "6.283185"},
                                 {"int64_t", "-69"},
                                 {"uint64_t", "420"},
-                                {"std::string", "hi there"},
+                                {"string", "hi there"},
                                 {"nullptr", "nullptr"},
                                 {"char*", "hi there"},
                                 {"list", "[\"hi\",420,true]"},
+                            });
+  }
+
+  SECTION("replaces colons with dots in tag key") {
+    auto span_id = get_id();
+    Span span{nullptr,    buffer,  get_time, sampler,
+              span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
+              get_time(), "",      "",       "",
+              "",         ""};
+
+    span.SetTag("foo:bar:baz", "x");
+
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
+                                {"foo.bar.baz", "x"},
                             });
   }
 
