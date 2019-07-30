@@ -36,6 +36,9 @@ int main(int argc, char* argv[]) {
   {
     // Fetch the global tracer
     auto globalTracer = opentracing::Tracer::Global();
+    std::string exchange = "adx";
+    auto span = globalTracer->StartSpan("test_span");
+    span->SetTag("exchange", exchange);
     auto span_a = globalTracer->StartSpan("A");
     span_a->SetTag("tag", 123);
     auto span_b = globalTracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
