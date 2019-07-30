@@ -1,4 +1,5 @@
 #include <opentracing/dynamic_load.h>
+#include <opentracing/tracer.h>
 #include <iostream>
 #include <string>
 
@@ -26,16 +27,25 @@ int main(int argc, char* argv[]) {
     std::cerr << "Failed to create tracer " << error_message << "\n";
     return 1;
   }
-  auto& tracer = *tracer_maybe;
+  // Keep the original tracer. We reset to it at the end.
+  auto original_tracer = opentracing::Tracer::Global();
+  // Initialize the global tracer.
+  opentracing::Tracer::InitGlobal(*tracer_maybe);
 
   // Create some spans.
   {
-    auto span_a = tracer->StartSpan("A");
+    // Fetch the global tracer
+    auto globalTracer = opentracing::Tracer::Global();
+    auto span_a = globalTracer->StartSpan("A");
     span_a->SetTag("tag", 123);
-    auto span_b = tracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
-    span_b->SetTag("tag", "value");
+    auto span_b = globalTracer->StartSpan("B", {opentracing::ChildOf(&span_a->context())});
+    std::string value("an std::string value");
+    span_b->SetTag("tag", value);
   }
 
-  tracer->Close();
+  // Close the current tracer as a courtesy.
+  opentracing::Tracer::Global()->Close();
+  // Reset to the original tracer.
+  opentracing::Tracer::InitGlobal(original_tracer);
   return 0;
 }
