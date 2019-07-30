@@ -1,8 +1,14 @@
 version: "3.2"
 services:
-  dd-opentracing-cpp-example:
+  example1:
     build:
       context: ./
+    depends_on:
+      - dd-agent
+  example2:
+    build:
+      context: ./
+      dockerfile: Dockerfile-fromsource
     depends_on:
       - dd-agent
   dd-agent:
