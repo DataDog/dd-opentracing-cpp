@@ -372,6 +372,30 @@ TEST_CASE("span") {
     }
   }
 
+  SECTION("invalid http status code is ignored") {
+    auto span_id = get_id();
+    Span span{nullptr,
+              buffer,
+              get_time,
+              sampler,
+              span_id,
+              span_id,
+              0,
+              SpanContext{span_id, span_id, "", {}},
+              get_time(),
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              "overridden operation name"};
+
+    span.SetTag(ot::ext::http_status_code, 0);
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    REQUIRE(result->meta.find(ot::ext::http_status_code) == result->meta.end());
+  }
+
   SECTION("sampling") {
     auto priority_sampler = std::make_shared<MockSampler>();
     priority_sampler->sampling_priority =

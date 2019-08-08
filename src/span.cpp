@@ -303,6 +303,14 @@ struct VariantVisitor {
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   std::string result;
   apply_visitor(VariantVisitor{result}, value);
+
+  // Check for invalid values.
+  // - tag: http.status_code, value: "0"
+  if (key == ::ot::ext::http_status_code && result == "0") {
+    return;
+  }
+
+  // Store the tag and value in span metadata.
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     span_->meta[key] = result;
