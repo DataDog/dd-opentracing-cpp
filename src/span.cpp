@@ -300,12 +300,24 @@ struct VariantVisitor {
 };
 }  // namespace
 
+// Normalizes the tag key.
+// For now:
+// - ':' is replaced with '.'
+// Further normalization may be done in the future, such as
+// converting to lowercase, and replacing spaces and other punctuation
+// with underscore.
+std::string normalizeTagKey(std::string tag) {
+  std::replace(tag.begin(), tag.end(), ':', '.');
+  return tag;
+}
+
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
+  std::string k = normalizeTagKey(key);
   std::string result;
   apply_visitor(VariantVisitor{result}, value);
   {
     std::lock_guard<std::mutex> lock_guard{mutex_};
-    span_->meta[key] = result;
+    span_->meta[k] = result;
   }
 
   // Normally special tags are processed at Span Finish, but this cannot be done for
@@ -313,7 +325,7 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   // assigned immutably.
   // The sampling tags are "sampling.priority", "manual.keep" and "manual.drop".
   // Doesn't need to be in the same mutex lock as above.
-  if (key == ::ot::ext::sampling_priority) {
+  if (k == ::ot::ext::sampling_priority) {
     // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
     // "sampling.priority"
     try {
@@ -329,9 +341,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     } catch (const std::out_of_range &oor) {
       std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
     }
-  } else if (key == tags::manual_keep) {
+  } else if (k == tags::manual_keep) {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
-  } else if (key == tags::manual_drop) {
+  } else if (k == tags::manual_drop) {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
   }
 }
