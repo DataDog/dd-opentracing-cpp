@@ -300,15 +300,19 @@ struct VariantVisitor {
 };
 }  // namespace
 
-// Replaces some characters in span tag keys with a '.'
-// For now, only ':' is replaced.
-std::string replacePunctuation(std::string tag) {
+// Normalizes the tag key.
+// For now:
+// - ':' is replaced with '.'
+// Further normalization may be done in the future, such as
+// converting to lowercase, and replacing spaces and other punctuation
+// with underscore.
+std::string normalizeTagKey(std::string tag) {
   std::replace(tag.begin(), tag.end(), ':', '.');
   return tag;
 }
 
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
-  std::string k = replacePunctuation(key);
+  std::string k = normalizeTagKey(key);
   std::string result;
   apply_visitor(VariantVisitor{result}, value);
   {
