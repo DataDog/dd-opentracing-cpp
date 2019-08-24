@@ -1,6 +1,5 @@
 #include "../src/tracer_options.h"
 
-#define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 

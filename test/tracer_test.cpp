@@ -1,10 +1,10 @@
 #include "../src/tracer.h"
+#include <unistd.h>
 #include <ctime>
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "mocks.h"
 
-#define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
