@@ -3,7 +3,9 @@
 
 # Build folder
 .build/
-.nginx-build/
+
+# Locally installed dependencies
+.deps/
 
 # Compiled Object files
 *.slo
