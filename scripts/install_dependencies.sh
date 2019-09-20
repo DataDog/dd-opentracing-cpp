@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-install_dir=$(cd "${0%/*}/../deps" && echo "$PWD")
+install_dir=$(mkdir -p "${0%/*}/../deps" && cd "${0%/*}/../deps" && echo "$PWD")
 if [[ ! -d "$install_dir" ]]; then
 	echo "Unable to determine install directory"
 	exit 1
