@@ -359,6 +359,13 @@ std::string Span::BaggageItem(ot::string_view restricted_key) const noexcept {
 void Span::Log(
     std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
 
+void Span::Log(
+    ot::SystemTime /* timestamp */,
+    std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
+
+void Span::Log(ot::SystemTime /* timestamp */,
+               const std::vector<std::pair<ot::string_view, ot::Value>> & /* fields */) noexcept {}
+
 OptionalSamplingPriority Span::setSamplingPriority(
     std::unique_ptr<UserSamplingPriority> user_priority) {
   std::lock_guard<std::mutex> lock_guard{mutex_};

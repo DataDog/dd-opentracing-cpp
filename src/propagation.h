@@ -55,13 +55,19 @@ class SpanContext : public ot::SpanContext {
   static SpanContext NginxOpenTracingCompatibilityHackSpanContext(
       uint64_t id, uint64_t trace_id, std::unordered_map<std::string, std::string> &&baggage);
 
+  SpanContext(const SpanContext &other);
   SpanContext(SpanContext &&other);
+  SpanContext &operator=(const SpanContext &other);
   SpanContext &operator=(SpanContext &&other);
   bool operator==(const SpanContext &other) const;
   bool operator!=(const SpanContext &other) const;
 
   void ForeachBaggageItem(
       std::function<bool(const std::string &, const std::string &)> f) const override;
+
+  std::unique_ptr<ot::SpanContext> Clone() const noexcept override;
+  std::string ToTraceID() const noexcept override;
+  std::string ToSpanID() const noexcept override;
 
   void setBaggageItem(ot::string_view key, ot::string_view value) noexcept;
 

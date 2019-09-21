@@ -38,6 +38,14 @@ std::string NoopSpan::BaggageItem(ot::string_view restricted_key) const noexcept
 void NoopSpan::Log(
     std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
 
+void NoopSpan::Log(
+    ot::SystemTime /* timestamp */,
+    std::initializer_list<std::pair<ot::string_view, ot::Value>> /* fields */) noexcept {}
+
+void NoopSpan::Log(
+    ot::SystemTime /* timestamp */,
+    const std::vector<std::pair<ot::string_view, ot::Value>> & /* fields */) noexcept {}
+
 const ot::SpanContext &NoopSpan::context() const noexcept { return context_; }
 
 const ot::Tracer &NoopSpan::tracer() const noexcept { return *tracer_; }

@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
-install_dir=$(cd "${0%/*}/../deps" && echo "$PWD")
+install_dir=$(mkdir -p "${0%/*}/../deps" && cd "${0%/*}/../deps" && echo "$PWD")
 if [[ ! -d "$install_dir" ]]; then
 	echo "Unable to determine install directory"
 	exit 1
 fi
 
-OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.5.1}
+OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.6.0}
 CURL_VERSION=${CURL_VERSION:-7.66.0}
 MSGPACK_VERSION=${MSGPACK_VERSION:-3.1.1}
 ZLIB_VERSION=${ZLIB_VERSION:-1.2.11}

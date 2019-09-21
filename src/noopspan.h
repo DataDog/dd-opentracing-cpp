@@ -30,6 +30,13 @@ class NoopSpan : public DatadogSpan {
   void SetBaggageItem(ot::string_view restricted_key, ot::string_view value) noexcept override;
   std::string BaggageItem(ot::string_view restricted_key) const noexcept override;
   void Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override;
+  virtual void Log(
+      ot::SystemTime timestamp,
+      std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override;
+
+  virtual void Log(
+      ot::SystemTime timestamp,
+      const std::vector<std::pair<ot::string_view, ot::Value>> &fields) noexcept override;
   const ot::SpanContext &context() const noexcept override;
   const ot::Tracer &tracer() const noexcept override;
   uint64_t traceId() const override;
