@@ -1,0 +1,35 @@
+#!/bin/bash
+# Checks if the version of cURL has become outdated and needs an update.
+# Details are parsed from https://curl.haxx.se/docs/releases.csv and the outcome can be
+# - unknown (eg: couldn't download or parse CSV file)
+# - up-to-date (yay)
+# - vulnerable, update and release required
+# - outdated, not vulnerable but still could be updated
+
+current_version=$(${0%/*}/../../../scripts/install_dependencies.sh versions | awk -F':' '$1 == "curl" { print $2; exit; }')
+
+if [[ -z "$current_version" ]]; then
+	echo "Unable to determine current version of curl."
+	exit 1
+fi
+
+# This ironically requires curl installed
+curl_releases=$(curl -s https://curl.haxx.se/docs/releases.csv)
+
+latest=$(awk -F';' '{ print $2; exit; }' <<< "$curl_releases" )
+if [[ $current_version == $latest ]]; then
+	echo "Up to date: $latest"
+	exit 0
+fi
+
+read -r age bugfixes changes vulns _ < <(awk -F';' -v "ver=$current_version" '$2 == ver { print $7, $9, $11, $3; exit; }' <<< "$curl_releases")
+
+if ((vulns > 0)); then
+	echo "Vulnerable: $vulns reported vulnerabilities for this release. Update from $current_version to $latest"
+	exit 1
+fi
+
+echo "Outdated: $current_version is from $age days ago and contains $bugfixes bug fixes and $changes other changes."
+if ((age > 100)); then
+	exit 1
+fi
