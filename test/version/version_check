@@ -15,7 +15,7 @@ if ! type g++ > /dev/null; then
     exit 0
 fi
 
-if ! g++ -I$(git rev-parse --show-toplevel)/include -o current_version current_version.cc; then
+if ! g++ -I"$(git rev-parse --show-toplevel)"/include -o current_version current_version.cc; then
     echo "failed to compile current_version.cc"
     exit 1
 fi
