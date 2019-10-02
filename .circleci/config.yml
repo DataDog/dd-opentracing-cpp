@@ -28,6 +28,9 @@ jobs:
               fi
             done
       - run:
+          name: Check version info is up-to-date
+          command: ./test/version/version_check
+      - run:
           name: Build source dependencies
           command: |
             ./scripts/install_dependencies.sh

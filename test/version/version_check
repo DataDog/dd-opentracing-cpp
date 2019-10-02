@@ -1,0 +1,43 @@
+#!/bin/bash
+
+if ! cd "${0%/*}"; then
+    echo "failed to change working directory"
+    exit 1
+fi
+
+if ! type git > /dev/null; then
+    echo "git not available."
+    exit 0
+fi
+
+if ! type g++ > /dev/null; then
+    echo "g++ not available."
+    exit 0
+fi
+
+if ! g++ -I"$(git rev-parse --show-toplevel)"/include -o current_version current_version.cc; then
+    echo "failed to compile current_version.cc"
+    exit 1
+fi
+if ! version=$(./current_version); then
+    echo "failed to execute current_version"
+    exit 1
+fi
+if ! [[ "$version" ]]; then
+    echo "empty version info"
+    exit 1
+fi
+rm ./current_version
+
+if ! git rev-parse "$version" &>/dev/null; then
+    # already updated
+    exit 0
+fi
+
+head_ts=$(git show -s --format=%ct HEAD)
+vers_ts=$(git show -s --format=%ct "$version")
+
+if ((head_ts > vers_ts)); then
+    echo "version tag is outdated and needs an update"
+    exit 1
+fi
