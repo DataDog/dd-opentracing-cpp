@@ -1,7 +1,7 @@
 # Builds and runs a simple nginx server, traced by Datadog
 FROM ubuntu:18.04
 
-ARG NGINX_VERSION=1.14.0
+ARG NGINX_VERSION=1.14.2
 
 RUN apt-get update && \
   apt-get install -y git gnupg wget tar

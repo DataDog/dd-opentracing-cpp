@@ -16,5 +16,3 @@ services:
       - DD_API_KEY
       - 'DD_APM_ENABLED=true'
     image: 'datadog/agent'
-    ports:
-        - "127.0.0.1:8126:8126"
