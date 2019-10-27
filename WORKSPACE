@@ -3,9 +3,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_opentracing_cpp",
-    sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
-    strip_prefix = "opentracing-cpp-1.5.1",
-    urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
+    sha256 = "5b170042da4d1c4c231df6594da120875429d5231e9baa5179822ee8d1054ac3",
+    strip_prefix = "opentracing-cpp-1.6.0",
+    urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.6.0.tar.gz"],
 )
 
 http_archive(
