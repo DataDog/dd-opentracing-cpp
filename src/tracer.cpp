@@ -37,7 +37,7 @@ thread_local std::mt19937_64 TlsRandomNumberGenerator::random_number_generator_{
 
 uint64_t getId() {
   static TlsRandomNumberGenerator rng;
-  static thread_local std::uniform_int_distribution<uint64_t> distribution;
+  static thread_local std::uniform_int_distribution<int64_t> distribution;
   return distribution(TlsRandomNumberGenerator::generator());
 }
 
