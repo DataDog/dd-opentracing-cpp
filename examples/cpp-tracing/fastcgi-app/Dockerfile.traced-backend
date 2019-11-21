@@ -1,0 +1,7 @@
+FROM golang:1.12 AS build
+ADD traced_backend.go /go/src/traced-backend/
+RUN go get -d traced-backend && go install traced-backend
+
+FROM debian:stretch-slim
+COPY --from=build /go/bin/traced-backend /bin/traced-backend
+ENTRYPOINT ["/bin/traced-backend"]

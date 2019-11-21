@@ -1,0 +1,32 @@
+FROM ubuntu:18.04
+
+RUN apt update && apt -y install cmake g++ libfcgi-dev wget zlib1g-dev libcurl4-openssl-dev
+RUN wget "https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz" && \
+  tar zxf v1.5.1.tar.gz && \
+  mkdir -p "opentracing-cpp-1.5.1/.build" && \
+  cd "opentracing-cpp-1.5.1/.build" && \
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_CXX_FLAGS="-fPIC" \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_MOCKTRACER=OFF \
+        .. && \
+  make && \
+  make install && \
+  cd ../.. && \
+  rm -r v1.5.1.tar.gz opentracing-cpp-1.5.1/ && \
+  wget https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.2.tar.gz && \
+  tar zxf v1.1.2.tar.gz && \
+  mkdir -p dd-opentracing-cpp-1.1.2/.build && \
+  cd dd-opentracing-cpp-1.1.2/.build && \
+  # Download and install the correct version of opentracing-cpp, & other deps.
+  ../scripts/install_dependencies.sh not-curl not-opentracing not-zlib && \
+  cmake .. && \
+  make && \
+  make install && \
+  cd ../.. && \
+  rm -r v1.1.2.tar.gz dd-opentracing-cpp-1.1.2/ && \
+  ldconfig
+COPY app.cpp /
+RUN g++ -Wall -Wextra -Werror -o app app.cpp -lfcgi -lcurl -lpthread -lopentracing -ldd_opentracing
+ENTRYPOINT ["/app"]
