@@ -20,6 +20,9 @@ if(BUILD_TESTING)
 endif()
 
 # Configure the compiler.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
 set(CMAKE_CXX_STANDARD 14)
 
 # Includes
