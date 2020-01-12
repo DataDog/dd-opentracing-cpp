@@ -126,7 +126,8 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
 
   // Check early if we need to discard. Check at span Finish if we need to sample (since users can
   // set this).
-  if (sampler_->discard(span_context)) {
+  if (span_context.getPropagatedSamplingPriority() == nullptr && sampler_->discard(span_context)) {
+    std::cout << "discarding " << span_context.traceId() << std::endl;
     return std::unique_ptr<ot::Span>{
         new NoopSpan{shared_from_this(), span_id, trace_id, parent_id, std::move(span_context)}};
   }
