@@ -1,7 +1,9 @@
 #include "../src/tracer.h"
+#include <unistd.h>
 #include <ctime>
 #include "../src/sample.h"
 #include "../src/span.h"
+#include "../src/tracer_options.h"
 #include "mocks.h"
 
 #include <catch2/catch.hpp>
@@ -115,5 +117,83 @@ TEST_CASE("tracer") {
     // Tag should not exist on the child span(s).
     auto& child_result = buffer->traces(100).finished_spans->at(0);
     REQUIRE(child_result->metrics.find("_dd1.sr.eausr") == child_result->metrics.end());
+  }
+}
+
+TEST_CASE("env overrides") {
+  int id = 100;  // Starting span id.
+  // Starting calendar time 2007-03-12 00:00:00
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
+  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
+                 std::chrono::steady_clock::time_point{}};
+  // auto buffer = std::make_shared<MockBuffer>();
+  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
+  IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
+  auto sampler = std::make_shared<KeepAllSampler>();
+  auto mwriter = std::make_shared<MockWriter>(sampler);
+  auto writer = std::shared_ptr<Writer>(mwriter);
+  TracerOptions tracer_options{"", 0, "service_name", "web"};
+  const ot::StartSpanOptions span_options;
+
+  struct EnvOverrideTest {
+    std::string env;
+    std::string val;
+    std::string hostname;
+    double rate;
+    bool error;
+  };
+
+  char buf[256];
+  ::gethostname(buf, 256);
+  std::string hostname(buf);
+
+  auto env_test = GENERATE_COPY(values<EnvOverrideTest>({
+      // Normal cases
+      {"DD_TRACE_REPORT_HOSTNAME", "true", hostname, std::nan(""), false},
+      {"DD_TRACE_ANALYTICS_ENABLED", "true", "", 1.0, false},
+      {"DD_TRACE_ANALYTICS_ENABLED", "false", "", 0.0, false},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5", "", 0.5, false},
+      {"", "", "", std::nan(""), false},
+      // Unexpected values handled gracefully
+      {"DD_TRACE_ANALYTICS_ENABLED", "yes please", "", std::nan(""), true},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1", "", std::nan(""), true},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "half", "", std::nan(""), true},
+  }));
+
+  SECTION("set correct tags and metrics") {
+    // Setup
+    ::setenv(env_test.env.c_str(), env_test.val.c_str(), 0);
+    auto maybe_options = applyTracerOptionsFromEnvironment(tracer_options);
+    if (env_test.error) {
+      REQUIRE(maybe_options.error());
+      return;
+    }
+    REQUIRE(maybe_options);
+    TracerOptions opts = maybe_options.value();
+    std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
+
+    // Create span
+    auto span = tracer->StartSpanWithOptions("/env-override", span_options);
+    const ot::FinishSpanOptions finish_options;
+    span->FinishWithOptions(finish_options);
+
+    auto& result = mwriter->traces[0][0];
+    // Check the analytics rate matches the expected value.
+    if (env_test.hostname.empty()) {
+      REQUIRE(result->meta.find("_dd.hostname") == result->meta.end());
+    } else {
+      REQUIRE(result->meta["_dd.hostname"] == env_test.hostname);
+    }
+    // Check the analytics rate matches the expected value.
+    if (std::isnan(env_test.rate)) {
+      REQUIRE(result->metrics.find("_dd1.sr.eausr") == result->metrics.end());
+    } else {
+      REQUIRE(result->metrics["_dd1.sr.eausr"] == env_test.rate);
+    }
+    // Tear-down
+    ::unsetenv(env_test.env.c_str());
   }
 }
