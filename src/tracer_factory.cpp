@@ -72,6 +72,15 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
       }
       options.inject = styles.value();
     }
+    if (config.find("dd.trace.report-hostname") != config.end()) {
+      config.at("dd.trace.report-hostname").get_to(options.report_hostname);
+    }
+    if (config.find("dd.trace.analytics-enabled") != config.end()) {
+      config.at("dd.trace.analytics-enabled").get_to(options.analytics_enabled);
+    }
+    if (config.find("dd.trace.analytics-sample-rate") != config.end()) {
+      config.at("dd.trace.analytics-sample-rate").get_to(options.analytics_rate);
+    }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
