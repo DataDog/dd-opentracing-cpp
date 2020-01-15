@@ -171,6 +171,41 @@ TEST_CASE("correct sampler is used") {
   }
 }
 
+TEST_CASE("rate sampling not applied to propagated traces") {
+  struct RateSamplingTestCase {
+    double sample_rate;
+    std::string sampling_priority;
+    bool sampled;
+  };
+
+  auto test_case = GENERATE(values<RateSamplingTestCase>({{0.0, "1", true}, {1.0, "0", false}}));
+
+  TracerOptions tracer_options{"", 0, "service_name", "web", "", test_case.sample_rate, false};
+  auto sampler = sampleProviderFromOptions(tracer_options);
+  REQUIRE(std::dynamic_pointer_cast<DiscardRateSampler>(sampler));
+  auto mwriter = std::make_shared<MockWriter>(sampler);
+  auto writer = std::shared_ptr<Writer>(mwriter);
+  auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+  SECTION("propagated priority used") {
+    MockTextMapCarrier carrier{};
+    carrier.Set("x-datadog-trace-id", "420");
+    carrier.Set("x-datadog-parent-id", "421");
+    carrier.Set("x-datadog-sampling-priority", test_case.sampling_priority);
+
+    auto context_maybe = SpanContext::deserialize(carrier, {PropagationStyle::Datadog});
+    REQUIRE(context_maybe);
+
+    auto span = tracer->StartSpan("test", {opentracing::ChildOf(context_maybe->get())});
+    REQUIRE(dynamic_cast<const Span *>(span.get()));
+    auto context = dynamic_cast<const SpanContext *>(&span->context());
+    REQUIRE(context);
+    auto want = asSamplingPriority(std::stoi(test_case.sampling_priority));
+    auto got = context->getPropagatedSamplingPriority();
+    REQUIRE(*want == *got);
+  }
+}
+
 TEST_CASE("priority sampler \"integration\" test") {
   // There's a real integration test! It's in ./integration/nginx
   // This tests the interaction between Span and the sampler. It's a bit of an overlap with the
@@ -222,7 +257,6 @@ TEST_CASE("priority sampler \"integration\" test") {
     REQUIRE(traces->size() == total);
     for (const auto &trace : *traces) {
       REQUIRE(trace.size() == 1);
-      std::cout << json(trace[0].metrics).dump() << std::endl;
       REQUIRE(trace[0].metrics.find("_sampling_priority_v1") != trace[0].metrics.end());
       OptionalSamplingPriority p =
           asSamplingPriority(trace[0].metrics.find("_sampling_priority_v1")->second);
