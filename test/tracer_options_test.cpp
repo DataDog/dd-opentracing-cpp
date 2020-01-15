@@ -24,6 +24,13 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const ch
   REQUIRE(lhs->operation_name_override == rhs->operation_name_override);
   REQUIRE(lhs->extract == rhs->extract);
   REQUIRE(lhs->inject == rhs->inject);
+  REQUIRE(lhs->report_hostname == rhs->report_hostname);
+  REQUIRE(lhs->analytics_enabled == rhs->analytics_enabled);
+  if (std::isnan(lhs->analytics_rate)) {
+    REQUIRE(std::isnan(rhs->analytics_rate));
+  } else {
+    REQUIRE(lhs->analytics_rate == rhs->analytics_rate);
+  }
 };
 
 TEST_CASE("tracer options from environment variables") {
@@ -39,7 +46,10 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_AGENT_PORT", "420"},
         {"DD_ENV", "env"},
         {"DD_PROPAGATION_STYLE_EXTRACT", "B3 Datadog"},
-        {"DD_PROPAGATION_STYLE_INJECT", "Datadog B3"}},
+        {"DD_PROPAGATION_STYLE_INJECT", "Datadog B3"},
+        {"DD_TRACE_REPORT_HOSTNAME", "true"},
+        {"DD_TRACE_ANALYTICS_ENABLED", "true"},
+        {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"}},
        TracerOptions{"host",
                      420,
                      "",
@@ -50,7 +60,10 @@ TEST_CASE("tracer options from environment variables") {
                      1000,
                      "",
                      {PropagationStyle::Datadog, PropagationStyle::B3},
-                     {PropagationStyle::Datadog, PropagationStyle::B3}}},
+                     {PropagationStyle::Datadog, PropagationStyle::B3},
+                     true,
+                     true,
+                     0.5}},
       {{{"DD_PROPAGATION_STYLE_EXTRACT", "Not even a real style"}},
        ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid")},
       {{{"DD_PROPAGATION_STYLE_INJECT", "Not even a real style"}},
@@ -59,6 +72,12 @@ TEST_CASE("tracer options from environment variables") {
        ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is invalid")},
       {{{"DD_TRACE_AGENT_PORT", "9223372036854775807"}},
        ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is out of range")},
+      {{{"DD_TRACE_REPORT_HOSTNAME", "yes please"}},
+       ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid")},
+      {{{"DD_TRACE_ANALYTICS_ENABLED", "yes please"}},
+       ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid")},
+      {{{"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1"}},
+       ot::make_unexpected("Value for DD_TRACE_ANALYTICS_SAMPLE_RATE is invalid")},
   }));
 
   // Setup

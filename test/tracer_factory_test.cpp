@@ -1,5 +1,6 @@
 #include "../src/tracer_factory.h"
 #include "../src/tracer.h"
+#include "mocks.h"
 
 // Source file needed to ensure compilation of templated class TracerFactory<MockTracer>
 #include "../src/tracer_factory.cpp"
@@ -77,8 +78,12 @@ TEST_CASE("tracer") {
              {"[\"Datadog\", \"B3\"]", {PropagationStyle::Datadog, PropagationStyle::B3}},
              {"[\"Datadog\", \"B3\", \"Datadog\", \"B3\"]",
               {PropagationStyle::Datadog, PropagationStyle::B3}}}));
+    auto report_hostname = GENERATE(false, true);
+    auto analytics_enabled = GENERATE(false, true);
+    auto analytics_rate = GENERATE(0.0, 0.5, 1.0);
 
     std::ostringstream input;
+    input << std::boolalpha;
     input << R"(
       {
         "service": "my-service",
@@ -88,7 +93,13 @@ TEST_CASE("tracer") {
         "propagation_style_extract": )"
           << propagation_style_extract.first << R"(,
         "propagation_style_inject": )"
-          << propagation_style_inject.first << R"(
+          << propagation_style_inject.first << R"(,
+        "dd.trace.report-hostname": )"
+          << report_hostname << R"(,
+        "dd.trace.analytics-enabled": )"
+          << analytics_enabled << R"(,
+        "dd.trace.analytics-sample-rate": )"
+          << analytics_rate << R"(
       }
     )";
     std::string error = "";
@@ -102,6 +113,9 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.type == "db");
     REQUIRE(tracer->opts.extract == propagation_style_extract.second);
     REQUIRE(tracer->opts.inject == propagation_style_inject.second);
+    REQUIRE(tracer->opts.report_hostname == report_hostname);
+    REQUIRE(tracer->opts.analytics_enabled == analytics_enabled);
+    REQUIRE(tracer->opts.analytics_rate == analytics_rate);
   }
 
   SECTION("can be created without optional fields") {
@@ -362,6 +376,74 @@ TEST_CASE("tracer") {
       REQUIRE(error == "Value for DD_TRACE_AGENT_PORT is invalid");
       REQUIRE(!result);
       REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
+    }
+    SECTION("DD_TRACE_REPORT_HOSTNAME overrides default") {
+      ::setenv("DD_TRACE_REPORT_HOSTNAME", "true", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_REPORT_HOSTNAME");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.report_hostname);
+    }
+    SECTION("DD_TRACE_REPORT_HOSTNAME overrides config") {
+      ::setenv("DD_TRACE_REPORT_HOSTNAME", "false", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "dd.trace.report-hostname": true
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_REPORT_HOSTNAME");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(!tracer->opts.report_hostname);
+    }
+    SECTION("DD_TRACE_ANALYTICS_ENABLED overrides default") {
+      ::setenv("DD_TRACE_ANALYTICS_ENABLED", "true", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_ANALYTICS_ENABLED");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.analytics_enabled);
+      REQUIRE(tracer->opts.analytics_rate == 1.0);
+    }
+    SECTION("DD_TRACE_ANALYTICS_ENABLED overrides config") {
+      ::setenv("DD_TRACE_ANALYTICS_ENABLED", "false", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "dd.trace.analytics-enabled": true
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_TRACE_ANALYTICS_ENABLED");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(!tracer->opts.analytics_enabled);
+      REQUIRE(std::isnan(tracer->opts.analytics_rate));
     }
   }
 }

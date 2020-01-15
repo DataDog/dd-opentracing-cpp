@@ -3,6 +3,7 @@
 
 #include <opentracing/tracer.h>
 
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -58,6 +59,16 @@ struct TracerOptions {
   // The style of propagation headers to emit/inject. Can also be set by the environment variable
   // DD_PROPAGATION_STYLE_INJECT.
   std::set<PropagationStyle> inject{PropagationStyle::Datadog};
+  // If true, injects the hostname into spans reported by this tracer. Can also be set by the
+  // environment variable DD_TRACE_REPORT_HOSTNAME.
+  bool report_hostname = false;
+  // If true and global analytics rate is not set, spans will be tagged with an analytics rate
+  // of 1.0. Can also be set by the environment variable DD_TRACE_ANALYTICS_ENABLED.
+  bool analytics_enabled = false;
+  // When set to a value between 0.0 and 1.0 (inclusive), spans will be tagged with the provided
+  // value for analytics sampling rate. Can also be set by the environment variable
+  // DD_TRACE_ANALYTICS_SAMPLE_RATE
+  double analytics_rate = std::nan("");
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

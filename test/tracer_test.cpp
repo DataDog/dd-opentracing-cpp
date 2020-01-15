@@ -3,6 +3,7 @@
 #include <ctime>
 #include "../src/sample.h"
 #include "../src/span.h"
+#include "../src/tracer_options.h"
 #include "mocks.h"
 
 #include <catch2/catch.hpp>
@@ -142,28 +143,37 @@ TEST_CASE("env overrides") {
     std::string val;
     std::string hostname;
     double rate;
+    bool error;
   };
 
   char buf[256];
   ::gethostname(buf, 256);
   std::string hostname(buf);
 
-  auto env_test = GENERATE_COPY(
-      values<EnvOverrideTest>({// Normal cases
-                               {"DD_TRACE_REPORT_HOSTNAME", "true", hostname, std::nan("")},
-                               {"DD_TRACE_ANALYTICS_ENABLED", "true", "", 1.0},
-                               {"DD_TRACE_ANALYTICS_ENABLED", "false", "", 0.0},
-                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "0.5", "", 0.5},
-                               {"", "", "", std::nan("")},
-                               // Unexpected values handled gracefully
-                               {"DD_TRACE_ANALYTICS_ENABLED", "yes please", "", std::nan("")},
-                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "1.1", "", std::nan("")},
-                               {"DD_GLOBAL_ANALYTICS_SAMPLE_RATE", "half", "", std::nan("")}}));
+  auto env_test = GENERATE_COPY(values<EnvOverrideTest>({
+      // Normal cases
+      {"DD_TRACE_REPORT_HOSTNAME", "true", hostname, std::nan(""), false},
+      {"DD_TRACE_ANALYTICS_ENABLED", "true", "", 1.0, false},
+      {"DD_TRACE_ANALYTICS_ENABLED", "false", "", 0.0, false},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5", "", 0.5, false},
+      {"", "", "", std::nan(""), false},
+      // Unexpected values handled gracefully
+      {"DD_TRACE_ANALYTICS_ENABLED", "yes please", "", std::nan(""), true},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1", "", std::nan(""), true},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "half", "", std::nan(""), true},
+  }));
 
   SECTION("set correct tags and metrics") {
     // Setup
     ::setenv(env_test.env.c_str(), env_test.val.c_str(), 0);
-    std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, writer, sampler}};
+    auto maybe_options = applyTracerOptionsFromEnvironment(tracer_options);
+    if (env_test.error) {
+      REQUIRE(maybe_options.error());
+      return;
+    }
+    REQUIRE(maybe_options);
+    TracerOptions opts = maybe_options.value();
+    std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 
     // Create span
     auto span = tracer->StartSpanWithOptions("/env-override", span_options);

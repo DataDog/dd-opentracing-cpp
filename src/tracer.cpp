@@ -41,47 +41,22 @@ uint64_t getId() {
   return distribution(TlsRandomNumberGenerator::generator());
 }
 
-std::string reportingHostname() {
-  // This returns the machine name if the DD_TRACE_REPORT_HOSTNAME is set to true.
-  auto report_hostname_opt = std::getenv("DD_TRACE_REPORT_HOSTNAME");
-  if (report_hostname_opt != nullptr && std::strlen(report_hostname_opt) > 0) {
-    if (std::string(report_hostname_opt) == "true") {
-      char buffer[256];
-      if (!::gethostname(buffer, 256)) {
-        return std::string(buffer);
-      }
+std::string reportingHostname(TracerOptions options) {
+  // This returns the machine name when the tracer has been configured
+  // to report hostnames.
+  if (options.report_hostname) {
+    char buffer[256];
+    if (!::gethostname(buffer, 256)) {
+      return std::string(buffer);
     }
   }
   return "";
 }
 
-double analyticsRate() {
-  // This returns the analytics rate to apply to spans produced by this tracer.
-  // The value of DD_TRACE_ANALYTICS_ENABLED and/or DD_GLOBAL_ANALYTICS_SAMPLE_RATE
-  // are used in determining the rate.
-  auto global_rate_opt = std::getenv("DD_GLOBAL_ANALYTICS_SAMPLE_RATE");
-  if (global_rate_opt != nullptr) {
-    try {
-      double value = std::stod(global_rate_opt);
-      if (value >= 0.0 && value <= 1.0) {
-        return value;
-      }
-    } catch (const std::invalid_argument &ia) {
-      // Ignore invalid value.
-    } catch (const std::out_of_range &oor) {
-      // Ignore values not in range.
-    }
+double analyticsRate(TracerOptions options) {
+  if (options.analytics_rate >= 0.0 && options.analytics_rate <= 1.0) {
+    return options.analytics_rate;
   }
-  auto enabled_opt = std::getenv("DD_TRACE_ANALYTICS_ENABLED");
-  if (enabled_opt != nullptr) {
-    auto value = std::string(enabled_opt);
-    if (value == "true" || value == "1") {
-      return 1.0;
-    } else if (value == "false" || value == "0" || value == "") {
-      return 0.0;
-    }
-  }
-  // use NaN to indicate "not set".
   return std::nan("");
 }
 
@@ -97,7 +72,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<SampleProvider> sampler)
     : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
   buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{
-      writer, WritingSpanBufferOptions{reportingHostname(), analyticsRate()}}};
+      writer, WritingSpanBufferOptions{reportingHostname(options), analyticsRate(options)}}};
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
