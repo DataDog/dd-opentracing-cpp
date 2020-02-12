@@ -88,8 +88,6 @@ class TraceEncoder {
   virtual const std::string payload() = 0;
   // Receives and handles the response from the Agent.
   virtual void handleResponse(const std::string& response) = 0;
-  //
-  virtual bool sampled(const ot::SpanContext& ctx, bool) = 0;
 };
 
 // makeTracer returns an opentracing::Tracer that submits traces to the Datadog Agent.
