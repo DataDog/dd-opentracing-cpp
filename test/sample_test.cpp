@@ -268,31 +268,3 @@ TEST_CASE("priority sampler \"integration\" test") {
     REQUIRE((sample_rate < 0.35 && sample_rate > 0.25));
   }
 }
-
-TEST_CASE("trace encoder sampling decision") {
-  std::shared_ptr<SampleProvider> sampler = std::make_shared<PrioritySampler>();
-  std::unique_ptr<TraceEncoder> encoder = std::make_unique<AgentHttpEncoder>(sampler);
-
-  std::istringstream p1_ctx(R"({"trace_id": "100", "parent_id": "100", "sampling_priority": 1})");
-  opentracing::expected<std::unique_ptr<opentracing::SpanContext>> sampled =
-      SpanContext::deserialize(p1_ctx);
-  std::istringstream p0_ctx(R"({"trace_id": "100", "parent_id": "100", "sampling_priority": 0})");
-  opentracing::expected<std::unique_ptr<opentracing::SpanContext>> unsampled =
-      SpanContext::deserialize(p0_ctx);
-  std::istringstream no_priority_ctx(R"({"trace_id": "100", "parent_id": "100"})");
-  opentracing::expected<std::unique_ptr<opentracing::SpanContext>> undecided =
-      SpanContext::deserialize(no_priority_ctx);
-  REQUIRE(sampled);
-  REQUIRE(unsampled);
-  REQUIRE(undecided);
-
-  auto tracing_decision = GENERATE(false, true);
-  SECTION("prioritizes propagated sampling decision") {
-    auto result = encoder->sampled(*(sampled.value().get()), tracing_decision);
-    REQUIRE(result == true);
-    result = encoder->sampled(*(unsampled.value().get()), tracing_decision);
-    REQUIRE(result == false);
-    result = encoder->sampled(*(undecided.value().get()), tracing_decision);
-    REQUIRE(result == tracing_decision);
-  }
-}

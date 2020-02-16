@@ -29,7 +29,6 @@ class AgentHttpEncoder : public TraceEncoder {
   // Returns the encoded payload from the collection of traces.
   const std::string payload() override;
   void handleResponse(const std::string& response) override;
-  bool sampled(const ot::SpanContext& ctx, bool fallback_decision) override;
   void addTrace(Trace trace);
 
  private:

@@ -77,18 +77,5 @@ void AgentHttpEncoder::handleResponse(const std::string& response) {
   }
 }
 
-bool AgentHttpEncoder::sampled(const ot::SpanContext& ctx, bool fallback_decision) try {
-  auto context = dynamic_cast<const SpanContext*>(&ctx);
-  if (context != nullptr) {
-    OptionalSamplingPriority p = context->getPropagatedSamplingPriority();
-    if (p != nullptr) {
-      return *p > SamplingPriority::SamplerDrop;
-    }
-  }
-  return fallback_decision;
-} catch (std::bad_cast&) {
-  return fallback_decision;
-}
-
 }  // namespace opentracing
 }  // namespace datadog
