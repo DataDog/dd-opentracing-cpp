@@ -20,7 +20,7 @@ RUN get_latest_release() { \
 
 COPY tracer_example.cpp .
 
-RUN g++ -std=c++14 -o tracer_example tracer_example.cpp -ldd_opentracing -lopentracing
+RUN g++ -std=c++14 -o tracer_example tracer_example.cpp -I/dd-opentracing-cpp/deps/include -L/dd-opentracing-cpp/deps/lib -ldd_opentracing -lopentracing
 # Add /usr/local/lib to LD_LIBRARY_PATH
 RUN ldconfig
 
