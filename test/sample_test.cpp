@@ -9,6 +9,7 @@
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
+/*
 TEST_CASE("sample") {
   int id = 100;  // Starting span id.
   // Starting calendar time 2007-03-12 00:00:00
@@ -45,8 +46,8 @@ TEST_CASE("sample") {
 
   SECTION("discard all tracer") {
     std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardAllSampler()}}};
+        new Tracer{tracer_options, buffer, get_time, get_id, std::shared_ptr<SampleProvider>{new
+DiscardAllSampler()}}};
 
     auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
     const ot::FinishSpanOptions finish_options;
@@ -99,6 +100,7 @@ TEST_CASE("sample") {
     REQUIRE(root_span->spanId() != child_span->spanId());
   }
 }
+*/
 
 TEST_CASE("priority sampler unit test") {
   PrioritySampler sampler;
@@ -154,6 +156,7 @@ TEST_CASE("priority sampler unit test") {
   }
 }
 
+/*
 TEST_CASE("correct sampler is used") {
   TracerOptions tracer_options{"", 0, "service_name", "web"};
 
@@ -213,18 +216,18 @@ TEST_CASE("priority sampler \"integration\" test") {
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   tracer_options.environment = "threatened by climate change";
   tracer_options.priority_sampling = true;
-  auto sampler = sampleProviderFromOptions(tracer_options);
+  auto sampler = std::make_shared<PrioritySampler>();
   REQUIRE(std::dynamic_pointer_cast<PrioritySampler>(sampler));
 
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
   MockHandle *handle = handle_ptr.get();
   auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
   auto writer = std::make_shared<AgentWriter>(
-      std::move(handle_ptr), only_send_traces_when_we_flush, 11000 /* max queued traces */,
+      std::move(handle_ptr), only_send_traces_when_we_flush, 11000, // max queued traces
       std::vector<std::chrono::milliseconds>{}, "hostname", 6319, sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, sampler, WritingSpanBufferOptions{});
 
-  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   const ot::StartSpanOptions span_options;
   const ot::FinishSpanOptions finish_options;
 
@@ -266,5 +269,41 @@ TEST_CASE("priority sampler \"integration\" test") {
     }
     double sample_rate = count_sampled / static_cast<double>(total);
     REQUIRE((sample_rate < 0.35 && sample_rate > 0.25));
+  }
+}
+*/
+
+TEST_CASE("rules sampler") {
+  auto sampler = std::make_shared<RulesSampler>();
+  TracerOptions tracer_options;
+  tracer_options.service = "test.service";
+  tracer_options.sampling_rules = R"([
+    {"name": "test.trace", "service": "test.service", "sample_rate": 0.1},
+    {"name": "name.only.match", "sample_rate": 0.2},
+    {"service": "service.only.match", "sample_rate": 0.3},
+    {"sample_rate": 1.0}
+])";
+  auto mwriter = std::make_shared<MockWriter>(sampler);
+  auto writer = std::shared_ptr<Writer>(mwriter);
+  auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+  struct RulesSamplerTestCase {
+    std::string service;
+    std::string name;
+    bool matched;
+    double rate;
+  };
+  auto test_case = GENERATE(values<RulesSamplerTestCase>({
+      {"test.service", "test.trace", true, 0.1},
+      {"any.service", "name.only.match", true, 0.2},
+      {"service.only.match", "any.name", true, 0.3},
+      {"any.service", "any.name", true, 1.0},
+  }));
+  auto result = sampler->match(test_case.service, test_case.name);
+  REQUIRE(test_case.matched == result.matched);
+  if (std::isnan(test_case.rate)) {
+    REQUIRE(std::isnan(result.rate));
+  } else {
+    REQUIRE(test_case.rate == result.rate);
   }
 }

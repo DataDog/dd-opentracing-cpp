@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include "limiter.h"
 #include "propagation.h"
 
 namespace ot = opentracing;
@@ -69,6 +70,36 @@ class PrioritySampler : public SampleProvider {
 };
 
 std::shared_ptr<SampleProvider> sampleProviderFromOptions(const TracerOptions& options);
+
+struct RuleResult {
+  bool matched;
+  double rate;
+};
+
+using RuleFunc = std::function<RuleResult(const std::string&, const std::string&)>;
+
+struct SampleResult {
+  bool rules_sampling_applied;
+  double applied_rate;
+  double limiter_rate;
+  OptionalSamplingPriority sampling_priority;
+};
+
+class RulesSampler {
+ public:
+  RulesSampler();
+  virtual ~RulesSampler() {}
+  void addRule(RuleFunc f);
+  virtual SampleResult sample(const std::string& environment, const std::string& service,
+                              const std::string& name, uint64_t trace_id);
+  virtual RuleResult match(const std::string& service, const std::string& name) const;
+  virtual void updatePrioritySampler(json config);
+
+ private:
+  Limiter sampling_limiter_;
+  std::vector<RuleFunc> sampling_rules_;
+  PrioritySampler priority_sampler_;
+};
 
 }  // namespace opentracing
 }  // namespace datadog

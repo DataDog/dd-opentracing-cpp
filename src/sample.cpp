@@ -89,5 +89,44 @@ std::shared_ptr<SampleProvider> sampleProviderFromOptions(const TracerOptions& o
   return std::shared_ptr<SampleProvider>{new DiscardRateSampler(1.0 - options.sample_rate)};
 }
 
+RulesSampler::RulesSampler() : sampling_limiter_(getRealTime, 100, 100.0, 1) {}
+
+void RulesSampler::addRule(RuleFunc f) { sampling_rules_.push_back(f); }
+
+SampleResult RulesSampler::sample(const std::string& environment, const std::string& service,
+                                  const std::string& name, uint64_t trace_id) {
+  auto limit_result = sampling_limiter_.allow();
+  if (!limit_result.allowed) {
+    return {false, 0.0, 0.0, priority_sampler_.sample(environment, service, trace_id)};
+  }
+  auto rule_result = match(service, name);
+  if (!rule_result.matched) {
+    return {false, 0.0, 0.0, priority_sampler_.sample(environment, service, trace_id)};
+  }
+
+  auto max_hash = maxIdFromKeepRate(rule_result.rate);
+  uint64_t hashed_id = trace_id * constant_rate_hash_factor;
+  OptionalSamplingPriority sampling_priority;
+  if (hashed_id >= max_hash) {
+    sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+  } else {
+    sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  }
+  return {true, rule_result.rate, limit_result.effective_rate, std::move(sampling_priority)};
+}
+
+RuleResult RulesSampler::match(const std::string& service, const std::string& name) const {
+  static auto nan = std::nan("");
+  for (auto& rule : sampling_rules_) {
+    auto result = rule(service, name);
+    if (result.matched) {
+      return result;
+    }
+  }
+  return {false, nan};
+}
+
+void RulesSampler::updatePrioritySampler(json config) { priority_sampler_.configure(config); }
+
 }  // namespace opentracing
 }  // namespace datadog

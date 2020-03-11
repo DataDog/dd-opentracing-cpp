@@ -13,7 +13,7 @@ struct MockTracer : public ot::Tracer {
   TracerOptions opts;
 
   MockTracer(TracerOptions opts_, std::shared_ptr<Writer> & /* writer */,
-             std::shared_ptr<SampleProvider> /* sampler */)
+             std::shared_ptr<RulesSampler> /* sampler */)
       : opts(opts_) {}
 
   std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,

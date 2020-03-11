@@ -214,7 +214,8 @@ TEST_CASE("span") {
     REQUIRE(result->service == "new service");
     REQUIRE(result->type == "new type");
     REQUIRE(result->resource == "new resource");
-    REQUIRE(result->metrics == std::unordered_map<std::string, double>{{"_dd1.sr.eausr", 1}});
+    REQUIRE(result->metrics.find("_dd1.sr.eausr") != result->metrics.end());
+    REQUIRE(result->metrics["_dd1.sr.eausr"] == 1.0);
   }
 
   SECTION("values for analytics_event tag") {
@@ -388,8 +389,8 @@ TEST_CASE("span") {
     }
   }
 
-  SECTION("sampling") {
-    auto priority_sampler = std::make_shared<MockSampler>();
+  SECTION("priority sampling") {
+    auto priority_sampler = std::make_shared<MockPrioritySampler>();
     priority_sampler->sampling_priority =
         std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
 
@@ -463,6 +464,27 @@ TEST_CASE("span") {
       auto& result = buffer->traces(100).finished_spans->at(0);
       REQUIRE(result->metrics ==
               std::unordered_map<std::string, double>{{"_sampling_priority_v1", -1}});
+    }
+  }
+
+  SECTION("rules sampling") {
+    auto rules_sampler = std::make_shared<MockRulesSampler>();
+    rules_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    rules_sampler->applied_rate = 0.42;
+    rules_sampler->limiter_rate = 0.99;
+    auto buffer = std::make_shared<MockBuffer>(rules_sampler);
+
+    SECTION("spans are tagged with rules sampler rates") {
+      Span span{nullptr,    buffer, get_time, nullptr, 100, 100, 0, SpanContext{100, 100, "", {}},
+                get_time(), "",     "",       "",      "",  ""};
+      span.FinishWithOptions(finish_options);
+
+      auto& result = buffer->traces(100).finished_spans->at(0);
+      REQUIRE(result->metrics.find("_dd.rule_psr") != result->metrics.end());
+      REQUIRE(result->metrics.find("_dd.limit_psr") != result->metrics.end());
+      REQUIRE(result->metrics["_dd.rule_psr"] == 0.42);
+      REQUIRE(result->metrics["_dd.limit_psr"] == 0.99);
     }
   }
 }

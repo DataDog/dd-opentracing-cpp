@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "sample.h"
 #include "span.h"
 
 namespace datadog {
@@ -30,6 +31,9 @@ struct PendingTrace {
   std::string origin;
   std::string hostname;
   double analytics_rate;
+  bool rules_sampling_applied = false;
+  double rules_applied_rate;
+  double rules_limiter_rate;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -56,7 +60,8 @@ struct WritingSpanBufferOptions {
 // A SpanBuffer that sends completed traces to a Writer.
 class WritingSpanBuffer : public SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<Writer> writer, WritingSpanBufferOptions options);
+  WritingSpanBuffer(std::shared_ptr<Writer> writer, std::shared_ptr<RulesSampler> sampler,
+                    WritingSpanBufferOptions options);
 
   void registerSpan(const SpanContext& context) override;
   void finishSpan(std::unique_ptr<SpanData> span,
@@ -78,9 +83,11 @@ class WritingSpanBuffer : public SpanBuffer {
                                                    OptionalSamplingPriority priority);
   OptionalSamplingPriority assignSamplingPriorityImpl(
       const std::shared_ptr<SampleProvider>& sampler, const SpanData* span);
+  void setRulesSamplerMetrics(uint64_t trace_id, double applied_rate, double limiter_rate);
 
   std::shared_ptr<Writer> writer_;
   mutable std::mutex mutex_;
+  std::shared_ptr<RulesSampler> sampler_;
 
  protected:
   // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish

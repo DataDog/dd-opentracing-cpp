@@ -67,12 +67,15 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
       sampler_(sampler),
       context_(std::move(context)),
       start_time_(start_time),
-      operation_name_override_(operation_name_override),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
                              start_time_.absolute_time.time_since_epoch())
                              .count())) {
+  if (!operation_name_override.empty()) {
+    span_->meta[tags::operation_name] = span_->name;
+    span_->name = operation_name_override;
+  }
   buffer_->registerSpan(context_);
 }
 
@@ -117,11 +120,6 @@ void Span::FinishWithOptions(
   auto end_time = get_time_();
   span_->duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
-  // Override operation name if needed.
-  if (operation_name_override_ != "") {
-    span_->meta[tags::operation_name] = span_->name;
-    span_->name = operation_name_override_;
-  }
   // Apply special tags.
   // If we add any more cases; then abstract this. For now, KISS.
   auto tag = span_->meta.find(tags::span_type);

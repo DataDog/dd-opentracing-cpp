@@ -6,7 +6,7 @@
 namespace datadog {
 namespace opentracing {
 
-Writer::Writer(std::shared_ptr<SampleProvider> sampler)
+Writer::Writer(std::shared_ptr<RulesSampler> sampler)
     : trace_encoder_(std::make_shared<AgentHttpEncoder>(sampler)) {}
 
 void ExternalWriter::write(Trace trace) { trace_encoder_->addTrace(std::move(trace)); }

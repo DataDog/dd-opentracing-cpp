@@ -32,8 +32,8 @@ struct TestSpanData : public SpanData {
                      trace_id, parent_id, error);
 };
 
-struct MockSampler : public PrioritySampler {
-  MockSampler() {}
+struct MockPrioritySampler : public PrioritySampler {
+  MockPrioritySampler() {}
 
   bool discard(const SpanContext& /* context */) const override { return discard_spans; }
   OptionalSamplingPriority sample(const std::string& /* environment */,
@@ -51,9 +51,28 @@ struct MockSampler : public PrioritySampler {
   std::string config;
 };
 
+struct MockRulesSampler : public RulesSampler {
+  MockRulesSampler() {}
+
+  SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
+                      const std::string& /* name */, uint64_t /* trace_id */) override {
+    if (sampling_priority == nullptr) {
+      return {};
+    }
+    return {true, applied_rate, limiter_rate,
+            std::make_unique<SamplingPriority>(*sampling_priority)};
+  }
+  void updatePrioritySampler(json new_config) override { config = new_config.dump(); }
+
+  OptionalSamplingPriority sampling_priority = nullptr;
+  double applied_rate = 1.0;
+  double limiter_rate = 1.0;
+  std::string config;
+};
+
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter(std::shared_ptr<SampleProvider> sampler) : Writer(sampler) {}
+  MockWriter(std::shared_ptr<RulesSampler> sampler) : Writer(sampler) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {
@@ -74,8 +93,9 @@ struct MockWriter : public Writer {
 
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>()),
-                          WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(nullptr, std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+  MockBuffer(std::shared_ptr<RulesSampler> sampler)
+      : WritingSpanBuffer(nullptr, sampler, WritingSpanBufferOptions{}){};
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.

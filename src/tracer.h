@@ -27,14 +27,14 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:
   // Creates a Tracer by copying the given options and injecting the given dependencies.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-         IdProvider get_id, std::shared_ptr<SampleProvider> sampler);
+         IdProvider get_id);
 
   // Creates a Tracer by copying the given options and using the preconfigured writer.
   // The writer is either an AgentWriter that sends trace data directly to the Datadog Agent, or
   // an ExternalWriter that requires an external HTTP client to encode and submit to the Datadog
   // Agent.
   Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
-         std::shared_ptr<SampleProvider> sampler);
+         std::shared_ptr<RulesSampler> sampler);
 
   Tracer() = delete;
 
@@ -71,7 +71,6 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   IdProvider get_id_;
-  std::shared_ptr<SampleProvider> sampler_;
 };
 
 }  // namespace opentracing

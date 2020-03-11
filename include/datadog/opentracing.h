@@ -39,14 +39,21 @@ struct TracerOptions {
   // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
   // by the environment variable DD_ENV
   std::string environment = "";
-  // Client side sampling. The percentage of traces are sent to the agent, real number in [0, 1].
-  // 0 = discard all traces, 1 = keep all traces.
-  // Setting this lower reduces performance overhead at the cost of less data.
-  double sample_rate = 1.0;
-  // If true, disables client-side sampling (thus ignoring sample_rate) and enables distributed
-  // priority sampling, where traces are sampled based on a combination of user-assigned priorities
-  // and configuration from the agent.
+  // This option is deprecated and may be removed in future releases.
+  // It is equivalent to setting a sampling rule with only a "sample_rate".
+  // Values must be between 0.0 and 1.0 (inclusive)
+  double sample_rate = std::nan("");
+  // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
+  // Rules sampling is applied when initiating traces to determine the sampling rate.
+  // Traces that do not match any rules fall back to using priority sampling, where the rate is
+  // determined by a combination of user-assigned priorities and configuration from the agent.
+  // Configuration is specified as a JSON array of objects. Each object must have a "sample_rate",
+  // and the "name" and "service" fields are optional. The "sample_rate" value must be between 0.0
+  // and 1.0 (inclusive). Rules are applied in configured order, so a specific match should be
+  // specified before a wider match. If any rules are invalid, they are ignored. Can also be set by
+  // the environment variable DD_TRACE_SAMPLING_RULES.
+  std::string sampling_rules = R"([{"sample_rate": 1.0}])";
   // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
   // than 10s, so that is the upper bound.
   int64_t write_period_ms = 1000;

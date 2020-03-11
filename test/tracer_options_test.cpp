@@ -18,8 +18,13 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const ch
   REQUIRE(lhs->service == rhs->service);
   REQUIRE(lhs->type == rhs->type);
   REQUIRE(lhs->environment == rhs->environment);
-  REQUIRE(lhs->sample_rate == rhs->sample_rate);
+  if (std::isnan(lhs->sample_rate)) {
+    REQUIRE(std::isnan(rhs->sample_rate));
+  } else {
+    REQUIRE(lhs->sample_rate == rhs->sample_rate);
+  }
   REQUIRE(lhs->priority_sampling == rhs->priority_sampling);
+  REQUIRE(lhs->sampling_rules == rhs->sampling_rules);
   REQUIRE(lhs->write_period_ms == rhs->write_period_ms);
   REQUIRE(lhs->operation_name_override == rhs->operation_name_override);
   REQUIRE(lhs->extract == rhs->extract);
@@ -45,6 +50,7 @@ TEST_CASE("tracer options from environment variables") {
       {{{"DD_AGENT_HOST", "host"},
         {"DD_TRACE_AGENT_PORT", "420"},
         {"DD_ENV", "env"},
+        {"DD_TRACE_SAMPLING_RULES", "rules"},
         {"DD_PROPAGATION_STYLE_EXTRACT", "B3 Datadog"},
         {"DD_PROPAGATION_STYLE_INJECT", "Datadog B3"},
         {"DD_TRACE_REPORT_HOSTNAME", "true"},
@@ -55,8 +61,9 @@ TEST_CASE("tracer options from environment variables") {
                      "",
                      "web",
                      "env",
-                     1.0,
+                     std::nan(""),
                      true,
+                     "rules",
                      1000,
                      "",
                      {PropagationStyle::Datadog, PropagationStyle::B3},

@@ -20,9 +20,7 @@ const std::string header_dd_trace_count = "X-Datadog-Trace-Count";
 const size_t RESPONSE_ERROR_REGION_SIZE = 50;
 }  // namespace
 
-AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<SampleProvider> sampler)
-    : /* May be nullptr if priority sampling disabled. */ sampler_(
-          std::dynamic_pointer_cast<PrioritySampler>(sampler)) {
+AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<RulesSampler> sampler) : sampler_(sampler) {
   // Set up common headers and default encoder
   common_headers_ = {{header_content_type, "application/msgpack"},
                      {header_dd_meta_lang, "cpp"},
@@ -60,7 +58,7 @@ void AgentHttpEncoder::handleResponse(const std::string& response) {
       if (config.find(priority_sampling_key) == config.end()) {
         return;  // No priority sampling info.
       }
-      sampler_->configure(config[priority_sampling_key]);
+      sampler_->updatePrioritySampler(config[priority_sampling_key]);
     } catch (const json::parse_error& error) {
       size_t start = (error.byte > (RESPONSE_ERROR_REGION_SIZE / 2))
                          ? error.byte - (RESPONSE_ERROR_REGION_SIZE / 2)
