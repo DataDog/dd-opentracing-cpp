@@ -53,10 +53,6 @@ LimitResult Limiter::allow(long tokens_requested) {
   }
 
   num_requested_++;
-  // check if we're out of tokens
-  if (num_tokens_ == 0 && now < next_refresh_) {
-    return {false, 0.0};
-  }
   // refill "tokens"
   if (now >= next_refresh_) {
     auto intervals = (now - next_refresh_) / refresh_interval_ + 1;

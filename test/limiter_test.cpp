@@ -52,7 +52,7 @@ TEST_CASE("limiter") {
     REQUIRE(first.effective_rate == 1.0);
     auto second = lim.allow();
     REQUIRE(!second.allowed);
-    REQUIRE(second.effective_rate < 1.0);
+    REQUIRE(second.effective_rate == 0.95);
     // if 10 seconds pass, then the effective rate gets reset, so it should be
     // 9 seconds of 1.0 and one second of 1.0
     advanceTime(time, std::chrono::seconds(10));
