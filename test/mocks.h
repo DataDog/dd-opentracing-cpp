@@ -93,11 +93,11 @@ struct MockBuffer : public WritingSpanBuffer {
   void flush(std::chrono::milliseconds /* timeout (unused) */) override{};
 };
 
-// Advances the relative (steady_clock) time in the given TimePoint by the given number of seconds.
+// Advances the relative (steady_clock) time in the given TimePoint by the given duration.
 // Ignores the absolute/system time.
-void advanceSeconds(TimePoint& t, int s) {
-  std::chrono::duration<int, std::ratio<1>> by(s);
-  t.relative_time += by;
+template <typename Rep, typename Period>
+void advanceTime(TimePoint& t, std::chrono::duration<Rep, Period> dur) {
+  t.relative_time += dur;
 }
 
 // Enums not hashable on some recent GCC versions:
