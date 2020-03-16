@@ -59,7 +59,7 @@ TEST_CASE("span") {
               span_id,    span_id, 0,        SpanContext{span_id, span_id, "", {}},
               get_time(), "",      "",       "",
               "",         ""};
-    advanceSeconds(time, 10);
+    advanceTime(time, std::chrono::seconds(10));
     span.FinishWithOptions(finish_options);
 
     auto& result = buffer->traces(100).finished_spans->at(0);
