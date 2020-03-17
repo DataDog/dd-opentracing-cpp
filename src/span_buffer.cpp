@@ -14,6 +14,7 @@ const std::string datadog_hostname_tag = "_dd.hostname";
 const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
+const std::string priority_sampler_applied_rate = "_dd.agent_psr";
 }  // namespace
 
 void PendingTrace::finish() {
@@ -44,6 +45,8 @@ void PendingTrace::finish() {
       if (rules_sampling_applied) {
         span->metrics[rules_sampler_applied_rate] = rules_applied_rate;
         span->metrics[rules_sampler_limiter_rate] = rules_limiter_rate;
+      } else if (priority_sampling_applied) {
+        span->metrics[priority_sampler_applied_rate] = priority_applied_rate;
       }
       break;
     }
@@ -73,8 +76,7 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   trace->second.all_spans.insert(context.id());
 }
 
-void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span,
-                                   const std::shared_ptr<SampleProvider>& sampler) {
+void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   auto trace_iter = traces_.find(span->traceId());
   if (trace_iter == traces_.end()) {
@@ -89,7 +91,7 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span,
   uint64_t trace_id = span->traceId();
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
-    assignSamplingPriorityImpl(sampler, trace.finished_spans->back().get());
+    assignSamplingPriorityImpl(trace.finished_spans->back().get());
     trace.finish();
     unbufferAndWriteTrace(trace_id);
   }
@@ -158,14 +160,12 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
   return getSamplingPriorityImpl(trace_id);
 }
 
-OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriority(
-    const std::shared_ptr<SampleProvider>& sampler, const SpanData* span) {
+OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriority(const SpanData* span) {
   std::lock_guard<std::mutex> lock{mutex_};
-  return assignSamplingPriorityImpl(sampler, span);
+  return assignSamplingPriorityImpl(span);
 }
 
-OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(
-    const std::shared_ptr<SampleProvider>& /* sampler */, const SpanData* span) {
+OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const SpanData* span) {
   bool sampling_priority_unset = getSamplingPriorityImpl(span->trace_id) == nullptr;
   if (sampling_priority_unset) {
     auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
@@ -173,6 +173,8 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(
     if (sampler_result.rules_sampling_applied) {
       setRulesSamplerMetrics(span->trace_id, sampler_result.applied_rate,
                              sampler_result.limiter_rate);
+    } else {
+      setPrioritySamplerMetrics(span->trace_id, sampler_result.priority_rate);
     }
   }
   return getSamplingPriorityImpl(span->trace_id);
@@ -182,13 +184,24 @@ void WritingSpanBuffer::setRulesSamplerMetrics(uint64_t trace_id, double applied
                                                double limiter_rate) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
-    std::cerr << "Missing trace in setSamplingPriority" << std::endl;
+    std::cerr << "Missing trace in setRulesSamplerMetrics" << std::endl;
     return;
   }
   PendingTrace& trace = trace_entry->second;
   trace.rules_sampling_applied = true;
   trace.rules_applied_rate = applied_rate;
   trace.rules_limiter_rate = limiter_rate;
+}
+
+void WritingSpanBuffer::setPrioritySamplerMetrics(uint64_t trace_id, double applied_rate) {
+  auto trace_entry = traces_.find(trace_id);
+  if (trace_entry == traces_.end()) {
+    std::cerr << "Missing trace in setPrioritySamplerMetrics" << std::endl;
+    return;
+  }
+  PendingTrace& trace = trace_entry->second;
+  trace.priority_sampling_applied = true;
+  trace.priority_applied_rate = applied_rate;
 }
 
 }  // namespace opentracing

@@ -35,19 +35,16 @@ struct TestSpanData : public SpanData {
 struct MockPrioritySampler : public PrioritySampler {
   MockPrioritySampler() {}
 
-  bool discard(const SpanContext& /* context */) const override { return discard_spans; }
-  OptionalSamplingPriority sample(const std::string& /* environment */,
-                                  const std::string& /* service */,
-                                  uint64_t /* trace_id */) const override {
-    if (sampling_priority == nullptr) {
-      return nullptr;
-    }
-    return std::make_unique<SamplingPriority>(*sampling_priority);
+  SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
+                      uint64_t /* trace_id */) const override {
+    return {false, 0.0, 0.0, sampling_rate,
+            std::make_unique<SamplingPriority>(*sampling_priority)};
   }
   void configure(json new_config) override { config = new_config.dump(); }
 
-  bool discard_spans = false;
   OptionalSamplingPriority sampling_priority = nullptr;
+  double sampling_rate;
+
   std::string config;
 };
 
@@ -59,7 +56,7 @@ struct MockRulesSampler : public RulesSampler {
     if (sampling_priority == nullptr) {
       return {};
     }
-    return {true, applied_rate, limiter_rate,
+    return {true, applied_rate, limiter_rate, 0.0,
             std::make_unique<SamplingPriority>(*sampling_priority)};
   }
   void updatePrioritySampler(json new_config) override { config = new_config.dump(); }

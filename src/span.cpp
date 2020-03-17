@@ -57,14 +57,13 @@ std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
 std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
 
 Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
-           TimeProvider get_time, std::shared_ptr<SampleProvider> sampler, uint64_t span_id,
-           uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
-           std::string span_service, std::string span_type, std::string span_name,
-           std::string resource, std::string operation_name_override)
+           TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
+           SpanContext context, TimePoint start_time, std::string span_service,
+           std::string span_type, std::string span_name, std::string resource,
+           std::string operation_name_override)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
-      sampler_(sampler),
       context_(std::move(context)),
       start_time_(start_time),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
@@ -174,7 +173,7 @@ void Span::FinishWithOptions(
   }
   // Audit and finish span.
   audit(span_.get());
-  buffer_->finishSpan(std::move(span_), sampler_);
+  buffer_->finishSpan(std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
   span_ = stubSpanData();
@@ -381,7 +380,7 @@ const ot::SpanContext &Span::context() const noexcept {
   // here, when the context is fetched before being serialized. The negative side-effect is that if
   // anything else happens to want to get and/or serialize a SpanContext, that will end up having
   // this spooky action at a distance of assigning a SamplingPriority.
-  buffer_->assignSamplingPriority(sampler_, span_.get() /* Doesn't take ownership */);
+  buffer_->assignSamplingPriority(span_.get() /* Doesn't take ownership */);
   return context_;
 }
 

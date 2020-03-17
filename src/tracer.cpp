@@ -163,8 +163,8 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
 
   // Check early if we need to discard. Check at span Finish if we need to sample (since users can
   // set this).
-  std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, nullptr, span_id,
-                                      trace_id, parent_id, std::move(span_context), get_time_(),
+  std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                                      parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
                                       opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;

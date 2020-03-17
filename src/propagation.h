@@ -22,7 +22,6 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
                                                        bool prioritySamplingEnabled);
 
 class SpanBuffer;
-class SampleProvider;
 struct HeadersImpl;
 
 enum class SamplingPriority : int {
