@@ -6,8 +6,6 @@ cc_library(
         "src/encoder.h",
         "src/limiter.cpp",
         "src/limiter.h",
-        "src/noopspan.cpp",
-        "src/noopspan.h",
         "src/opentracing_external.cpp",
         "src/propagation.cpp",
         "src/propagation.h",

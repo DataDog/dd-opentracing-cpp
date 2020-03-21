@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <random>
 
-#include "noopspan.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
