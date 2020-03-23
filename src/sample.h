@@ -55,6 +55,7 @@ using RuleFunc = std::function<RuleResult(const std::string&, const std::string&
 class RulesSampler {
  public:
   RulesSampler();
+  RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
   virtual ~RulesSampler() {}
   void addRule(RuleFunc f);
   virtual SampleResult sample(const std::string& environment, const std::string& service,

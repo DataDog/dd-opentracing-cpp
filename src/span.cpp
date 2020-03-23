@@ -66,6 +66,7 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
       get_time_(get_time),
       context_(std::move(context)),
       start_time_(start_time),
+      operation_name_override_(operation_name_override),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -183,7 +184,11 @@ void Span::FinishWithOptions(
 
 void Span::SetOperationName(ot::string_view operation_name) noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  span_->name = operation_name;
+  if (!operation_name_override_.empty()) {
+    span_->meta[tags::operation_name] = operation_name;
+  } else {
+    span_->name = operation_name;
+  }
   span_->resource = operation_name;
 }
 

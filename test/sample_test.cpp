@@ -9,99 +9,6 @@
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
-/*
-TEST_CASE("sample") {
-  int id = 100;  // Starting span id.
-  // Starting calendar time 2007-03-12 00:00:00
-  std::tm start{};
-  start.tm_mday = 12;
-  start.tm_mon = 2;
-  start.tm_year = 107;
-  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
-                 std::chrono::steady_clock::time_point{}};
-  auto buffer = std::make_shared<MockBuffer>();
-  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
-  IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  TracerOptions tracer_options{"", 0, "service_name", "web"};
-  const ot::StartSpanOptions span_options;
-
-  SECTION("keep all traces") {
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new KeepAllSampler()}}};
-
-    auto span = tracer->StartSpanWithOptions("/should_be_kept", span_options);
-    const ot::FinishSpanOptions finish_options;
-    span->FinishWithOptions(finish_options);
-
-    REQUIRE(buffer->traces().size() == 1);
-    auto &result = buffer->traces(100).finished_spans->at(0);
-    REQUIRE(result->type == "web");
-    REQUIRE(result->service == "service_name");
-    REQUIRE(result->name == "/should_be_kept");
-    REQUIRE(result->resource == "/should_be_kept");
-    // This sampler should not set the _sample_rate tag.
-    REQUIRE(result->meta["_sample_rate"] == std::string());
-  }
-
-  SECTION("discard all tracer") {
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id, std::shared_ptr<SampleProvider>{new
-DiscardAllSampler()}}};
-
-    auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
-    const ot::FinishSpanOptions finish_options;
-    span->FinishWithOptions(finish_options);
-
-    REQUIRE(buffer->traces().size() == 0);
-  }
-
-  SECTION("discard rate sampler") {
-    double rate = 0.75;
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
-
-    for (int i = 0; i < 100; i++) {
-      auto span = tracer->StartSpanWithOptions("/discard_rate_sample", span_options);
-      const ot::FinishSpanOptions finish_options;
-      span->FinishWithOptions(finish_options);
-    }
-
-    auto size = buffer->traces().size();
-    // allow for a tiny bit of variance. double brackets because of macro
-    REQUIRE((size >= 24 && size <= 26));
-  }
-
-  SECTION("discard rate sampler applied to child spans within same trace") {
-    double rate = 0;
-    std::shared_ptr<ot::Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
-    auto ot_root_span = tracer->StartSpan("/discard_rate_sample");
-    uint64_t trace_id = (dynamic_cast<const Span *>(ot_root_span.get()))->traceId();
-    auto ot_child_span =
-        tracer->StartSpan("/child_span", {opentracing::ChildOf(&ot_root_span->context())});
-
-    ot_child_span->Finish();
-    ot_root_span->Finish();
-
-    // One trace should have been captured.
-    REQUIRE(buffer->traces().size() == 1);
-
-    // Both spans should be recorded under the same trace.
-    REQUIRE(buffer->traces(trace_id).finished_spans->size() == 2);
-
-    // The trace id should be the same.
-    auto &root_span = buffer->traces(trace_id).finished_spans->at(1);
-    auto &child_span = buffer->traces(trace_id).finished_spans->at(0);
-    REQUIRE(root_span->traceId() == child_span->traceId());
-    // The span id should be different.
-    REQUIRE(root_span->spanId() != child_span->spanId());
-  }
-}
-*/
-
 TEST_CASE("priority sampler unit test") {
   PrioritySampler sampler;
   auto buffer = std::make_shared<MockBuffer>();
@@ -155,36 +62,86 @@ TEST_CASE("priority sampler unit test") {
 }
 
 TEST_CASE("rules sampler") {
-  auto sampler = std::make_shared<RulesSampler>();
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
+  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
+                 std::chrono::steady_clock::time_point{}};
+  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
+
+  auto sampler = std::make_shared<RulesSampler>(get_time, 1, 1.0, 1);
   TracerOptions tracer_options;
   tracer_options.service = "test.service";
   tracer_options.sampling_rules = R"([
     {"name": "test.trace", "service": "test.service", "sample_rate": 0.1},
     {"name": "name.only.match", "sample_rate": 0.2},
     {"service": "service.only.match", "sample_rate": 0.3},
+    {"name": "overridden operation name", "sample_rate": 0.4},
     {"sample_rate": 1.0}
 ])";
+  const ot::StartSpanOptions span_options;
+  const ot::FinishSpanOptions finish_options;
+
   auto mwriter = std::make_shared<MockWriter>(sampler);
   auto writer = std::shared_ptr<Writer>(mwriter);
-  auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
-  struct RulesSamplerTestCase {
-    std::string service;
-    std::string name;
-    bool matched;
-    double rate;
-  };
-  auto test_case = GENERATE(values<RulesSamplerTestCase>({
-      {"test.service", "test.trace", true, 0.1},
-      {"any.service", "name.only.match", true, 0.2},
-      {"service.only.match", "any.name", true, 0.3},
-      {"any.service", "any.name", true, 1.0},
-  }));
-  auto result = sampler->match(test_case.service, test_case.name);
-  REQUIRE(test_case.matched == result.matched);
-  if (std::isnan(test_case.rate)) {
-    REQUIRE(std::isnan(result.rate));
-  } else {
-    REQUIRE(test_case.rate == result.rate);
+  SECTION("rule matching applied") {
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    struct RulesSamplerTestCase {
+      std::string service;
+      std::string name;
+      bool matched;
+      double rate;
+    };
+    auto test_case = GENERATE(values<RulesSamplerTestCase>({
+        {"test.service", "test.trace", true, 0.1},
+        {"any.service", "name.only.match", true, 0.2},
+        {"service.only.match", "any.name", true, 0.3},
+        {"any.service", "any.name", true, 1.0},
+    }));
+    advanceTime(time, std::chrono::seconds(1));
+    auto result = sampler->match(test_case.service, test_case.name);
+    REQUIRE(test_case.matched == result.matched);
+    if (std::isnan(test_case.rate)) {
+      REQUIRE(std::isnan(result.rate));
+    } else {
+      REQUIRE(test_case.rate == result.rate);
+    }
+  }
+
+  SECTION("rate limiting falls back to priority sampling") {
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    advanceTime(time, std::chrono::seconds(1));
+    auto first = tracer->StartSpanWithOptions("operation name", span_options);
+    first->FinishWithOptions(finish_options);
+
+    auto& first_metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(first_metrics.find("_dd.rule_psr") != first_metrics.end());
+    REQUIRE(first_metrics.find("_dd.limit_psr") != first_metrics.end());
+    REQUIRE(first_metrics.find("_dd.agent_psr") == first_metrics.end());
+
+    // not advancing time, so hitting rate limit
+    auto second = tracer->StartSpanWithOptions("operation name", span_options);
+    second->FinishWithOptions(finish_options);
+
+    auto& second_metrics = mwriter->traces[1][0]->metrics;
+    REQUIRE(second_metrics.find("_dd.rule_psr") == second_metrics.end());
+    REQUIRE(second_metrics.find("_dd.limit_psr") == second_metrics.end());
+    REQUIRE(second_metrics.find("_dd.agent_psr") != second_metrics.end());
+  }
+
+  SECTION("rule matching applied to overridden name") {
+    advanceTime(time, std::chrono::seconds(1));
+    tracer_options.operation_name_override = "overridden operation name";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    auto span = tracer->StartSpanWithOptions("operation name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& result = mwriter->traces[0][0];
+    REQUIRE(result->metrics.find("_dd.rule_psr") != result->metrics.end());
+    REQUIRE(result->metrics["_dd.rule_psr"] == 0.4);
   }
 }

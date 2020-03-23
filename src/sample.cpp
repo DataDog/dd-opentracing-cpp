@@ -66,6 +66,10 @@ void PrioritySampler::configure(json config) {
 
 RulesSampler::RulesSampler() : sampling_limiter_(getRealTime, 100, 100.0, 1) {}
 
+RulesSampler::RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate,
+                           long tokens_per_refresh)
+    : sampling_limiter_(clock, max_tokens, refresh_rate, tokens_per_refresh) {}
+
 void RulesSampler::addRule(RuleFunc f) { sampling_rules_.push_back(f); }
 
 SampleResult RulesSampler::sample(const std::string& environment, const std::string& service,

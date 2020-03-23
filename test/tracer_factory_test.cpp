@@ -59,10 +59,10 @@ struct MockTracer : public ot::Tracer {
   void Close() noexcept override {}
 };
 
-TEST_CASE("tracer") {
+TEST_CASE("tracer factory") {
   TracerFactory<MockTracer> factory;
 
-  SECTION("can be created with valid config") {
+  SECTION("can create a tracer with valid config") {
     // Checks all combinations.
     auto propagation_style_inject =
         GENERATE(values<std::pair<std::string, std::set<PropagationStyle>>>(
@@ -118,7 +118,7 @@ TEST_CASE("tracer") {
     REQUIRE(tracer->opts.analytics_rate == analytics_rate);
   }
 
-  SECTION("can be created without optional fields") {
+  SECTION("can create a tracer without optional fields") {
     std::string input{R"(
       {
         "service": "my-service"

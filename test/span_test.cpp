@@ -385,6 +385,31 @@ TEST_CASE("span") {
     }
   }
 
+  SECTION("SetOperationName updates the tag but not the overridden name") {
+    auto span_id = get_id();
+    Span span{nullptr,
+              buffer,
+              get_time,
+              span_id,
+              span_id,
+              0,
+              SpanContext{span_id, span_id, "", {}},
+              get_time(),
+              "original service",
+              "original type",
+              "original span name",
+              "original resource",
+              "overridden name"};
+    span.SetOperationName("updated operation name");
+    const ot::FinishSpanOptions finish_options;
+    span.FinishWithOptions(finish_options);
+
+    auto& result = buffer->traces(100).finished_spans->at(0);
+    REQUIRE(result->name == "overridden name");
+    REQUIRE(result->resource == "updated operation name");
+    REQUIRE(result->meta[tags::operation_name] == "updated operation name");
+  }
+
   SECTION("priority sampling") {
     SECTION("root spans may be sampled") {
       Span span{nullptr,    buffer, get_time, 100, 100, 0, SpanContext{100, 100, "", {}},

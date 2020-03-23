@@ -133,6 +133,7 @@ class Span : public DatadogSpan {
   TimeProvider get_time_;
   SpanContext context_;
   TimePoint start_time_;
+  std::string operation_name_override_;
 
   // Set in constructor initializer, depends on previous constructor initializer-set members:
   std::unique_ptr<SpanData> span_;
