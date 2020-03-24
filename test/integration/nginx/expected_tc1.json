@@ -10,7 +10,11 @@
         "http.url": "http://localhost/",
         "operation": "GET /index.html"
       },
-      "metrics": {},
+      "metrics": {
+        "_dd.limit_psr": 1,
+        "_dd.rule_psr": 1,
+        "_sampling_priority_v1": 1
+      },
       "name": "nginx.handle",
       "resource": "/",
       "service": "nginx",
@@ -28,7 +32,11 @@
         "http.url": "http://localhost/",
         "operation": "GET /index.html"
       },
-      "metrics": {},
+      "metrics": {
+        "_dd.limit_psr": 1,
+        "_dd.rule_psr": 1,
+        "_sampling_priority_v1": 1
+      },
       "name": "nginx.handle",
       "resource": "/",
       "service": "nginx",
@@ -46,7 +54,11 @@
         "http.url": "http://localhost/",
         "operation": "GET /index.html"
       },
-      "metrics": {},
+      "metrics": {
+        "_dd.limit_psr": 1,
+        "_dd.rule_psr": 1,
+        "_sampling_priority_v1": 1
+      },
       "name": "nginx.handle",
       "resource": "/",
       "service": "nginx",

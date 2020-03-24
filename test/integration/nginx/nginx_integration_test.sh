@@ -149,6 +149,7 @@ echo '{
   "agent_host": "localhost",
   "agent_port": 8126,
   "dd.priority.sampling": true,
+  "sampling_rules": [{"sample_rate": 0.5}],
   "environment": "prod"
 }' > ${TRACER_CONF_PATH}
 
