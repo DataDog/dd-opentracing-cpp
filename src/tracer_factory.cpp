@@ -44,6 +44,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("sample_rate") != config.end()) {
       config.at("sample_rate").get_to(options.sample_rate);
     }
+    if (config.find("sampling_rules") != config.end()) {
+      options.sampling_rules = config.at("sampling_rules").dump();
+    }
     if (config.find("operation_name_override") != config.end()) {
       config.at("operation_name_override").get_to(options.operation_name_override);
     }
