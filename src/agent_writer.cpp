@@ -20,24 +20,27 @@ const std::vector<std::chrono::milliseconds> default_retry_periods{
 const long default_timeout_ms = 2000L;
 }  // namespace
 
-AgentWriter::AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period,
+AgentWriter::AgentWriter(std::string host, uint32_t port, std::string unix_socket,
+                         std::chrono::milliseconds write_period,
                          std::shared_ptr<RulesSampler> sampler)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
-                  default_retry_periods, host, port, sampler){};
+                  default_retry_periods, host, port, unix_socket, sampler){};
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,
                          std::vector<std::chrono::milliseconds> retry_periods, std::string host,
-                         uint32_t port, std::shared_ptr<RulesSampler> sampler)
+                         uint32_t port, std::string unix_socket,
+                         std::shared_ptr<RulesSampler> sampler)
     : Writer(sampler),
       write_period_(write_period),
       max_queued_traces_(max_queued_traces),
       retry_periods_(retry_periods) {
-  setUpHandle(handle, host, port);
+  setUpHandle(handle, host, port, unix_socket);
   startWriting(std::move(handle));
 }
 
-void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port) {
+void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port,
+                              std::string unix_socket) {
   // Some options are the same for all actions, set them here.
   // Set the agent URI.
   std::stringstream agent_uri;
@@ -46,12 +49,19 @@ void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent URL: ") + curl_easy_strerror(rcode));
   }
+  if (!unix_socket.empty()) {
+    rcode = handle->setopt(CURLOPT_UNIX_SOCKET_PATH, unix_socket.c_str());
+    if (rcode != CURLE_OK) {
+      throw std::runtime_error(std::string("Unable to set unix socket path: ") +
+                               curl_easy_strerror(rcode));
+    }
+  }
   rcode = handle->setopt(CURLOPT_TIMEOUT_MS, default_timeout_ms);
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent timeout: ") +
                              curl_easy_strerror(rcode));
   }
-}  // namespace opentracing
+}
 
 AgentWriter::~AgentWriter() { stop(); }
 

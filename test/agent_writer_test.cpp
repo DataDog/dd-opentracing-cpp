@@ -32,6 +32,7 @@ TEST_CASE("writer") {
                      disable_retry,
                      "hostname",
                      6319,
+                     "",
                      sampler};
 
   SECTION("initilises handle correctly") {
@@ -142,7 +143,7 @@ TEST_CASE("writer") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
-                               max_queued_traces, disable_retry, "hostname", 6319,
+                               max_queued_traces, disable_retry, "hostname", 6319, "",
                                std::make_shared<RulesSampler>()});
   }
 
@@ -253,6 +254,7 @@ TEST_CASE("writer") {
                        disable_retry,
                        "hostname",
                        6319,
+                       "",
                        std::make_shared<RulesSampler>()};
     // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
     // different writes. We don't count the number of writes because that could flake, but we do
@@ -291,6 +293,7 @@ TEST_CASE("writer") {
                        retry_periods,
                        "hostname",
                        6319,
+                       "",
                        std::make_shared<RulesSampler>()};
     // Redirect cerr, so the the terminal output doesn't imply failure.
     std::stringstream error_message;
@@ -346,6 +349,7 @@ TEST_CASE("flush") {
                      retry_periods,
                      "hostname",
                      6319,
+                     "",
                      std::make_shared<RulesSampler>()};
   // Redirect cerr, so the the terminal output doesn't imply failure.
   std::stringstream error_message;

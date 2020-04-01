@@ -82,6 +82,9 @@ struct TracerOptions {
   // The version of the overall application being traced. Can also be set by the environment
   // variable DD_VERSION.
   std::string version = "";
+  // The path of the UNIX Domain Socket that can be used for sending traces to the agent.
+  // Can also be set by the environment variable DD_TRACE_AGENT_SOCKET.
+  std::string agent_socket = "";
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the
