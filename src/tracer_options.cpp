@@ -12,7 +12,7 @@ namespace datadog {
 namespace opentracing {
 
 // Extracts key-value pairs from a string.
-// Duplicates are overwritten.
+// Duplicates are overwritten. Empty keys are ignored.
 // Intended use is for settings tags from DD_TAGS options.
 std::map<std::string, std::string> keyvalues(std::string text, char itemsep, char tokensep,
                                              char escape) {
@@ -34,7 +34,15 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
     }
     esc = false;
   };
-  auto addkv = [&](std::string key, std::string val) { kvp[key] = val; };
+  auto addkv = [&](std::string key, std::string val) {
+    if (key.empty()) {
+      return;
+    }
+    if (val.empty()) {
+      return;
+    }
+    kvp[key] = val;
+  };
   for (auto ch : text) {
     if (esc) {
       assignchar(ch);
@@ -86,7 +94,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
   auto tags = std::getenv("DD_TAGS");
   if (tags != nullptr && std::strlen(tags) > 0) {
     opts.tags = keyvalues(tags, ':', ',', '\\');
-    // Special case for env and sampling priority
+    // Special cases for env, version and sampling priority
     if (environment != nullptr && std::strlen(environment) > 0 &&
         opts.tags.find(datadog::tags::environment) != opts.tags.end()) {
       opts.tags.erase(datadog::tags::environment);

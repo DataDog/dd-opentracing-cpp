@@ -124,6 +124,8 @@ TEST_CASE("exceptions for DD_TAGS") {
   auto test_case = GENERATE(values<TestCase>({
       {{{"DD_ENV", "foo"}, {"DD_TAGS", "env:bar"}}, {}},
       {{{"DD_TAGS", std::string(ot::ext::sampling_priority) + ":1"}}, {}},
+      {{{"DD_TAGS", ":,:,:,:"}}, {}},  // repeatedly handles missing keys
+      {{{"DD_TAGS", "keywithoutvalue:"}}, {}},
       {{{"DD_VERSION", "awesomeapp v1.2.3"}, {"DD_TAGS", "version:abcd"}}, {}},
   }));
 
