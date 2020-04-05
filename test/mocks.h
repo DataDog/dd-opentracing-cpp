@@ -37,8 +37,12 @@ struct MockPrioritySampler : public PrioritySampler {
 
   SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
                       uint64_t /* trace_id */) const override {
-    return {false, 0.0, 0.0, sampling_rate,
-            std::make_unique<SamplingPriority>(*sampling_priority)};
+    SampleResult result;
+    result.priority_rate = sampling_rate;
+    if (sampling_priority != nullptr) {
+      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
+    }
+    return result;
   }
   void configure(json new_config) override { config = new_config.dump(); }
 
@@ -53,16 +57,18 @@ struct MockRulesSampler : public RulesSampler {
 
   SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
                       const std::string& /* name */, uint64_t /* trace_id */) override {
-    if (sampling_priority == nullptr) {
-      return {};
+    SampleResult result;
+    if (sampling_priority != nullptr) {
+      result.rule_rate = rule_rate;
+      result.limiter_rate = limiter_rate;
+      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
     }
-    return {true, applied_rate, limiter_rate, 0.0,
-            std::make_unique<SamplingPriority>(*sampling_priority)};
+    return result;
   }
   void updatePrioritySampler(json new_config) override { config = new_config.dump(); }
 
   OptionalSamplingPriority sampling_priority = nullptr;
-  double applied_rate = 1.0;
+  double rule_rate = 1.0;
   double limiter_rate = 1.0;
   std::string config;
 };

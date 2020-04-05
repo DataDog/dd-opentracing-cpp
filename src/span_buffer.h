@@ -30,11 +30,7 @@ struct PendingTrace {
   std::string origin;
   std::string hostname;
   double analytics_rate;
-  bool rules_sampling_applied = false;
-  double rules_applied_rate;
-  double rules_limiter_rate;
-  bool priority_sampling_applied = false;
-  double priority_applied_rate;
+  SampleResult sample_result;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -79,8 +75,7 @@ class WritingSpanBuffer : public SpanBuffer {
   OptionalSamplingPriority setSamplingPriorityImpl(uint64_t trace_id,
                                                    OptionalSamplingPriority priority);
   OptionalSamplingPriority assignSamplingPriorityImpl(const SpanData* span);
-  void setRulesSamplerMetrics(uint64_t trace_id, double applied_rate, double limiter_rate);
-  void setPrioritySamplerMetrics(uint64_t trace_id, double applied_rate);
+  void setSamplerResult(uint64_t trace_id, SampleResult& sample_result);
 
   std::shared_ptr<Writer> writer_;
   mutable std::mutex mutex_;

@@ -71,15 +71,6 @@ TEST_CASE("rules sampler") {
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
 
   auto sampler = std::make_shared<RulesSampler>(get_time, 1, 1.0, 1);
-  TracerOptions tracer_options;
-  tracer_options.service = "test.service";
-  tracer_options.sampling_rules = R"([
-    {"name": "test.trace", "service": "test.service", "sample_rate": 0.1},
-    {"name": "name.only.match", "sample_rate": 0.2},
-    {"service": "service.only.match", "sample_rate": 0.3},
-    {"name": "overridden operation name", "sample_rate": 0.4},
-    {"sample_rate": 1.0}
-])";
   const ot::StartSpanOptions span_options;
   const ot::FinishSpanOptions finish_options;
 
@@ -87,6 +78,15 @@ TEST_CASE("rules sampler") {
   auto writer = std::shared_ptr<Writer>(mwriter);
 
   SECTION("rule matching applied") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "test.trace", "service": "test.service", "sample_rate": 0.1},
+    {"name": "name.only.match", "sample_rate": 0.2},
+    {"service": "service.only.match", "sample_rate": 0.3},
+    {"name": "overridden operation name", "sample_rate": 0.4},
+    {"sample_rate": 1.0}
+])";
     auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
     struct RulesSamplerTestCase {
       std::string service;
@@ -100,7 +100,6 @@ TEST_CASE("rules sampler") {
         {"service.only.match", "any.name", true, 0.3},
         {"any.service", "any.name", true, 1.0},
     }));
-    advanceTime(time, std::chrono::seconds(1));
     auto result = sampler->match(test_case.service, test_case.name);
     REQUIRE(test_case.matched == result.matched);
     if (std::isnan(test_case.rate)) {
@@ -110,38 +109,56 @@ TEST_CASE("rules sampler") {
     }
   }
 
-  SECTION("rate limiting falls back to priority sampling") {
+  SECTION("falls back to priority sampling when no matching rule") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
+])";
     auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
-    advanceTime(time, std::chrono::seconds(1));
-    auto first = tracer->StartSpanWithOptions("operation name", span_options);
-    first->FinishWithOptions(finish_options);
+    auto span = tracer->StartSpanWithOptions("operation.name", span_options);
+    span->FinishWithOptions(finish_options);
 
-    auto& first_metrics = mwriter->traces[0][0]->metrics;
-    REQUIRE(first_metrics.find("_dd.rule_psr") != first_metrics.end());
-    REQUIRE(first_metrics.find("_dd.limit_psr") != first_metrics.end());
-    REQUIRE(first_metrics.find("_dd.agent_psr") == first_metrics.end());
-
-    // not advancing time, so hitting rate limit
-    auto second = tracer->StartSpanWithOptions("operation name", span_options);
-    second->FinishWithOptions(finish_options);
-
-    auto& second_metrics = mwriter->traces[1][0]->metrics;
-    REQUIRE(second_metrics.find("_dd.rule_psr") == second_metrics.end());
-    REQUIRE(second_metrics.find("_dd.limit_psr") == second_metrics.end());
-    REQUIRE(second_metrics.find("_dd.agent_psr") != second_metrics.end());
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.agent_psr") != metrics.end());
   }
 
   SECTION("rule matching applied to overridden name") {
-    advanceTime(time, std::chrono::seconds(1));
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "overridden operation name", "sample_rate": 0.4},
+    {"sample_rate": 1.0}
+])";
     tracer_options.operation_name_override = "overridden operation name";
     auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
     auto span = tracer->StartSpanWithOptions("operation name", span_options);
     span->FinishWithOptions(finish_options);
 
-    auto& result = mwriter->traces[0][0];
-    REQUIRE(result->metrics.find("_dd.rule_psr") != result->metrics.end());
-    REQUIRE(result->metrics["_dd.rule_psr"] == 0.4);
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.4);
+  }
+
+  SECTION("applies limiter to sampled spans") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"sample_rate": 0.0}
+])";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    auto span = tracer->StartSpanWithOptions("operation name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.0);
+    REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 }

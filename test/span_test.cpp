@@ -504,7 +504,7 @@ TEST_CASE("span") {
     auto rules_sampler = std::make_shared<MockRulesSampler>();
     rules_sampler->sampling_priority =
         std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-    rules_sampler->applied_rate = 0.42;
+    rules_sampler->rule_rate = 0.42;
     rules_sampler->limiter_rate = 0.99;
     auto buffer = std::make_shared<MockBuffer>(rules_sampler);
 

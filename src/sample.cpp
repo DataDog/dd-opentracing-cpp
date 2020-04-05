@@ -40,13 +40,14 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
   // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
   // bit awkward.
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
+  SampleResult result;
+  result.priority_rate = applied_rate.rate;
   if (hashed_id >= applied_rate.max_hash) {
-    return {false, 0.0, 0.0, applied_rate.rate,
-            std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop)};
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+  } else {
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   }
-
-  return {false, 0.0, 0.0, applied_rate.rate,
-          std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)};
+  return result;
 }
 
 void PrioritySampler::configure(json config) {
@@ -78,20 +79,24 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
   if (!rule_result.matched) {
     return priority_sampler_.sample(environment, service, trace_id);
   }
-  auto limit_result = sampling_limiter_.allow();
-  if (!limit_result.allowed) {
-    return priority_sampler_.sample(environment, service, trace_id);
-  }
 
+  SampleResult result;
+  result.rule_rate = rule_result.rate;
   auto max_hash = maxIdFromSampleRate(rule_result.rate);
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
-  OptionalSamplingPriority sampling_priority;
   if (hashed_id >= max_hash) {
-    sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
-  } else {
-    sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    return result;
   }
-  return {true, rule_result.rate, limit_result.effective_rate, 0.0, std::move(sampling_priority)};
+
+  auto limit_result = sampling_limiter_.allow();
+  result.limiter_rate = limit_result.effective_rate;
+  if (limit_result.allowed) {
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  } else {
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+  }
+  return result;
 }
 
 RuleResult RulesSampler::match(const std::string& service, const std::string& name) const {

@@ -42,11 +42,14 @@ void PendingTrace::finish() {
           span->metrics.find(event_sample_rate_metric) == span->metrics.end()) {
         span->metrics[event_sample_rate_metric] = analytics_rate;
       }
-      if (rules_sampling_applied) {
-        span->metrics[rules_sampler_applied_rate] = rules_applied_rate;
-        span->metrics[rules_sampler_limiter_rate] = rules_limiter_rate;
-      } else if (priority_sampling_applied) {
-        span->metrics[priority_sampler_applied_rate] = priority_applied_rate;
+      if (!std::isnan(sample_result.rule_rate)) {
+        span->metrics[rules_sampler_applied_rate] = sample_result.rule_rate;
+      }
+      if (!std::isnan(sample_result.limiter_rate)) {
+        span->metrics[rules_sampler_limiter_rate] = sample_result.limiter_rate;
+      }
+      if (!std::isnan(sample_result.priority_rate)) {
+        span->metrics[priority_sampler_applied_rate] = sample_result.priority_rate;
       }
       break;
     }
@@ -170,38 +173,25 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const Spa
   if (sampling_priority_unset) {
     auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
     setSamplingPriorityImpl(span->trace_id, std::move(sampler_result.sampling_priority));
-    if (sampler_result.rules_sampling_applied) {
-      setRulesSamplerMetrics(span->trace_id, sampler_result.applied_rate,
-                             sampler_result.limiter_rate);
-    } else {
-      setPrioritySamplerMetrics(span->trace_id, sampler_result.priority_rate);
-    }
+    setSamplerResult(span->trace_id, sampler_result);
   }
   return getSamplingPriorityImpl(span->trace_id);
 }
 
-void WritingSpanBuffer::setRulesSamplerMetrics(uint64_t trace_id, double applied_rate,
-                                               double limiter_rate) {
+void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, SampleResult& sample_result) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
-    std::cerr << "Missing trace in setRulesSamplerMetrics" << std::endl;
+    std::cerr << "Missing trace in setSamplerResult" << std::endl;
     return;
   }
   PendingTrace& trace = trace_entry->second;
-  trace.rules_sampling_applied = true;
-  trace.rules_applied_rate = applied_rate;
-  trace.rules_limiter_rate = limiter_rate;
-}
-
-void WritingSpanBuffer::setPrioritySamplerMetrics(uint64_t trace_id, double applied_rate) {
-  auto trace_entry = traces_.find(trace_id);
-  if (trace_entry == traces_.end()) {
-    std::cerr << "Missing trace in setPrioritySamplerMetrics" << std::endl;
-    return;
+  trace.sample_result.rule_rate = sample_result.rule_rate;
+  trace.sample_result.limiter_rate = sample_result.limiter_rate;
+  trace.sample_result.priority_rate = sample_result.priority_rate;
+  if (sample_result.sampling_priority != nullptr) {
+    trace.sample_result.sampling_priority =
+        std::make_unique<SamplingPriority>(*sample_result.sampling_priority);
   }
-  PendingTrace& trace = trace_entry->second;
-  trace.priority_sampling_applied = true;
-  trace.priority_applied_rate = applied_rate;
 }
 
 }  // namespace opentracing
