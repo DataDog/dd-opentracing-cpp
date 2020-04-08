@@ -29,7 +29,7 @@ struct TracerOptions {
   // Port on which the Datadog agent is running. Can also be set by the environment variable
   // DD_TRACE_AGENT_PORT
   uint32_t agent_port = 8126;
-  // The name of the service being traced.
+  // The name of the service being traced. Can also be set by the environment variable DD_SERVICE.
   // See:
   // https://help.datadoghq.com/hc/en-us/articles/115000702546-What-is-the-Difference-Between-Type-Service-Resource-and-Name-
   std::string service;
@@ -76,6 +76,12 @@ struct TracerOptions {
   // value for analytics sampling rate. Can also be set by the environment variable
   // DD_TRACE_ANALYTICS_SAMPLE_RATE
   double analytics_rate = std::nan("");
+  // Tags that are applied to all spans reported by this tracer. Can also be set by the environment
+  // variable DD_TAGS.
+  std::map<std::string, std::string> tags = {};
+  // The version of the overall application being traced. Can also be set by the environment
+  // variable DD_VERSION.
+  std::string version = "";
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

@@ -1,5 +1,6 @@
 #include "../src/tracer_options.h"
 
+#include <opentracing/ext/tags.h>
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
@@ -36,6 +37,7 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const ch
   } else {
     REQUIRE(lhs->analytics_rate == rhs->analytics_rate);
   }
+  REQUIRE(lhs->tags == rhs->tags);
 };
 
 TEST_CASE("tracer options from environment variables") {
@@ -51,26 +53,36 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_AGENT_PORT", "420"},
         {"DD_ENV", "env"},
         {"DD_TRACE_SAMPLING_RULES", "rules"},
+        {"DD_SERVICE", "service"},
         {"DD_PROPAGATION_STYLE_EXTRACT", "B3 Datadog"},
         {"DD_PROPAGATION_STYLE_INJECT", "Datadog B3"},
         {"DD_TRACE_REPORT_HOSTNAME", "true"},
         {"DD_TRACE_ANALYTICS_ENABLED", "true"},
-        {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"}},
-       TracerOptions{"host",
-                     420,
-                     "",
-                     "web",
-                     "env",
-                     std::nan(""),
-                     true,
-                     "rules",
-                     1000,
-                     "",
-                     {PropagationStyle::Datadog, PropagationStyle::B3},
-                     {PropagationStyle::Datadog, PropagationStyle::B3},
-                     true,
-                     true,
-                     0.5}},
+        {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"},
+        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"}},
+       TracerOptions{
+           "host",
+           420,
+           "service",
+           "web",
+           "env",
+           std::nan(""),
+           true,
+           "rules",
+           1000,
+           "",
+           {PropagationStyle::Datadog, PropagationStyle::B3},
+           {PropagationStyle::Datadog, PropagationStyle::B3},
+           true,
+           true,
+           0.5,
+           {
+               {"host", "my-host-name"},
+               {"region", "us-east-1"},
+               {"datacenter", "us"},
+               {"partition", "5"},
+           },
+       }},
       {{{"DD_PROPAGATION_STYLE_EXTRACT", "Not even a real style"}},
        ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid")},
       {{{"DD_PROPAGATION_STYLE_INJECT", "Not even a real style"}},
@@ -94,6 +106,35 @@ TEST_CASE("tracer options from environment variables") {
 
   auto got = applyTracerOptionsFromEnvironment(input);
   requireTracerOptionsResultsMatch(test_case.expected, got);
+
+  // Teardown
+  for (const auto &env_var : test_case.environment_variables) {
+    REQUIRE(unsetenv(env_var.first.c_str()) == 0);
+  }
+}
+
+TEST_CASE("exceptions for DD_TAGS") {
+  //
+  TracerOptions input{};
+  struct TestCase {
+    std::map<std::string, std::string> environment_variables;
+    std::map<std::string, std::string> tags;
+  };
+
+  auto test_case = GENERATE(values<TestCase>({
+      {{{"DD_ENV", "foo"}, {"DD_TAGS", "env:bar"}}, {}},
+      {{{"DD_TAGS", std::string(ot::ext::sampling_priority) + ":1"}}, {}},
+      {{{"DD_VERSION", "awesomeapp v1.2.3"}, {"DD_TAGS", "version:abcd"}}, {}},
+  }));
+
+  // Setup
+  for (const auto &env_var : test_case.environment_variables) {
+    REQUIRE(setenv(env_var.first.c_str(), env_var.second.c_str(), 1) == 0);
+  }
+
+  auto got = applyTracerOptionsFromEnvironment(input);
+  REQUIRE(got);
+  REQUIRE(test_case.tags == got->tags);
 
   // Teardown
   for (const auto &env_var : test_case.environment_variables) {

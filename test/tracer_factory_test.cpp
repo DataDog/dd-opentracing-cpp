@@ -165,7 +165,9 @@ TEST_CASE("tracer factory") {
     )"};  // Missing service
     std::string error = "";
     auto result = factory.MakeTracer(input.c_str(), error);
-    REQUIRE(error == "configuration argument 'service' is missing");
+    REQUIRE(
+        error ==
+        "tracer option 'service' has not been set via config or DD_SERVICE environment variable");
     REQUIRE(!result);
     REQUIRE(result.error() == std::make_error_code(std::errc::invalid_argument));
   }
@@ -248,6 +250,42 @@ TEST_CASE("tracer factory") {
   }
 
   SECTION("injected environment variables") {
+    SECTION("DD_ENV overrides default") {
+      ::setenv("DD_ENV", "injected-env", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "environment": "env"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_ENV");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.environment == "injected-env");
+    }
+
+    SECTION("DD_SERVICE overrides default") {
+      ::setenv("DD_SERVICE", "injected-service", 0);
+      std::string input{R"(
+      {
+        "service": "my-service"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_SERVICE");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.service == "injected-service");
+    }
+
     SECTION("DD_AGENT_HOST overrides default") {
       ::setenv("DD_AGENT_HOST", "injected-hostname", 0);
       std::string input{R"(

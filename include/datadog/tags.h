@@ -12,6 +12,7 @@ const std::string resource_name = "resource.name";
 const std::string analytics_event = "analytics.event";
 const std::string manual_keep = "manual.keep";
 const std::string manual_drop = "manual.drop";
+const std::string version = "version";
 
 }  // namespace tags
 }  // namespace datadog

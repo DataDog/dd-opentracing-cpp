@@ -3,23 +3,106 @@
 #include <iterator>
 #include <sstream>
 
+#include <datadog/tags.h>
+#include <opentracing/ext/tags.h>
+
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
+// Extracts key-value pairs from a string.
+// Duplicates are overwritten.
+// Intended use is for settings tags from DD_TAGS options.
+std::map<std::string, std::string> keyvalues(std::string text, char itemsep, char tokensep,
+                                             char escape) {
+  // early-return if empty
+  if (text.empty()) {
+    return {};
+  }
+
+  bool esc = false;
+  std::map<std::string, std::string> kvp;
+  std::string key;
+  std::string val;
+  bool keyfound = false;
+  auto assignchar = [&](char c) {
+    if (keyfound) {
+      val += c;
+    } else {
+      key += c;
+    }
+    esc = false;
+  };
+  auto addkv = [&](std::string key, std::string val) { kvp[key] = val; };
+  for (auto ch : text) {
+    if (esc) {
+      assignchar(ch);
+      continue;
+    }
+    if (ch == escape) {
+      esc = true;
+      continue;
+    }
+    if (ch == tokensep) {
+      addkv(key, val);
+      key = "";
+      val = "";
+      keyfound = false;
+      continue;
+    }
+    if (ch == itemsep) {
+      keyfound = true;
+      continue;
+    }
+    assignchar(ch);
+  }
+  if (!key.empty()) {
+    addkv(key, val);
+  }
+
+  return kvp;
+}
+
 ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     const TracerOptions &input) {
   TracerOptions opts = input;
 
-  auto agent_host = std::getenv("DD_AGENT_HOST");
-  if (agent_host != nullptr && std::strlen(agent_host) > 0) {
-    opts.agent_host = agent_host;
-  }
-
   auto environment = std::getenv("DD_ENV");
   if (environment != nullptr && std::strlen(environment) > 0) {
     opts.environment = environment;
+  }
+
+  auto service = std::getenv("DD_SERVICE");
+  if (service != nullptr && std::strlen(service) > 0) {
+    opts.service = service;
+  }
+
+  auto version = std::getenv("DD_VERSION");
+  if (version != nullptr && std::strlen(version) > 0) {
+    opts.version = version;
+  }
+
+  auto tags = std::getenv("DD_TAGS");
+  if (tags != nullptr && std::strlen(tags) > 0) {
+    opts.tags = keyvalues(tags, ':', ',', '\\');
+    // Special case for env and sampling priority
+    if (environment != nullptr && std::strlen(environment) > 0 &&
+        opts.tags.find(datadog::tags::environment) != opts.tags.end()) {
+      opts.tags.erase(datadog::tags::environment);
+    }
+    if (version != nullptr && std::strlen(version) > 0 &&
+        opts.tags.find(datadog::tags::version) != opts.tags.end()) {
+      opts.tags.erase(datadog::tags::version);
+    }
+    if (opts.tags.find(ot::ext::sampling_priority) != opts.tags.end()) {
+      opts.tags.erase(ot::ext::sampling_priority);
+    }
+  }
+
+  auto agent_host = std::getenv("DD_AGENT_HOST");
+  if (agent_host != nullptr && std::strlen(agent_host) > 0) {
+    opts.agent_host = agent_host;
   }
 
   auto trace_agent_port = std::getenv("DD_TRACE_AGENT_PORT");
