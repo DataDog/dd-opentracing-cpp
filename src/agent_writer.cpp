@@ -20,43 +20,76 @@ const std::vector<std::chrono::milliseconds> default_retry_periods{
 const long default_timeout_ms = 2000L;
 }  // namespace
 
-AgentWriter::AgentWriter(std::string host, uint32_t port, std::string unix_socket,
+AgentWriter::AgentWriter(std::string host, uint32_t port, std::string url,
                          std::chrono::milliseconds write_period,
                          std::shared_ptr<RulesSampler> sampler)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
-                  default_retry_periods, host, port, unix_socket, sampler){};
+                  default_retry_periods, host, port, url, sampler){};
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,
                          std::vector<std::chrono::milliseconds> retry_periods, std::string host,
-                         uint32_t port, std::string unix_socket,
-                         std::shared_ptr<RulesSampler> sampler)
+                         uint32_t port, std::string url, std::shared_ptr<RulesSampler> sampler)
     : Writer(sampler),
       write_period_(write_period),
       max_queued_traces_(max_queued_traces),
       retry_periods_(retry_periods) {
-  setUpHandle(handle, host, port, unix_socket);
+  setUpHandle(handle, host, port, url);
   startWriting(std::move(handle));
 }
 
 void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port,
-                              std::string unix_socket) {
+                              std::string url) {
   // Some options are the same for all actions, set them here.
-  // Set the agent URI.
-  std::stringstream agent_uri;
-  agent_uri << agent_protocol << host << ":" << std::to_string(port) << trace_encoder_->path();
-  auto rcode = handle->setopt(CURLOPT_URL, agent_uri.str().c_str());
-  if (rcode != CURLE_OK) {
-    throw std::runtime_error(std::string("Unable to set agent URL: ") + curl_easy_strerror(rcode));
-  }
-  if (!unix_socket.empty()) {
-    rcode = handle->setopt(CURLOPT_UNIX_SOCKET_PATH, unix_socket.c_str());
+  // Set the agent URL.
+  // The URL can be either
+  // - http://host
+  // - http://host:port
+  // - https://host
+  // - https://host:port
+  // - unix:///path/to/trace-agent.socket
+  // - /path/to/trace-agent.socket
+  if (!url.empty()) {
+    const std::string http_scheme = "http://";
+    const std::string https_scheme = "https://";
+    const std::string unix_scheme = "unix://";
+    if (url.substr(0, http_scheme.size()) == http_scheme ||
+        url.substr(0, https_scheme.size()) == https_scheme) {
+      std::string agent_uri = url + trace_encoder_->path();
+      // http:// or https://
+      auto rcode = handle->setopt(CURLOPT_URL, agent_uri.c_str());
+      if (rcode != CURLE_OK) {
+        throw std::runtime_error(std::string("Unable to set agent URL: ") +
+                                 curl_easy_strerror(rcode));
+      }
+    } else if (url.substr(0, unix_scheme.size()) == unix_scheme) {
+      // unix://
+      url = url.substr(unix_scheme.size());
+      auto rcode = handle->setopt(CURLOPT_UNIX_SOCKET_PATH, url.c_str());
+      if (rcode != CURLE_OK) {
+        throw std::runtime_error(std::string("Unable to set unix socket path: ") +
+                                 curl_easy_strerror(rcode));
+      }
+    } else if (url.substr(0, 1) == "/") {
+      // plain file path
+      auto rcode = handle->setopt(CURLOPT_UNIX_SOCKET_PATH, url.c_str());
+      if (rcode != CURLE_OK) {
+        throw std::runtime_error(std::string("Unable to set unix socket path: ") +
+                                 curl_easy_strerror(rcode));
+      }
+    } else {
+      throw std::runtime_error(std::string("Unable to set agent URL: unknown url scheme: " + url));
+    }
+  } else {
+    std::string agent_uri =
+        agent_protocol + host + ":" + std::to_string(port) + trace_encoder_->path();
+    auto rcode = handle->setopt(CURLOPT_URL, agent_uri.c_str());
     if (rcode != CURLE_OK) {
-      throw std::runtime_error(std::string("Unable to set unix socket path: ") +
+      throw std::runtime_error(std::string("Unable to set agent URL: ") +
                                curl_easy_strerror(rcode));
     }
   }
-  rcode = handle->setopt(CURLOPT_TIMEOUT_MS, default_timeout_ms);
+  auto rcode = handle->setopt(CURLOPT_TIMEOUT_MS, default_timeout_ms);
   if (rcode != CURLE_OK) {
     throw std::runtime_error(std::string("Unable to set agent timeout: ") +
                              curl_easy_strerror(rcode));

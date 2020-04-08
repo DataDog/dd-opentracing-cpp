@@ -129,9 +129,9 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     opts.sampling_rules = sampling_rules;
   }
 
-  auto trace_agent_socket = std::getenv("DD_TRACE_AGENT_SOCKET");
-  if (trace_agent_socket != nullptr && std::strlen(trace_agent_socket) > 0) {
-    opts.agent_socket = trace_agent_socket;
+  auto trace_agent_url = std::getenv("DD_TRACE_AGENT_URL");
+  if (trace_agent_url != nullptr && std::strlen(trace_agent_url) > 0) {
+    opts.agent_url = trace_agent_url;
   }
 
   auto extract = std::getenv("DD_PROPAGATION_STYLE_EXTRACT");

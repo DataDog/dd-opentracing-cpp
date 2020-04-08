@@ -33,8 +33,8 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("agent_port") != config.end()) {
       config.at("agent_port").get_to(options.agent_port);
     }
-    if (config.find("agent_socket") != config.end()) {
-      config.at("agent_socket").get_to(options.agent_socket);
+    if (config.find("agent_url") != config.end()) {
+      config.at("agent_url").get_to(options.agent_url);
     }
     if (config.find("type") != config.end()) {
       config.at("type").get_to(options.type);
@@ -136,7 +136,7 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
 
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::shared_ptr<Writer>{
-      new AgentWriter(options.agent_host, options.agent_port, options.agent_socket,
+      new AgentWriter(options.agent_host, options.agent_port, options.agent_url,
                       std::chrono::milliseconds(llabs(options.write_period_ms)), sampler)};
 
   return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer, sampler}};

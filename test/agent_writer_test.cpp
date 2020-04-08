@@ -17,6 +17,37 @@ Trace make_trace(std::initializer_list<TestSpanData> spans) {
 }
 
 TEST_CASE("writer") {
+  SECTION("initializes handle correctly") {
+    std::atomic<bool> handle_destructed{false};
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
+    MockHandle* handle = handle_ptr.get();
+    auto sampler = std::make_shared<RulesSampler>();
+    struct InitializationTestCase {
+      std::string host;
+      uint32_t port;
+      std::string url;
+      CURLoption expected_opt;
+      std::string expected_uri;
+    };
+    auto test_case = GENERATE(values<InitializationTestCase>({
+        {"hostname", 1234, "", CURLOPT_URL, "http://hostname:1234/v0.4/traces"},
+        {"hostname", 1234, "http://override:5678", CURLOPT_URL,
+         "http://override:5678/v0.4/traces"},
+        {"", 0, "https://localhost:8126", CURLOPT_URL, "https://localhost:8126/v0.4/traces"},
+        {"", 0, "unix:///path/to/trace-agent.socket", CURLOPT_UNIX_SOCKET_PATH,
+         "/path/to/trace-agent.socket"},
+        {"", 0, "/path/to/trace-agent.socket", CURLOPT_UNIX_SOCKET_PATH,
+         "/path/to/trace-agent.socket"},
+    }));
+
+    AgentWriter writer{std::move(handle_ptr), std::chrono::seconds(1), 100,           {},
+                       test_case.host,        test_case.port,          test_case.url, sampler};
+
+    REQUIRE(handle->options ==
+            std::unordered_map<CURLoption, std::string, EnumClassHash>{
+                {test_case.expected_opt, test_case.expected_uri}, {CURLOPT_TIMEOUT_MS, "2000"}});
+  }
+
   std::atomic<bool> handle_destructed{false};
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
   MockHandle* handle = handle_ptr.get();
@@ -26,6 +57,7 @@ TEST_CASE("writer") {
   auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
   size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
+
   AgentWriter writer{std::move(handle_ptr),
                      only_send_traces_when_we_flush,
                      max_queued_traces,
@@ -34,12 +66,6 @@ TEST_CASE("writer") {
                      6319,
                      "",
                      sampler};
-
-  SECTION("initilises handle correctly") {
-    REQUIRE(handle->options ==
-            std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                {CURLOPT_URL, "http://hostname:6319/v0.4/traces"}, {CURLOPT_TIMEOUT_MS, "2000"}});
-  }
 
   SECTION("traces can be sent") {
     writer.write(make_trace(

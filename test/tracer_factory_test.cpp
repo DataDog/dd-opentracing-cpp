@@ -440,8 +440,8 @@ TEST_CASE("tracer factory") {
       REQUIRE(tracer->opts.sampling_rules == sampling_rules);
     }
 
-    SECTION("DD_TRACE_AGENT_SOCKET overrides default") {
-      ::setenv("DD_TRACE_AGENT_SOCKET", "/path/to/trace-agent.socket", 0);
+    SECTION("DD_TRACE_AGENT_URL overrides default") {
+      ::setenv("DD_TRACE_AGENT_URL", "/path/to/trace-agent.socket", 0);
       std::string input{R"(
       {
         "service": "my-service"
@@ -449,31 +449,31 @@ TEST_CASE("tracer factory") {
       )"};
       std::string error = "";
       auto result = factory.MakeTracer(input.c_str(), error);
-      ::unsetenv("DD_TRACE_AGENT_SOCKET");
+      ::unsetenv("DD_TRACE_AGENT_URL");
 
       REQUIRE(error == "");
       REQUIRE(result->get() != nullptr);
       auto tracer = dynamic_cast<MockTracer *>(result->get());
       REQUIRE(tracer->opts.service == "my-service");
-      REQUIRE(tracer->opts.agent_socket == "/path/to/trace-agent.socket");
+      REQUIRE(tracer->opts.agent_url == "/path/to/trace-agent.socket");
     }
-    SECTION("DD_TRACE_AGENT_SOCKET overrides configuration") {
-      ::setenv("DD_TRACE_AGENT_SOCKET", "/path/to/trace-agent.socket", 0);
+    SECTION("DD_TRACE_AGENT_URL overrides configuration") {
+      ::setenv("DD_TRACE_AGENT_URL", "/path/to/trace-agent.socket", 0);
       std::string input{R"(
       {
         "service": "my-service",
-        "agent_socket": "/configured/trace-agent.socket"
+        "agent_url": "/configured/trace-agent.socket"
       }
       )"};
       std::string error = "";
       auto result = factory.MakeTracer(input.c_str(), error);
-      ::unsetenv("DD_TRACE_AGENT_SOCKET");
+      ::unsetenv("DD_TRACE_AGENT_URL");
 
       REQUIRE(error == "");
       REQUIRE(result->get() != nullptr);
       auto tracer = dynamic_cast<MockTracer *>(result->get());
       REQUIRE(tracer->opts.service == "my-service");
-      REQUIRE(tracer->opts.agent_socket == "/path/to/trace-agent.socket");
+      REQUIRE(tracer->opts.agent_url == "/path/to/trace-agent.socket");
     }
 
     SECTION("DD_TRACE_REPORT_HOSTNAME overrides default") {
