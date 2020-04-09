@@ -21,9 +21,8 @@ TEST_CASE("tracer") {
   auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  auto sampler = std::make_shared<KeepAllSampler>();
   TracerOptions tracer_options{"", 0, "service_name", "web"};
-  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, get_time, get_id, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, get_time, get_id}};
   const ot::StartSpanOptions span_options;
 
   SECTION("names spans correctly") {
@@ -132,7 +131,7 @@ TEST_CASE("env overrides") {
   // auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  auto sampler = std::make_shared<KeepAllSampler>();
+  auto sampler = std::make_shared<RulesSampler>();
   auto mwriter = std::make_shared<MockWriter>(sampler);
   auto writer = std::shared_ptr<Writer>(mwriter);
   TracerOptions tracer_options{"", 0, "service_name", "web"};

@@ -148,7 +148,7 @@ echo '{
   "operation_name_override": "nginx.handle",
   "agent_host": "localhost",
   "agent_port": 8126,
-  "dd.priority.sampling": true,
+  "sampling_rules": [],
   "environment": "prod"
 }' > ${TRACER_CONF_PATH}
 

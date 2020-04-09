@@ -9,122 +9,26 @@
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
-TEST_CASE("sample") {
-  int id = 100;  // Starting span id.
-  // Starting calendar time 2007-03-12 00:00:00
-  std::tm start{};
-  start.tm_mday = 12;
-  start.tm_mon = 2;
-  start.tm_year = 107;
-  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
-                 std::chrono::steady_clock::time_point{}};
-  auto buffer = std::make_shared<MockBuffer>();
-  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
-  IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  TracerOptions tracer_options{"", 0, "service_name", "web"};
-  const ot::StartSpanOptions span_options;
-
-  SECTION("keep all traces") {
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new KeepAllSampler()}}};
-
-    auto span = tracer->StartSpanWithOptions("/should_be_kept", span_options);
-    const ot::FinishSpanOptions finish_options;
-    span->FinishWithOptions(finish_options);
-
-    REQUIRE(buffer->traces().size() == 1);
-    auto &result = buffer->traces(100).finished_spans->at(0);
-    REQUIRE(result->type == "web");
-    REQUIRE(result->service == "service_name");
-    REQUIRE(result->name == "/should_be_kept");
-    REQUIRE(result->resource == "/should_be_kept");
-    // This sampler should not set the _sample_rate tag.
-    REQUIRE(result->meta["_sample_rate"] == std::string());
-  }
-
-  SECTION("discard all tracer") {
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardAllSampler()}}};
-
-    auto span = tracer->StartSpanWithOptions("/should_be_discarded", span_options);
-    const ot::FinishSpanOptions finish_options;
-    span->FinishWithOptions(finish_options);
-
-    REQUIRE(buffer->traces().size() == 0);
-  }
-
-  SECTION("discard rate sampler") {
-    double rate = 0.75;
-    std::shared_ptr<Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
-
-    for (int i = 0; i < 100; i++) {
-      auto span = tracer->StartSpanWithOptions("/discard_rate_sample", span_options);
-      const ot::FinishSpanOptions finish_options;
-      span->FinishWithOptions(finish_options);
-    }
-
-    auto size = buffer->traces().size();
-    // allow for a tiny bit of variance. double brackets because of macro
-    REQUIRE((size >= 24 && size <= 26));
-  }
-
-  SECTION("discard rate sampler applied to child spans within same trace") {
-    double rate = 0;
-    std::shared_ptr<ot::Tracer> tracer{
-        new Tracer{tracer_options, buffer, get_time, get_id,
-                   std::shared_ptr<SampleProvider>{new DiscardRateSampler(rate)}}};
-    auto ot_root_span = tracer->StartSpan("/discard_rate_sample");
-    uint64_t trace_id = (dynamic_cast<const Span *>(ot_root_span.get()))->traceId();
-    auto ot_child_span =
-        tracer->StartSpan("/child_span", {opentracing::ChildOf(&ot_root_span->context())});
-
-    ot_child_span->Finish();
-    ot_root_span->Finish();
-
-    // One trace should have been captured.
-    REQUIRE(buffer->traces().size() == 1);
-
-    // Both spans should be recorded under the same trace.
-    REQUIRE(buffer->traces(trace_id).finished_spans->size() == 2);
-
-    // The trace id should be the same.
-    auto &root_span = buffer->traces(trace_id).finished_spans->at(1);
-    auto &child_span = buffer->traces(trace_id).finished_spans->at(0);
-    REQUIRE(root_span->traceId() == child_span->traceId());
-    // The span id should be different.
-    REQUIRE(root_span->spanId() != child_span->spanId());
-  }
-}
-
 TEST_CASE("priority sampler unit test") {
   PrioritySampler sampler;
   auto buffer = std::make_shared<MockBuffer>();
 
-  SECTION("doesn't discard") {
-    for (const std::string &p : {"", R"(, "sampling_priority": -1)", R"(, "sampling_priority": 0)",
-                                 R"(, "sampling_priority": 1)", R"(, "sampling_priority": 2)"}) {
-      std::istringstream ctx(R"({"trace_id": "100", "parent_id": "100")" + p + "}");
-      auto context = SpanContext::deserialize(ctx);
-
-      REQUIRE(!sampler.discard(std::move(*static_cast<SpanContext *>(context.value().get()))));
-    }
-  }
-
   SECTION("default unconfigured priority sampling behaviour is to always sample") {
-    REQUIRE(*sampler.sample("", "", 0) == SamplingPriority::SamplerKeep);
-    REQUIRE(*sampler.sample("env", "service", 1) == SamplingPriority::SamplerKeep);
+    auto result = sampler.sample("", "", 0);
+    REQUIRE(result.priority_rate == 1.0);
+    REQUIRE(*result.sampling_priority == SamplingPriority::SamplerKeep);
+    result = sampler.sample("env", "service", 1);
+    REQUIRE(result.priority_rate == 1.0);
+    REQUIRE(*result.sampling_priority == SamplingPriority::SamplerKeep);
   }
 
   SECTION("configured") {
     sampler.configure("{ \"service:nginx,env:\": 0.8, \"service:nginx,env:prod\": 0.2 }"_json);
 
-    SECTION("spans that don't match a rule are given a sampling priority of SamplerKeep") {
-      REQUIRE(*sampler.sample("different env", "different service", 1) ==
-              SamplingPriority::SamplerKeep);
+    SECTION("spans that don't match a rule use the default rate") {
+      auto result = sampler.sample("different env", "different service", 1);
+      REQUIRE(result.priority_rate == 1.0);
+      REQUIRE(*result.sampling_priority == SamplingPriority::SamplerKeep);
     }
 
     SECTION("spans can be sampled") {
@@ -132,7 +36,9 @@ TEST_CASE("priority sampler unit test") {
       int count_sampled = 0;
       int total = 10000;
       for (int i = 0; i < total; i++) {
-        auto p = sampler.sample("", "nginx", getId());
+        auto result = sampler.sample("", "nginx", getId());
+        const auto& p = result.sampling_priority;
+
         REQUIRE(p != nullptr);
         REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
         count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
@@ -143,7 +49,8 @@ TEST_CASE("priority sampler unit test") {
       count_sampled = 0;
       total = 10000;
       for (int i = 0; i < total; i++) {
-        auto p = sampler.sample("", "nginx", getId());
+        auto result = sampler.sample("", "nginx", getId());
+        const auto& p = result.sampling_priority;
         REQUIRE(p != nullptr);
         REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
         count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
@@ -154,117 +61,104 @@ TEST_CASE("priority sampler unit test") {
   }
 }
 
-TEST_CASE("correct sampler is used") {
-  TracerOptions tracer_options{"", 0, "service_name", "web"};
+TEST_CASE("rules sampler") {
+  std::tm start{};
+  start.tm_mday = 12;
+  start.tm_mon = 2;
+  start.tm_year = 107;
+  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
+                 std::chrono::steady_clock::time_point{}};
+  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
 
-  SECTION("rate sampler") {
-    tracer_options.sample_rate = 0.4;
-    tracer_options.priority_sampling = false;
-    auto sampler = sampleProviderFromOptions(tracer_options);
-    REQUIRE(std::dynamic_pointer_cast<DiscardRateSampler>(sampler));
-  }
-
-  SECTION("priority sampler") {
-    tracer_options.priority_sampling = true;
-    auto sampler = sampleProviderFromOptions(tracer_options);
-    REQUIRE(std::dynamic_pointer_cast<PrioritySampler>(sampler));
-  }
-}
-
-TEST_CASE("rate sampling not applied to propagated traces") {
-  struct RateSamplingTestCase {
-    double sample_rate;
-    std::string sampling_priority;
-    bool sampled;
-  };
-
-  auto test_case = GENERATE(values<RateSamplingTestCase>({{0.0, "1", true}, {1.0, "0", false}}));
-
-  TracerOptions tracer_options{"", 0, "service_name", "web", "", test_case.sample_rate, false};
-  auto sampler = sampleProviderFromOptions(tracer_options);
-  REQUIRE(std::dynamic_pointer_cast<DiscardRateSampler>(sampler));
-  auto mwriter = std::make_shared<MockWriter>(sampler);
-  auto writer = std::shared_ptr<Writer>(mwriter);
-  auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
-
-  SECTION("propagated priority used") {
-    MockTextMapCarrier carrier{};
-    carrier.Set("x-datadog-trace-id", "420");
-    carrier.Set("x-datadog-parent-id", "421");
-    carrier.Set("x-datadog-sampling-priority", test_case.sampling_priority);
-
-    auto context_maybe = SpanContext::deserialize(carrier, {PropagationStyle::Datadog});
-    REQUIRE(context_maybe);
-
-    auto span = tracer->StartSpan("test", {opentracing::ChildOf(context_maybe->get())});
-    REQUIRE(dynamic_cast<const Span *>(span.get()));
-    auto context = dynamic_cast<const SpanContext *>(&span->context());
-    REQUIRE(context);
-    auto want = asSamplingPriority(std::stoi(test_case.sampling_priority));
-    auto got = context->getPropagatedSamplingPriority();
-    REQUIRE(*want == *got);
-  }
-}
-
-TEST_CASE("priority sampler \"integration\" test") {
-  // There's a real integration test! It's in ./integration/nginx
-  // This tests the interaction between Span and the sampler. It's a bit of an overlap with the
-  // tests in span_test.cpp.
-  TracerOptions tracer_options{"", 0, "service_name", "web"};
-  tracer_options.environment = "threatened by climate change";
-  tracer_options.priority_sampling = true;
-  auto sampler = sampleProviderFromOptions(tracer_options);
-  REQUIRE(std::dynamic_pointer_cast<PrioritySampler>(sampler));
-
-  std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
-  MockHandle *handle = handle_ptr.get();
-  auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
-  auto writer = std::make_shared<AgentWriter>(
-      std::move(handle_ptr), only_send_traces_when_we_flush, 11000 /* max queued traces */,
-      std::vector<std::chrono::milliseconds>{}, "hostname", 6319, sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
-
-  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  auto sampler = std::make_shared<RulesSampler>(get_time, 1, 1.0, 1);
   const ot::StartSpanOptions span_options;
   const ot::FinishSpanOptions finish_options;
 
-  // First, configure the PrioritySampler. Send a trace to the agent, and have the agent reply with
-  // the config.
-  handle->response = R"( {
-    "rate_by_service": {
-      "service:service_name,env:threatened by climate change": 0.3,
-      "service:wrong,env:threatened by climate change": 0.1,
-      "service:service_name,env:wrong": 0.5
-    }
-  } )";
+  auto mwriter = std::make_shared<MockWriter>(sampler);
+  auto writer = std::shared_ptr<Writer>(mwriter);
 
-  auto span = tracer->StartSpanWithOptions("operation_name", span_options);
-  span->FinishWithOptions(finish_options);
-  writer->flush(std::chrono::seconds(10));
-  handle->response = "";
+  SECTION("rule matching applied") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "test.trace", "service": "test.service", "sample_rate": 0.1},
+    {"name": "name.only.match", "sample_rate": 0.2},
+    {"service": "service.only.match", "sample_rate": 0.3},
+    {"name": "overridden operation name", "sample_rate": 0.4},
+    {"sample_rate": 1.0}
+])";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    struct RulesSamplerTestCase {
+      std::string service;
+      std::string name;
+      bool matched;
+      double rate;
+    };
+    auto test_case = GENERATE(values<RulesSamplerTestCase>({
+        {"test.service", "test.trace", true, 0.1},
+        {"any.service", "name.only.match", true, 0.2},
+        {"service.only.match", "any.name", true, 0.3},
+        {"any.service", "any.name", true, 1.0},
+    }));
+    auto result = sampler->match(test_case.service, test_case.name);
+    REQUIRE(test_case.matched == result.matched);
+    if (std::isnan(test_case.rate)) {
+      REQUIRE(std::isnan(result.rate));
+    } else {
+      REQUIRE(test_case.rate == result.rate);
+    }
+  }
 
-  SECTION("sampling rate is applied") {
-    // Start a heap of spans.
-    int total = 10000;
-    int count_sampled = 0;
-    for (int i = 0; i < total; i++) {
-      auto span = tracer->StartSpanWithOptions("operation_name", span_options);
-      span->FinishWithOptions(finish_options);
-    }
-    writer->flush(std::chrono::seconds(10));
-    // Check the spans, and the rate at which they were sampled.
-    auto traces = handle->getTraces();
-    REQUIRE(traces->size() == total);
-    for (const auto &trace : *traces) {
-      REQUIRE(trace.size() == 1);
-      REQUIRE(trace[0].metrics.find("_sampling_priority_v1") != trace[0].metrics.end());
-      OptionalSamplingPriority p =
-          asSamplingPriority(trace[0].metrics.find("_sampling_priority_v1")->second);
-      REQUIRE(p != nullptr);
-      REQUIRE(((*p == SamplingPriority::SamplerKeep) || (*p == SamplingPriority::SamplerDrop)));
-      count_sampled += *p == SamplingPriority::SamplerKeep ? 1 : 0;
-    }
-    double sample_rate = count_sampled / static_cast<double>(total);
-    REQUIRE((sample_rate < 0.35 && sample_rate > 0.25));
+  SECTION("falls back to priority sampling when no matching rule") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
+])";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    auto span = tracer->StartSpanWithOptions("operation.name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.agent_psr") != metrics.end());
+  }
+
+  SECTION("rule matching applied to overridden name") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"name": "overridden operation name", "sample_rate": 0.4},
+    {"sample_rate": 1.0}
+])";
+    tracer_options.operation_name_override = "overridden operation name";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    auto span = tracer->StartSpanWithOptions("operation name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.4);
+  }
+
+  SECTION("applies limiter to sampled spans") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sampling_rules = R"([
+    {"sample_rate": 0.0}
+])";
+    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+    auto span = tracer->StartSpanWithOptions("operation name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.0);
+    REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
+    REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 }

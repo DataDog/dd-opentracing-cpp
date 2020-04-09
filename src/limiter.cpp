@@ -42,7 +42,11 @@ LimitResult Limiter::allow(long tokens_requested) {
     } else {
       std::move_backward(previous_rates_.begin(), previous_rates_.end() - intervals,
                          previous_rates_.end());
-      previous_rates_[intervals - 1] = double(num_allowed_) / double(num_requested_);
+      if (num_requested_ > 0) {
+        previous_rates_[intervals - 1] = double(num_allowed_) / double(num_requested_);
+      } else {
+        previous_rates_[intervals - 1] = 1.0;
+      }
       if (intervals - 2 > 0) {
         std::fill(previous_rates_.begin(), previous_rates_.begin() + intervals - 2, 1.0);
       }
@@ -50,6 +54,7 @@ LimitResult Limiter::allow(long tokens_requested) {
     previous_rates_sum_ = std::accumulate(previous_rates_.begin(), previous_rates_.end(), 0.0);
     num_allowed_ = 0;
     num_requested_ = 0;
+    current_period_ = now;
   }
 
   num_requested_++;

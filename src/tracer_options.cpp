@@ -33,6 +33,11 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     }
   }
 
+  auto sampling_rules = std::getenv("DD_TRACE_SAMPLING_RULES");
+  if (sampling_rules != nullptr && std::strlen(sampling_rules) > 0) {
+    opts.sampling_rules = sampling_rules;
+  }
+
   auto extract = std::getenv("DD_PROPAGATION_STYLE_EXTRACT");
   if (extract != nullptr && std::strlen(extract) > 0) {
     std::stringstream words{extract};

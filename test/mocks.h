@@ -32,28 +32,50 @@ struct TestSpanData : public SpanData {
                      trace_id, parent_id, error);
 };
 
-struct MockSampler : public PrioritySampler {
-  MockSampler() {}
+struct MockPrioritySampler : public PrioritySampler {
+  MockPrioritySampler() {}
 
-  bool discard(const SpanContext& /* context */) const override { return discard_spans; }
-  OptionalSamplingPriority sample(const std::string& /* environment */,
-                                  const std::string& /* service */,
-                                  uint64_t /* trace_id */) const override {
-    if (sampling_priority == nullptr) {
-      return nullptr;
+  SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
+                      uint64_t /* trace_id */) const override {
+    SampleResult result;
+    result.priority_rate = sampling_rate;
+    if (sampling_priority != nullptr) {
+      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
     }
-    return std::make_unique<SamplingPriority>(*sampling_priority);
+    return result;
   }
   void configure(json new_config) override { config = new_config.dump(); }
 
-  bool discard_spans = false;
   OptionalSamplingPriority sampling_priority = nullptr;
+  double sampling_rate;
+
+  std::string config;
+};
+
+struct MockRulesSampler : public RulesSampler {
+  MockRulesSampler() {}
+
+  SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
+                      const std::string& /* name */, uint64_t /* trace_id */) override {
+    SampleResult result;
+    if (sampling_priority != nullptr) {
+      result.rule_rate = rule_rate;
+      result.limiter_rate = limiter_rate;
+      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
+    }
+    return result;
+  }
+  void updatePrioritySampler(json new_config) override { config = new_config.dump(); }
+
+  OptionalSamplingPriority sampling_priority = nullptr;
+  double rule_rate = 1.0;
+  double limiter_rate = 1.0;
   std::string config;
 };
 
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter(std::shared_ptr<SampleProvider> sampler) : Writer(sampler) {}
+  MockWriter(std::shared_ptr<RulesSampler> sampler) : Writer(sampler) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {
@@ -74,8 +96,9 @@ struct MockWriter : public Writer {
 
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockWriter>(std::make_shared<MockSampler>()),
-                          WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(nullptr, std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+  MockBuffer(std::shared_ptr<RulesSampler> sampler)
+      : WritingSpanBuffer(nullptr, sampler, WritingSpanBufferOptions{}){};
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.

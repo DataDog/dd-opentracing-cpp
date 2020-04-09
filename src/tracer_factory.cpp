@@ -44,8 +44,8 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("sample_rate") != config.end()) {
       config.at("sample_rate").get_to(options.sample_rate);
     }
-    if (config.find("dd.priority.sampling") != config.end()) {
-      config.at("dd.priority.sampling").get_to(options.priority_sampling);
+    if (config.find("sampling_rules") != config.end()) {
+      options.sampling_rules = config.at("sampling_rules").dump();
     }
     if (config.find("operation_name_override") != config.end()) {
       config.at("operation_name_override").get_to(options.operation_name_override);
@@ -105,9 +105,6 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 //     eg. "" (env:none), "staging", "prod". Can also be set by the environment variable
 //     DD_ENV
 // "sample_rate": A double, defaults to 1.0.
-// "dd.priority.sampling": A boolean, true by default. If true disables client-side sampling (thus
-//     ignoring sample_rate) and enables distributed priority sampling, where traces are sampled
-//     based on a combination of user-assigned priorities and configuration from the agent.
 // "operation_name_override": A string, if not empty it overrides the operation name (and the
 //     overridden operation name is recorded in the tag "operation").
 // "propagation_style_extract": A list of strings, each string is one of "Datadog", "B3". Defaults
@@ -127,7 +124,7 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
   }
   TracerOptions options = maybe_options.value();
 
-  std::shared_ptr<SampleProvider> sampler = sampleProviderFromOptions(options);
+  auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::shared_ptr<Writer>{
       new AgentWriter(options.agent_host, options.agent_port,
                       std::chrono::milliseconds(llabs(options.write_period_ms)), sampler)};

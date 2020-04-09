@@ -10,7 +10,7 @@ RUN apt-get update && \
   apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq iproute2
 
 # Get Wiremock
-RUN wget http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar -O wiremock-standalone-2.18.0.jar
+RUN wget https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar -O wiremock-standalone-2.18.0.jar
 RUN printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 
@@ -18,10 +18,10 @@ ARG NGINX_VERSION
 
 # Install nginx
 RUN CODENAME=$(lsb_release -s -c) && \
-  wget http://nginx.org/keys/nginx_signing.key && \
+  wget https://nginx.org/keys/nginx_signing.key && \
   apt-key add nginx_signing.key && \
-  echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
-  echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
+  echo deb https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
+  echo deb-src https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
   apt-get update && \
   apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
 

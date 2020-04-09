@@ -302,11 +302,11 @@ TEST_CASE("Binary Span Context") {
 }
 
 TEST_CASE("sampling behaviour") {
-  auto sampler = std::make_shared<MockSampler>();
+  auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, sampler, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
-  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
 
   // There's two ways we can set the sampling priority. Either directly using the method, or
@@ -510,11 +510,11 @@ TEST_CASE("sampling behaviour") {
 }
 
 TEST_CASE("force tracing behaviour") {
-  auto sampler = std::make_shared<MockSampler>();
+  auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, WritingSpanBufferOptions{});
+  auto buffer = std::make_shared<WritingSpanBuffer>(writer, sampler, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
-  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
 
   auto priority = GENERATE(values<std::pair<std::string, SamplingPriority>>(
@@ -531,13 +531,13 @@ TEST_CASE("force tracing behaviour") {
 }
 
 TEST_CASE("origin header propagation") {
-  auto sampler = std::make_shared<MockSampler>();
+  auto sampler = std::make_shared<MockRulesSampler>();
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   SpanContext context{420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
-  std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
 
   SECTION("the origin header is injected") {

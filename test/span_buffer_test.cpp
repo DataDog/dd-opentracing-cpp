@@ -6,10 +6,11 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("span buffer") {
-  auto sampler = std::make_shared<KeepAllSampler>();
+  auto sampler = std::make_shared<RulesSampler>();
   auto writer_ptr = std::make_shared<MockWriter>(sampler);
   MockWriter* writer = writer_ptr.get();
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer_ptr, WritingSpanBufferOptions{});
+  auto buffer =
+      std::make_shared<WritingSpanBuffer>(writer_ptr, sampler, WritingSpanBufferOptions{});
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
     return SpanContext{span.span_id, span.trace_id, "", {}};
@@ -19,7 +20,7 @@ TEST_CASE("span buffer") {
     auto span = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420, 420, 0,
                                                123, 456, 0);
     buffer->registerSpan(context_from_span(*span));
-    buffer->finishSpan(std::move(span), sampler);
+    buffer->finishSpan(std::move(span));
     REQUIRE(writer->traces.size() == 1);
     REQUIRE(writer->traces[0].size() == 1);
     auto& result = writer->traces[0][0];
@@ -43,8 +44,8 @@ TEST_CASE("span buffer") {
     auto childSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                     421, 0, 124, 455, 0);
     buffer->registerSpan(context_from_span(*childSpan));
-    buffer->finishSpan(std::move(childSpan), sampler);
-    buffer->finishSpan(std::move(rootSpan), sampler);
+    buffer->finishSpan(std::move(childSpan));
+    buffer->finishSpan(std::move(rootSpan));
     REQUIRE(writer->traces.size() == 1);
     REQUIRE(writer->traces[0].size() == 2);
     // Although order doesn't actually matter.
@@ -59,8 +60,8 @@ TEST_CASE("span buffer") {
     auto childSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                     421, 0, 124, 455, 0);
     buffer->registerSpan(context_from_span(*childSpan));
-    buffer->finishSpan(std::move(rootSpan), sampler);
-    buffer->finishSpan(std::move(childSpan), sampler);
+    buffer->finishSpan(std::move(rootSpan));
+    buffer->finishSpan(std::move(childSpan));
     REQUIRE(writer->traces.size() == 1);
     REQUIRE(writer->traces[0].size() == 2);
     // Although order doesn't actually matter.
@@ -75,16 +76,16 @@ TEST_CASE("span buffer") {
     auto childSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                     421, 0, 124, 455, 0);
     buffer->registerSpan(context_from_span(*childSpan));
-    buffer->finishSpan(std::move(childSpan), sampler);
+    buffer->finishSpan(std::move(childSpan));
     REQUIRE(writer->traces.size() == 0);  // rootSpan still outstanding
     auto childSpan2 = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                      422, 0, 125, 457, 0);
     buffer->registerSpan(context_from_span(*childSpan2));
-    buffer->finishSpan(std::move(rootSpan), sampler);
+    buffer->finishSpan(std::move(rootSpan));
     // Root span finished, but *after* childSpan2 was registered, so childSpan2 still oustanding.
     REQUIRE(writer->traces.size() == 0);
     // Ok now we're done!
-    buffer->finishSpan(std::move(childSpan2), sampler);
+    buffer->finishSpan(std::move(childSpan2));
     REQUIRE(writer->traces.size() == 1);
     REQUIRE(writer->traces[0].size() == 3);
   }
@@ -97,7 +98,7 @@ TEST_CASE("span buffer") {
     SECTION("not even a trace") {
       auto rootSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                      420, 0, 123, 456, 0);
-      buffer->finishSpan(std::move(rootSpan), sampler);
+      buffer->finishSpan(std::move(rootSpan));
       REQUIRE(writer->traces.size() == 0);
     }
     SECTION("there's a trace but no startSpan call") {
@@ -106,8 +107,8 @@ TEST_CASE("span buffer") {
       buffer->registerSpan(context_from_span(*rootSpan));
       auto childSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                       421, 0, 124, 455, 0);
-      buffer->finishSpan(std::move(childSpan), sampler);
-      buffer->finishSpan(std::move(rootSpan), sampler);
+      buffer->finishSpan(std::move(childSpan));
+      buffer->finishSpan(std::move(rootSpan));
       REQUIRE(writer->traces.size() == 1);
       REQUIRE(writer->traces[0].size() == 1);  // Only rootSpan got written.
       REQUIRE(writer->traces[0][0]->span_id == 420);
@@ -120,12 +121,12 @@ TEST_CASE("span buffer") {
     auto rootSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420, 420,
                                                    0, 123, 456, 0);
     buffer->registerSpan(context_from_span(*rootSpan));
-    buffer->finishSpan(std::move(rootSpan), sampler);
+    buffer->finishSpan(std::move(rootSpan));
     REQUIRE(writer->traces.size() == 1);
     auto childSpan = std::make_unique<TestSpanData>("type", "service", "resource", "name", 420,
                                                     421, 0, 123, 456, 0);
     buffer->registerSpan(context_from_span(*childSpan));
-    buffer->finishSpan(std::move(childSpan), sampler);
+    buffer->finishSpan(std::move(childSpan));
     REQUIRE(writer->traces.size() == 2);
   }
 
@@ -156,7 +157,7 @@ TEST_CASE("span buffer") {
                   [&](uint64_t span_id) {
                     auto span = std::make_unique<TestSpanData>(
                         "type", "service", "resource", "name", trace_id, span_id, 0, 123, 456, 0);
-                    buffer->finishSpan(std::move(span), sampler);
+                    buffer->finishSpan(std::move(span));
                   },
                   span_id);
             }

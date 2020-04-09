@@ -21,14 +21,14 @@ const long default_timeout_ms = 2000L;
 }  // namespace
 
 AgentWriter::AgentWriter(std::string host, uint32_t port, std::chrono::milliseconds write_period,
-                         std::shared_ptr<SampleProvider> sampler)
+                         std::shared_ptr<RulesSampler> sampler)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
                   default_retry_periods, host, port, sampler){};
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,
                          std::vector<std::chrono::milliseconds> retry_periods, std::string host,
-                         uint32_t port, std::shared_ptr<SampleProvider> sampler)
+                         uint32_t port, std::shared_ptr<RulesSampler> sampler)
     : Writer(sampler),
       write_period_(write_period),
       max_queued_traces_(max_queued_traces),

@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include "limiter.h"
 #include "propagation.h"
 
 namespace ot = opentracing;
@@ -16,59 +17,56 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
-class Span;
-
-class SampleProvider {
- public:
-  SampleProvider(){};
-  virtual ~SampleProvider() {}
-
-  virtual bool discard(const SpanContext& context) const = 0;
-  virtual OptionalSamplingPriority sample(const std::string& environment,
-                                          const std::string& service, uint64_t trace_id) const = 0;
+struct SampleResult {
+  double rule_rate = std::nan("");
+  double limiter_rate = std::nan("");
+  double priority_rate = std::nan("");
+  OptionalSamplingPriority sampling_priority = nullptr;
 };
 
-class DiscardRateSampler : public SampleProvider {
- public:
-  DiscardRateSampler(double rate);
-  ~DiscardRateSampler() override {}
-
-  bool discard(const SpanContext& context) const override;
-  OptionalSamplingPriority sample(const std::string& environment, const std::string& service,
-                                  uint64_t trace_id) const override;
-
- protected:
-  uint64_t max_trace_id_ = 0;
+struct SamplingRate {
+  double rate = std::nan("");
+  uint64_t max_hash = 0;
 };
 
-class KeepAllSampler : public DiscardRateSampler {
+class PrioritySampler {
  public:
-  KeepAllSampler() : DiscardRateSampler(0) {}
-};
+  PrioritySampler() : default_sample_rate_{1.0, std::numeric_limits<uint64_t>::max()} {}
+  virtual ~PrioritySampler() {}
 
-class DiscardAllSampler : public DiscardRateSampler {
- public:
-  DiscardAllSampler() : DiscardRateSampler(1) {}
-};
-
-class PrioritySampler : public SampleProvider {
- public:
-  PrioritySampler() {}
-  ~PrioritySampler() override {}
-
-  virtual bool discard(const SpanContext& context) const override;
-  virtual OptionalSamplingPriority sample(const std::string& environment,
-                                          const std::string& service,
-                                          uint64_t trace_id) const override;
+  virtual SampleResult sample(const std::string& environment, const std::string& service,
+                              uint64_t trace_id) const;
   virtual void configure(json config);
 
  private:
-  std::map<std::string, uint64_t> max_hash_by_service_env_{
-      {"service:,env:", std::numeric_limits<uint64_t>::max()}};
   mutable std::mutex mutex_;
+  std::map<std::string, SamplingRate> agent_sampling_rates_;
+  SamplingRate default_sample_rate_;
 };
 
-std::shared_ptr<SampleProvider> sampleProviderFromOptions(const TracerOptions& options);
+struct RuleResult {
+  bool matched = false;
+  double rate = std::nan("");
+};
+
+using RuleFunc = std::function<RuleResult(const std::string&, const std::string&)>;
+
+class RulesSampler {
+ public:
+  RulesSampler();
+  RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
+  virtual ~RulesSampler() {}
+  void addRule(RuleFunc f);
+  virtual SampleResult sample(const std::string& environment, const std::string& service,
+                              const std::string& name, uint64_t trace_id);
+  virtual RuleResult match(const std::string& service, const std::string& name) const;
+  virtual void updatePrioritySampler(json config);
+
+ private:
+  Limiter sampling_limiter_;
+  std::vector<RuleFunc> sampling_rules_;
+  PrioritySampler priority_sampler_;
+};
 
 }  // namespace opentracing
 }  // namespace datadog

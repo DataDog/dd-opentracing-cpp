@@ -20,7 +20,7 @@ TEST_CASE("writer") {
   std::atomic<bool> handle_destructed{false};
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
   MockHandle* handle = handle_ptr.get();
-  auto sampler = std::make_shared<MockSampler>();
+  auto sampler = std::make_shared<MockRulesSampler>();
   // I mean, it *can* technically still flake, but if this test takes an hour we've got bigger
   // problems.
   auto only_send_traces_when_we_flush = std::chrono::seconds(3600);
@@ -143,7 +143,7 @@ TEST_CASE("writer") {
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
                                max_queued_traces, disable_retry, "hostname", 6319,
-                               std::make_shared<KeepAllSampler>()});
+                               std::make_shared<RulesSampler>()});
   }
 
   SECTION("handle failure during post") {
@@ -253,7 +253,7 @@ TEST_CASE("writer") {
                        disable_retry,
                        "hostname",
                        6319,
-                       std::make_shared<KeepAllSampler>()};
+                       std::make_shared<RulesSampler>()};
     // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
     // different writes. We don't count the number of writes because that could flake, but we do
     // check that all 7 traces are written, implicitly testing that multiple writes happen.
@@ -291,7 +291,7 @@ TEST_CASE("writer") {
                        retry_periods,
                        "hostname",
                        6319,
-                       std::make_shared<KeepAllSampler>()};
+                       std::make_shared<RulesSampler>()};
     // Redirect cerr, so the the terminal output doesn't imply failure.
     std::stringstream error_message;
     std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
@@ -346,7 +346,7 @@ TEST_CASE("flush") {
                      retry_periods,
                      "hostname",
                      6319,
-                     std::make_shared<KeepAllSampler>()};
+                     std::make_shared<RulesSampler>()};
   // Redirect cerr, so the the terminal output doesn't imply failure.
   std::stringstream error_message;
   std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());

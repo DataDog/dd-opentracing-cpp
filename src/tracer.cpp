@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <random>
 
-#include "noopspan.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -53,6 +52,70 @@ std::string reportingHostname(TracerOptions options) {
   return "";
 }
 
+void configureRulesSampler(std::shared_ptr<RulesSampler> sampler, TracerOptions options) try {
+  json config = json::parse(options.sampling_rules);
+  for (auto &item : config.items()) {
+    auto rule = item.value();
+    if (!rule.is_object()) {
+      std::cerr << "unexpected item in sampling rules: " << rule << std::endl;
+      continue;
+    }
+    // "sample_rate" is mandatory
+    if (!rule.contains("sample_rate")) {
+      std::cerr << "sampling rule is missing 'sample_rate': " << rule << std::endl;
+      continue;
+    }
+    if (!rule.at("sample_rate").is_number()) {
+      std::cerr << "sampling rule has invalid type for 'sample_rate' (expected number): " << rule
+                << std::endl;
+      continue;
+    }
+    auto sample_rate = rule.at("sample_rate").get<json::number_float_t>();
+    if (!(sample_rate >= 0.0 && sample_rate <= 1.0)) {
+      std::cerr << "sampling rule has invalid value for 'sample_rate' (expected value between "
+                   "0.0 and 1.0: "
+                << rule << std::endl;
+    }
+    // "service" and "name" are optional
+    bool has_service = rule.contains("service") && rule.at("service").is_string();
+    bool has_name = rule.contains("name") && rule.at("name").is_string();
+    auto nan = std::nan("");
+    if (has_service && has_name) {
+      auto svc = rule.at("service").get<std::string>();
+      auto nm = rule.at("name").get<std::string>();
+      sampler->addRule([=](const std::string &service, const std::string &name) -> RuleResult {
+        if (service == svc && name == nm) {
+          return {true, sample_rate};
+        }
+        return {false, nan};
+      });
+    } else if (has_service) {
+      auto svc = rule.at("service").get<std::string>();
+      sampler->addRule([=](const std::string &service, const std::string &) -> RuleResult {
+        if (service == svc) {
+          return {true, sample_rate};
+        }
+        return {false, nan};
+      });
+    } else if (has_name) {
+      auto nm = rule.at("name").get<std::string>();
+      sampler->addRule([=](const std::string &, const std::string &name) -> RuleResult {
+        if (name == nm) {
+          return {true, sample_rate};
+        }
+        return {false, nan};
+      });
+    } else {
+      sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
+        return {true, sample_rate};
+      });
+    }
+  }
+} catch (const json::parse_error &error) {
+  std::cerr << "Unable to parse JSON config for rules sampler. Error was: " << error.what()
+            << std::endl;
+}
+
 double analyticsRate(TracerOptions options) {
   if (options.analytics_rate >= 0.0 && options.analytics_rate <= 1.0) {
     return options.analytics_rate;
@@ -61,18 +124,16 @@ double analyticsRate(TracerOptions options) {
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id, std::shared_ptr<SampleProvider> sampler)
-    : opts_(options),
-      buffer_(std::move(buffer)),
-      get_time_(get_time),
-      get_id_(get_id),
-      sampler_(sampler) {}
+               IdProvider get_id)
+    : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
-               std::shared_ptr<SampleProvider> sampler)
-    : opts_(options), get_time_(getRealTime), get_id_(getId), sampler_(sampler) {
-  buffer_ = std::shared_ptr<SpanBuffer>{new WritingSpanBuffer{
-      writer, WritingSpanBufferOptions{reportingHostname(options), analyticsRate(options)}}};
+               std::shared_ptr<RulesSampler> sampler)
+    : opts_(options), get_time_(getRealTime), get_id_(getId) {
+  configureRulesSampler(sampler, options);
+  buffer_ = std::make_shared<WritingSpanBuffer>(
+      writer, sampler,
+      WritingSpanBufferOptions{reportingHostname(options), analyticsRate(options)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -101,12 +162,8 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
 
   // Check early if we need to discard. Check at span Finish if we need to sample (since users can
   // set this).
-  if (span_context.getPropagatedSamplingPriority() == nullptr && sampler_->discard(span_context)) {
-    return std::unique_ptr<ot::Span>{
-        new NoopSpan{shared_from_this(), span_id, trace_id, parent_id, std::move(span_context)}};
-  }
-  std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, sampler_, span_id,
-                                      trace_id, parent_id, std::move(span_context), get_time_(),
+  std::unique_ptr<Span> span{new Span{shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                                      parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
                                       opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;

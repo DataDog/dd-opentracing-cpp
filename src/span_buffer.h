@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "sample.h"
 #include "span.h"
 
 namespace datadog {
@@ -14,7 +15,6 @@ namespace opentracing {
 
 class Writer;
 class SpanContext;
-class SampleProvider;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 struct PendingTrace {
@@ -30,6 +30,7 @@ struct PendingTrace {
   std::string origin;
   std::string hostname;
   double analytics_rate;
+  SampleResult sample_result;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -38,13 +39,11 @@ class SpanBuffer {
   SpanBuffer() {}
   virtual ~SpanBuffer() {}
   virtual void registerSpan(const SpanContext& context) = 0;
-  virtual void finishSpan(std::unique_ptr<SpanData> span,
-                          const std::shared_ptr<SampleProvider>& sampler) = 0;
+  virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
   virtual OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const = 0;
   virtual OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
                                                        OptionalSamplingPriority priority) = 0;
-  virtual OptionalSamplingPriority assignSamplingPriority(
-      const std::shared_ptr<SampleProvider>& sampler, const SpanData* span) = 0;
+  virtual OptionalSamplingPriority assignSamplingPriority(const SpanData* span) = 0;
   virtual void flush(std::chrono::milliseconds timeout) = 0;
 };
 
@@ -56,17 +55,16 @@ struct WritingSpanBufferOptions {
 // A SpanBuffer that sends completed traces to a Writer.
 class WritingSpanBuffer : public SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<Writer> writer, WritingSpanBufferOptions options);
+  WritingSpanBuffer(std::shared_ptr<Writer> writer, std::shared_ptr<RulesSampler> sampler,
+                    WritingSpanBufferOptions options);
 
   void registerSpan(const SpanContext& context) override;
-  void finishSpan(std::unique_ptr<SpanData> span,
-                  const std::shared_ptr<SampleProvider>& sampler) override;
+  void finishSpan(std::unique_ptr<SpanData> span) override;
 
   OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const override;
   OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
                                                OptionalSamplingPriority priority) override;
-  OptionalSamplingPriority assignSamplingPriority(const std::shared_ptr<SampleProvider>& sampler,
-                                                  const SpanData* span) override;
+  OptionalSamplingPriority assignSamplingPriority(const SpanData* span) override;
 
   // Causes the Writer to flush, but does not send any PendingTraces.
   void flush(std::chrono::milliseconds timeout) override;
@@ -76,11 +74,12 @@ class WritingSpanBuffer : public SpanBuffer {
   OptionalSamplingPriority getSamplingPriorityImpl(uint64_t trace_id) const;
   OptionalSamplingPriority setSamplingPriorityImpl(uint64_t trace_id,
                                                    OptionalSamplingPriority priority);
-  OptionalSamplingPriority assignSamplingPriorityImpl(
-      const std::shared_ptr<SampleProvider>& sampler, const SpanData* span);
+  OptionalSamplingPriority assignSamplingPriorityImpl(const SpanData* span);
+  void setSamplerResult(uint64_t trace_id, SampleResult& sample_result);
 
   std::shared_ptr<Writer> writer_;
   mutable std::mutex mutex_;
+  std::shared_ptr<RulesSampler> sampler_;
 
  protected:
   // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish
