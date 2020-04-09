@@ -167,6 +167,12 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
                                       opts_.service, opts_.type, operation_name, operation_name,
                                       opts_.operation_name_override}};
   bool is_trace_root = parent_id == 0;
+  if (!opts_.version.empty()) {
+    span->SetTag(datadog::tags::version, opts_.version);
+  }
+  for (auto &tag : opts_.tags) {
+    span->SetTag(tag.first, tag.second);
+  }
   for (auto &tag : options.tags) {
     if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {
       // Do not apply this tag if sampling priority is already assigned.
@@ -174,7 +180,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
     span->SetTag(tag.first, tag.second);
   }
-  if (is_trace_root && opts_.environment != "") {
+  if (is_trace_root && !opts_.environment.empty()) {
     span->SetTag(tags::environment, opts_.environment);
   }
   return span;

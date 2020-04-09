@@ -22,12 +22,10 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
   try {
-    // Mandatory config.
-    if (config.find("service") == config.end()) {
-      error_message = "configuration argument 'service' is missing";
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    // Mandatory config, but may be set via environment.
+    if (config.find("service") != config.end()) {
+      config.at("service").get_to(options.service);
     }
-    config.at("service").get_to(options.service);
     // Optional.
     if (config.find("agent_host") != config.end()) {
       config.at("agent_host").get_to(options.agent_host);
@@ -91,7 +89,16 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     error_message = maybe_options.error();
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
-  return maybe_options.value();
+
+  options = maybe_options.value();
+  // sanity-check for final option values
+  if (options.service.empty()) {
+    error_message =
+        "tracer option 'service' has not been set via config or DD_SERVICE environment variable";
+    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+
+  return options;
 }
 
 // Accepts configuration in JSON format, with the following keys:
