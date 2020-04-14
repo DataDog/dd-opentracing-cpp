@@ -26,26 +26,32 @@ TEST_CASE("writer") {
       std::string host;
       uint32_t port;
       std::string url;
-      CURLoption expected_opt;
-      std::string expected_uri;
+      std::unordered_map<CURLoption, std::string, EnumClassHash> expected_opts;
     };
     auto test_case = GENERATE(values<InitializationTestCase>({
-        {"hostname", 1234, "", CURLOPT_URL, "http://hostname:1234/v0.4/traces"},
-        {"hostname", 1234, "http://override:5678", CURLOPT_URL,
-         "http://override:5678/v0.4/traces"},
-        {"", 0, "https://localhost:8126", CURLOPT_URL, "https://localhost:8126/v0.4/traces"},
-        {"", 0, "unix:///path/to/trace-agent.socket", CURLOPT_UNIX_SOCKET_PATH,
-         "/path/to/trace-agent.socket"},
-        {"", 0, "/path/to/trace-agent.socket", CURLOPT_UNIX_SOCKET_PATH,
-         "/path/to/trace-agent.socket"},
+        {"hostname", 1234, "", {{CURLOPT_URL, "http://hostname:1234/v0.4/traces"}}},
+        {"hostname",
+         1234,
+         "http://override:5678",
+         {{CURLOPT_URL, "http://override:5678/v0.4/traces"}}},
+        {"", 0, "https://localhost:8126", {{CURLOPT_URL, "https://localhost:8126/v0.4/traces"}}},
+        {"localhost",
+         8126,
+         "unix:///path/to/trace-agent.socket",
+         {{CURLOPT_UNIX_SOCKET_PATH, "/path/to/trace-agent.socket"},
+          {CURLOPT_URL, "http://localhost:8126/v0.4/traces"}}},
+        {"localhost",
+         8126,
+         "/path/to/trace-agent.socket",
+         {{CURLOPT_UNIX_SOCKET_PATH, "/path/to/trace-agent.socket"},
+          {CURLOPT_URL, "http://localhost:8126/v0.4/traces"}}},
     }));
+    test_case.expected_opts[CURLOPT_TIMEOUT_MS] = "2000";
 
     AgentWriter writer{std::move(handle_ptr), std::chrono::seconds(1), 100,           {},
                        test_case.host,        test_case.port,          test_case.url, sampler};
 
-    REQUIRE(handle->options ==
-            std::unordered_map<CURLoption, std::string, EnumClassHash>{
-                {test_case.expected_opt, test_case.expected_uri}, {CURLOPT_TIMEOUT_MS, "2000"}});
+    REQUIRE(handle->options == test_case.expected_opts);
   }
 
   std::atomic<bool> handle_destructed{false};

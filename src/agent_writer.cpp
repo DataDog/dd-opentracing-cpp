@@ -49,6 +49,7 @@ void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
   // - https://host:port
   // - unix:///path/to/trace-agent.socket
   // - /path/to/trace-agent.socket
+  bool urlopt_set = false;
   if (!url.empty()) {
     const std::string http_scheme = "http://";
     const std::string https_scheme = "https://";
@@ -62,6 +63,7 @@ void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
         throw std::runtime_error(std::string("Unable to set agent URL: ") +
                                  curl_easy_strerror(rcode));
       }
+      urlopt_set = true;
     } else if (url.substr(0, unix_scheme.size()) == unix_scheme) {
       // unix://
       url = url.substr(unix_scheme.size());
@@ -80,7 +82,8 @@ void AgentWriter::setUpHandle(std::unique_ptr<Handle> &handle, std::string host,
     } else {
       throw std::runtime_error(std::string("Unable to set agent URL: unknown url scheme: " + url));
     }
-  } else {
+  }
+  if (!urlopt_set) {
     std::string agent_uri =
         agent_protocol + host + ":" + std::to_string(port) + trace_encoder_->path();
     auto rcode = handle->setopt(CURLOPT_URL, agent_uri.c_str());
