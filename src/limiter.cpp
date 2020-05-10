@@ -60,10 +60,13 @@ LimitResult Limiter::allow(long tokens_requested) {
   num_requested_++;
   // refill "tokens"
   if (now >= next_refresh_) {
-    auto intervals = (now - next_refresh_) / refresh_interval_ + 1;
+    auto intervals = (now - next_refresh_).count() / refresh_interval_.count() + 1;
     if (intervals > 0) {
-      next_refresh_ += (refresh_interval_ * intervals);
-      num_tokens_ = std::min(max_tokens_, num_tokens_ + intervals * tokens_per_refresh_);
+      next_refresh_ += refresh_interval_ * intervals;
+      num_tokens_ += intervals * tokens_per_refresh_;
+      if (num_tokens_ > max_tokens_) {
+        num_tokens_ = max_tokens_;
+      }
     }
   }
   // determine if allowed or not

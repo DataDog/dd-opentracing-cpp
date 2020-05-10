@@ -5,7 +5,7 @@
 .build/
 
 # Locally installed dependencies
-.deps/
+deps/
 
 # Compiled Object files
 *.slo
