@@ -3,8 +3,8 @@ add_library(catch STATIC test_main.cpp)
 macro(_datadog_test TEST_NAME)
   add_executable(${TEST_NAME} ${ARGN})
   add_sanitizers(${TEST_NAME})  
-  target_link_libraries(${TEST_NAME} ${DATADOG_LINK_LIBRARIES}
-                                     dd_opentracing
+  target_link_libraries(${TEST_NAME} dd_opentracing
+                                     ${DATADOG_LINK_LIBRARIES}
                                      catch)
   add_test(${TEST_NAME} ${TEST_NAME})
 endmacro()
