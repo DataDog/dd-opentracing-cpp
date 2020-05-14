@@ -1,0 +1,81 @@
+version: "3.2"
+services:
+  dd-agent:
+    environment:
+      - DD_API_KEY
+      - DD_APM_ENABLED=true
+    image: 'datadog/agent'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/proc/:/host/proc/:ro'
+      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+
+  envoy-ed6a1b8:
+    image: envoyproxy/envoy-dev:ed6a1b8b60a23e6bae7f08f990d1680b26b26cde
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-ed6a1b8.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.14:
+    image: envoyproxy/envoy:v1.14.1
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.14.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.13:
+    image: envoyproxy/envoy:v1.13.1
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.13.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.12:
+    image: envoyproxy/envoy:v1.12.3
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.12.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.11:
+    image: envoyproxy/envoy:v1.11.2
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.11.yaml:/etc/envoy/envoy.yaml:ro'

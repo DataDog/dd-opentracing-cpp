@@ -1,0 +1,85 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 80
+    traffic_direction: OUTBOUND
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          generate_request_id: true
+          tracing: {}
+          codec_type: auto
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: service1
+          http_filters:
+          # Traces for healthcheck requests should not be sampled.
+          - name: envoy.filters.http.health_check
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+              pass_through_mode: false
+              headers:
+                - exact_match: /healthcheck
+                  name: :path
+          - name: envoy.filters.http.router
+            typed_config: {}
+          use_remote_address: true
+  clusters:
+  - name: service1
+    connect_timeout: 0.250s
+    type: strict_dns
+    lb_policy: round_robin
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service1
+                port_value: 80
+  # Configure this cluster with the address of the datadog agent
+  # for sending traces.
+  - name: datadog_agent
+    connect_timeout: 1s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: dd-agent
+                port_value: 8126
+
+tracing:
+  # Use the datadog tracer
+  http:
+    name: envoy.tracers.datadog
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
+      collector_cluster: datadog_agent   # matched against the named cluster below
+      service_name: envoy-example        # user-defined service name
+
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
