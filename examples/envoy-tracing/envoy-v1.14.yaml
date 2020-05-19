@@ -59,7 +59,7 @@ static_resources:
     type: strict_dns
     lb_policy: round_robin
     load_assignment:
-      cluster_name: service1
+      cluster_name: datadog_agent
       endpoints:
       - lb_endpoints:
         - endpoint:
