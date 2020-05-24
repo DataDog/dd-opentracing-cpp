@@ -42,6 +42,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("environment") != config.end()) {
       config.at("environment").get_to(options.environment);
     }
+    if (config.find("version") != config.end()) {
+      config.at("version").get_to(options.version);
+    }
     if (config.find("sample_rate") != config.end()) {
       config.at("sample_rate").get_to(options.sample_rate);
     }
