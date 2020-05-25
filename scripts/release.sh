@@ -88,7 +88,7 @@ mkdir .bin
 cd .bin
 while read ARTIFACT_URL; do
   echo "Downloading artifact: ${ARTIFACT_URL}"
-  curl -s -O "${ARTIFACT_URL}"
+  curl -s -L -O "${ARTIFACT_URL}"
 done <<<"$ARTIFACT_URLS"
 
 # Process and sign artifacts
