@@ -5,6 +5,7 @@
 // Source file needed to ensure compilation of templated class TracerFactory<MockTracer>
 #include "../src/tracer_factory.cpp"
 
+#include <datadog/tags.h>
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
@@ -284,6 +285,25 @@ TEST_CASE("tracer factory") {
       REQUIRE(result->get() != nullptr);
       auto tracer = dynamic_cast<MockTracer *>(result->get());
       REQUIRE(tracer->opts.service == "injected-service");
+    }
+
+    SECTION("DD_VERSION overrides default") {
+      ::setenv("DD_VERSION", "injected-version v0.0.2", 0);
+      std::string input{R"(
+      {
+        "service": "my-service",
+        "version": "version v0.0.1"
+      }
+      )"};
+      std::string error = "";
+      auto result = factory.MakeTracer(input.c_str(), error);
+      ::unsetenv("DD_VERSION");
+
+      REQUIRE(error == "");
+      REQUIRE(result->get() != nullptr);
+      auto tracer = dynamic_cast<MockTracer *>(result->get());
+      REQUIRE(tracer->opts.service == "my-service");
+      REQUIRE(tracer->opts.version == "injected-version v0.0.2");
     }
 
     SECTION("DD_AGENT_HOST overrides default") {

@@ -27,6 +27,7 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(Iterable styles) {
   return propagation_styles;
 };
 
+// TODO(cgilmour): refactor this so it returns a "finalized options" type.
 ot::expected<TracerOptions, const char*> applyTracerOptionsFromEnvironment(
     const TracerOptions& input);
 

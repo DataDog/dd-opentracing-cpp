@@ -166,10 +166,14 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
                                       parent_id, std::move(span_context), get_time_(),
                                       opts_.service, opts_.type, operation_name, operation_name,
                                       opts_.operation_name_override}};
-  bool is_trace_root = parent_id == 0;
+
+  if (!opts_.environment.empty()) {
+    span->SetTag(datadog::tags::environment, opts_.environment);
+  }
   if (!opts_.version.empty()) {
     span->SetTag(datadog::tags::version, opts_.version);
   }
+
   for (auto &tag : opts_.tags) {
     span->SetTag(tag.first, tag.second);
   }
@@ -179,9 +183,6 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
       continue;
     }
     span->SetTag(tag.first, tag.second);
-  }
-  if (is_trace_root && !opts_.environment.empty()) {
-    span->SetTag(tags::environment, opts_.environment);
   }
   return span;
 } catch (const std::bad_alloc &) {
