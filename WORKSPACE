@@ -10,10 +10,10 @@ http_archive(
 
 http_archive(
     name = "com_github_msgpack_msgpack_c",
-    sha256 = "9859d44d336f9b023a79a3026bb6a558b2ea346107ab4eadba58236048650690",
-    strip_prefix = "msgpack-3.0.1",
+    sha256 = "433cbcd741e1813db9ae4b2e192b83ac7b1d2dd7968a3e11470eacc6f4ab58d2",
+    strip_prefix = "msgpack-3.2.1",
     urls = [
-        "https://github.com/msgpack/msgpack-c/releases/download/cpp-3.0.1/msgpack-3.0.1.tar.gz",
+        "https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.1/msgpack-3.2.1.tar.gz",
     ],
     build_file = "@//:bazel/external/msgpack.BUILD"
 )
