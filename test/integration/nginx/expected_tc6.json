@@ -8,7 +8,7 @@
         "http.method": "GET",
         "http.status_code": "200",
         "http.status_line": "200 OK",
-        "http.url": "http://localhost/proxy/?",
+        "http.url": "http://localhost/proxy/",
         "operation": "GET /proxy/"
       },
       "metrics": {

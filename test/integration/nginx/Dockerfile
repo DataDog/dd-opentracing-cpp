@@ -73,9 +73,10 @@ COPY ./test/integration/nginx/dd-config.json /etc/dd-config.json
 RUN mkdir -p /var/www/
 COPY ./test/integration/nginx/index.html /var/www/index.html
 
-COPY ./test/integration/nginx/nginx_integration_test.sh ./
-COPY ./test/integration/nginx/expected_*.json ./
 # TODO(cgilmour): Hack to pin a dep of msgpack-cli
 RUN git clone -b v1.1.2 https://github.com/ugorji/go /root/go/src/github.com/ugorji/go
 RUN go get github.com/jakm/msgpack-cli
+# Copy these last so that edits don't need as many image rebuild steps
+COPY ./test/integration/nginx/nginx_integration_test.sh ./
+COPY ./test/integration/nginx/expected_*.json ./
 CMD [ "bash", "-x", "./nginx_integration_test.sh"]
