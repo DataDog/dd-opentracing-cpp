@@ -60,13 +60,14 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
            TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
            SpanContext context, TimePoint start_time, std::string span_service,
            std::string span_type, std::string span_name, std::string resource,
-           std::string operation_name_override)
+           std::string operation_name_override, bool legacy_obfuscation)
     : tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       context_(std::move(context)),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
+      legacy_obfuscation_(legacy_obfuscation),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -103,10 +104,17 @@ std::regex &PATH_MIXED_ALPHANUMERICS() {
 // or cardinality issues.
 // If you want to add any more steps to this function, we should use a more
 // sophisticated architecture. For now, YAGNI.
-void audit(SpanData *span) {
+void audit(bool legacy_obfuscation, SpanData *span) {
   auto http_tag = span->meta.find(ot::ext::http_url);
   if (http_tag != span->meta.end()) {
-    http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
+    if (legacy_obfuscation) {
+      // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics, fragments and
+      // parameters.
+      http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
+    } else {
+      // Just trim the parameter portion of the URL.
+      http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));
+    }
   }
 }
 
@@ -173,7 +181,7 @@ void Span::FinishWithOptions(
     span_->meta.erase(tag);
   }
   // Audit and finish span.
-  audit(span_.get());
+  audit(legacy_obfuscation_, span_.get());
   buffer_->finishSpan(std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.

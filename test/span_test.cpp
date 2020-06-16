@@ -62,7 +62,45 @@ TEST_CASE("span") {
     REQUIRE(result->duration == 10000000000);
   }
 
-  SECTION("audits span data") {
+  SECTION("audits span data (just URL parameters)") {
+    std::list<std::pair<std::string, std::string>> test_cases{
+        // Should remove query params
+        {"/", "/"},
+        {"/?asdf", "/"},
+        {"/search", "/search"},
+        {"/search?", "/search"},
+        {"/search?id=100&private=true", "/search"},
+        {"/search?id=100&private=true?", "/search"},
+        {"http://i-012a3b45c6d78901e//api/v1/check_run?api_key=0abcdef1a23b4c5d67ef8a90b1cde234",
+         "http://i-012a3b45c6d78901e//api/v1/check_run"},
+    };
+
+    std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
+    for (auto& test_case : test_cases) {
+      auto span_id = get_id();
+      Span span{nullptr,
+                buffer_ptr,
+                get_time,
+                span_id,
+                span_id,
+                0,
+                SpanContext{span_id, span_id, "", {}},
+                get_time(),
+                "",
+                "",
+                "",
+                "",
+                ""};
+      span.SetTag(ot::ext::http_url, test_case.first);
+      const ot::FinishSpanOptions finish_options;
+      span.FinishWithOptions(finish_options);
+
+      auto& result = buffer->traces(span_id).finished_spans->back();
+      REQUIRE(result->meta.find(ot::ext::http_url)->second == test_case.second);
+    }
+  }
+
+  SECTION("audits span data (legacy)") {
     std::list<std::pair<std::string, std::string>> test_cases{
         // Should remove query params
         {"/", "/"},
@@ -103,7 +141,8 @@ TEST_CASE("span") {
                 "",
                 "",
                 "",
-                ""};
+                "",
+                true};
       span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
