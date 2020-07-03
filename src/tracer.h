@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_TRACER_H
 
 #include <datadog/opentracing.h>
+#include <datadog/version.h>
 #include <functional>
 #include <random>
 #include "clock.h"
@@ -22,6 +23,8 @@ class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;
 
 uint64_t getId();
+void logTracerOptions(std::chrono::time_point<std::chrono::system_clock> timestamp,
+                      TracerOptions &options, std::ostream &out);
 
 class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:

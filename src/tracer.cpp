@@ -1,8 +1,11 @@
 #include <datadog/opentracing.h>
 #include <datadog/tags.h>
+#include <errno.h>
 #include <opentracing/ext/tags.h>
 #include <pthread.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <fstream>
 #include <random>
 
 #include "tracer.h"
@@ -40,6 +43,7 @@ uint64_t getId() {
   return distribution(TlsRandomNumberGenerator::generator());
 }
 
+namespace {
 std::string reportingHostname(TracerOptions options) {
   // This returns the machine name when the tracer has been configured
   // to report hostnames.
@@ -123,6 +127,81 @@ double analyticsRate(TracerOptions options) {
   return std::nan("");
 }
 
+void startupLog(TracerOptions &options) {
+  auto env_setting = std::getenv("DD_TRACE_STARTUP_LOGS");
+  if (env_setting != nullptr && std::string(env_setting) == "0") {
+    // Startup logs are disabled.
+    return;
+  }
+  // C++17's filesystem api would be really nice to have right now..
+  std::string startup_log_path = "/var/tmp/dd-opentracing-cpp";
+  struct stat s;
+  if (stat(startup_log_path.c_str(), &s) == 0) {
+    if (!S_ISDIR(s.st_mode)) {
+      // Path exists but isn't a directory.
+      return;
+    }
+  } else {
+    if (errno != ENOENT) {
+      // Failed to stat directory, but reason was something other than
+      // not existing.
+      return;
+    }
+    if (mkdir(startup_log_path.c_str(), 01777) != 0) {
+      // Unable to create the log path.
+      return;
+    }
+  }
+
+  auto now = std::chrono::system_clock::now();
+  uint64_t timestamp =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+  std::ofstream log_file(startup_log_path + "/startup_options-" + std::to_string(timestamp) +
+                         ".json");
+  if (!log_file.good()) {
+    return;
+  }
+  logTracerOptions(now, options, log_file);
+  log_file.close();
+}
+
+}  // namespace
+
+void logTracerOptions(std::chrono::time_point<std::chrono::system_clock> timestamp,
+                      TracerOptions &options, std::ostream &out) {
+  json j;
+  std::time_t t = std::chrono::system_clock::to_time_t(timestamp);
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&t), "%FT%T%z");
+  j["date"] = ss.str();
+  j["version"] = datadog::version::tracer_version;
+  j["lang"] = "cpp";
+  j["lang_version"] = datadog::version::cpp_version;
+  j["env"] = options.environment;
+  j["enabled"] = true;
+  j["service"] = options.service;
+  if (!options.agent_url.empty()) {
+    j["agent_url"] = options.agent_url;
+  } else {
+    j["agent_url"] =
+        std::string("http://") + options.agent_host + ":" + std::to_string(options.agent_port);
+  }
+  j["analytics_enabled"] = options.analytics_enabled;
+  j["analytics_sample_rate"] = options.analytics_rate;
+  j["sampling_rules"] = options.sampling_rules;
+  if (!options.tags.empty()) {
+    j["tags"] = options.tags;
+  }
+  if (!options.version.empty()) {
+    j["dd_version"] = options.version;
+  }
+  j["report_hostname"] = options.report_hostname;
+  if (!options.operation_name_override.empty()) {
+    j["operation_name_override"] = options.operation_name_override;
+  }
+  out << j << std::endl;
+}
+
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id)
     : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
@@ -131,6 +210,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
                std::shared_ptr<RulesSampler> sampler)
     : opts_(options), get_time_(getRealTime), get_id_(getId) {
   configureRulesSampler(sampler, options);
+  startupLog(options);
   buffer_ = std::make_shared<WritingSpanBuffer>(
       writer, sampler,
       WritingSpanBufferOptions{reportingHostname(options), analyticsRate(options)});
