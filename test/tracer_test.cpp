@@ -240,3 +240,25 @@ TEST_CASE("env overrides") {
     ::unsetenv(env_test.env.c_str());
   }
 }
+
+TEST_CASE("startup log") {
+  TracerOptions opts;
+  opts.agent_url = "/path/to/unix.socket";
+  opts.analytics_rate = 0.3;
+  opts.tags.emplace("foo", "bar");
+  opts.tags.emplace("themeaningoflifetheuniverseandeverything", "42");
+  opts.operation_name_override = "meaningful.name";
+
+  auto now = std::chrono::system_clock::now();
+  std::stringstream ss;
+  logTracerOptions(now, opts, ss);
+
+  REQUIRE(!ss.str().empty());
+  json j;
+  ss >> j;  // May throw an exception
+  REQUIRE(j["date"].get<std::string>().size() == 24);
+  REQUIRE(j["agent_url"] == opts.agent_url);
+  REQUIRE(j["analytics_sample_rate"] == opts.analytics_rate);
+  REQUIRE(j["tags"] == opts.tags);
+  REQUIRE(j["operation_name_override"] == opts.operation_name_override);
+}
