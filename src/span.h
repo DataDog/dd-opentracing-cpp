@@ -92,7 +92,8 @@ class Span : public DatadogSpan {
   Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
        TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
        SpanContext context, TimePoint start_time, std::string span_service, std::string span_type,
-       std::string span_name, std::string resource, std::string operation_name_override);
+       std::string span_name, std::string resource, std::string operation_name_override,
+       bool legacy_obfuscation = false);
 
   Span() = delete;
   ~Span() override;
@@ -134,6 +135,7 @@ class Span : public DatadogSpan {
   SpanContext context_;
   TimePoint start_time_;
   std::string operation_name_override_;
+  bool legacy_obfuscation_ = false;
 
   // Set in constructor initializer, depends on previous constructor initializer-set members:
   std::unique_ptr<SpanData> span_;
