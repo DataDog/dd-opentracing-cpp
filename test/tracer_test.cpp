@@ -141,6 +141,7 @@ TEST_CASE("env overrides") {
   struct EnvOverrideTest {
     std::string env;
     std::string val;
+    bool enabled;
     std::string hostname;
     double rate;
     bool error;
@@ -155,21 +156,24 @@ TEST_CASE("env overrides") {
 
   auto env_test = GENERATE_COPY(values<EnvOverrideTest>({
       // Normal cases
-      {"DD_ENV", "test-env", "", std::nan(""), false, "test-env", "", {}},
+      {"DD_TRACE_ENABLED", "false", false, "", std::nan(""), false, "test-env", "", {}},
+      {"DD_ENV", "test-env", true, "", std::nan(""), false, "test-env", "", {}},
       {"DD_VERSION",
        "test-version v0.0.1",
+       true,
        "",
        std::nan(""),
        false,
        "",
        "test-version v0.0.1",
        {}},
-      {"DD_TRACE_REPORT_HOSTNAME", "true", hostname, std::nan(""), false, "", "", {}},
-      {"DD_TRACE_ANALYTICS_ENABLED", "true", "", 1.0, false, "", "", {}},
-      {"DD_TRACE_ANALYTICS_ENABLED", "false", "", 0.0, false, "", "", {}},
-      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5", "", 0.5, false, "", "", {}},
+      {"DD_TRACE_REPORT_HOSTNAME", "true", true, hostname, std::nan(""), false, "", "", {}},
+      {"DD_TRACE_ANALYTICS_ENABLED", "true", true, "", 1.0, false, "", "", {}},
+      {"DD_TRACE_ANALYTICS_ENABLED", "false", true, "", 0.0, false, "", "", {}},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5", true, "", 0.5, false, "", "", {}},
       {"DD_TAGS",
        "host:my-host-name,region:us-east-1,datacenter:us,partition:5",
+       true,
        "",
        std::nan(""),
        false,
@@ -181,11 +185,11 @@ TEST_CASE("env overrides") {
            {"datacenter", "us"},
            {"partition", "5"},
        }},
-      {"", "", "", std::nan(""), false, "", "", {}},
+      {"", "", true, "", std::nan(""), false, "", "", {}},
       // Unexpected values handled gracefully
-      {"DD_TRACE_ANALYTICS_ENABLED", "yes please", "", std::nan(""), true, "", "", {}},
-      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1", "", std::nan(""), true, "", "", {}},
-      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "half", "", std::nan(""), true, "", "", {}},
+      {"DD_TRACE_ANALYTICS_ENABLED", "yes please", true, "", std::nan(""), true, "", "", {}},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1", true, "", std::nan(""), true, "", "", {}},
+      {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "half", true, "", std::nan(""), true, "", "", {}},
   }));
 
   SECTION("set correct tags and metrics") {
@@ -205,35 +209,39 @@ TEST_CASE("env overrides") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto& result = mwriter->traces[0][0];
-    // Check the hostname matches the expected value.
-    if (env_test.hostname.empty()) {
-      REQUIRE(result->meta.find("_dd.hostname") == result->meta.end());
+    if (env_test.enabled) {
+      auto& result = mwriter->traces[0][0];
+      // Check the hostname matches the expected value.
+      if (env_test.hostname.empty()) {
+        REQUIRE(result->meta.find("_dd.hostname") == result->meta.end());
+      } else {
+        REQUIRE(result->meta["_dd.hostname"] == env_test.hostname);
+      }
+      // Check the analytics rate matches the expected value.
+      if (std::isnan(env_test.rate)) {
+        REQUIRE(result->metrics.find("_dd1.sr.eausr") == result->metrics.end());
+      } else {
+        REQUIRE(result->metrics["_dd1.sr.eausr"] == env_test.rate);
+      }
+      // Check the environment matches the expected value.
+      if (env_test.environment.empty()) {
+        REQUIRE(result->meta.find(datadog::tags::environment) == result->meta.end());
+      } else {
+        REQUIRE(result->meta[datadog::tags::environment] == env_test.environment);
+      }
+      // Check the version matches the expected value.
+      if (env_test.version.empty()) {
+        REQUIRE(result->meta.find(datadog::tags::version) == result->meta.end());
+      } else {
+        REQUIRE(result->meta[datadog::tags::version] == env_test.version);
+      }
+      // Check spans are tagged with values from DD_TAGS
+      for (auto& tag : env_test.extra_tags) {
+        REQUIRE(result->meta.find(tag.first) != result->meta.end());
+        REQUIRE(result->meta[tag.first] == tag.second);
+      }
     } else {
-      REQUIRE(result->meta["_dd.hostname"] == env_test.hostname);
-    }
-    // Check the analytics rate matches the expected value.
-    if (std::isnan(env_test.rate)) {
-      REQUIRE(result->metrics.find("_dd1.sr.eausr") == result->metrics.end());
-    } else {
-      REQUIRE(result->metrics["_dd1.sr.eausr"] == env_test.rate);
-    }
-    // Check the environment matches the expected value.
-    if (env_test.environment.empty()) {
-      REQUIRE(result->meta.find(datadog::tags::environment) == result->meta.end());
-    } else {
-      REQUIRE(result->meta[datadog::tags::environment] == env_test.environment);
-    }
-    // Check the version matches the expected value.
-    if (env_test.version.empty()) {
-      REQUIRE(result->meta.find(datadog::tags::version) == result->meta.end());
-    } else {
-      REQUIRE(result->meta[datadog::tags::version] == env_test.version);
-    }
-    // Check spans are tagged with values from DD_TAGS
-    for (auto& tag : env_test.extra_tags) {
-      REQUIRE(result->meta.find(tag.first) != result->meta.end());
-      REQUIRE(result->meta[tag.first] == tag.second);
+      REQUIRE(mwriter->traces.empty());
     }
 
     // Tear-down

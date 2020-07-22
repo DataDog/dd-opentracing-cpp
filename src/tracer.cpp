@@ -44,6 +44,15 @@ uint64_t getId() {
 }
 
 namespace {
+
+bool isEnabled() {
+  auto enabled = std::getenv("DD_TRACE_ENABLED");
+  if (enabled != nullptr && std::string(enabled) == "false") {
+    return false;
+  }
+  return true;
+}
+
 std::string reportingHostname(TracerOptions options) {
   // This returns the machine name when the tracer has been configured
   // to report hostnames.
@@ -228,7 +237,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
   startupLog(options);
   buffer_ = std::make_shared<WritingSpanBuffer>(
       writer, sampler,
-      WritingSpanBufferOptions{reportingHostname(options), analyticsRate(options)});
+      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,

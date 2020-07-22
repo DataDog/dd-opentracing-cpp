@@ -106,7 +106,9 @@ void WritingSpanBuffer::unbufferAndWriteTrace(uint64_t trace_id) {
     return;
   }
   auto& trace = trace_iter->second;
-  writer_->write(std::move(trace.finished_spans));
+  if (options_.enabled) {
+    writer_->write(std::move(trace.finished_spans));
+  }
   traces_.erase(trace_iter);
 }
 
