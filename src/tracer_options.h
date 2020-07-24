@@ -9,6 +9,7 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+// TODO(cgilmour): clean this up, since it's not really used generically.
 template <class Iterable>
 ot::expected<std::set<PropagationStyle>> asPropagationStyle(Iterable styles) {
   std::set<PropagationStyle> propagation_styles;

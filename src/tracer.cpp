@@ -8,6 +8,7 @@
 #include <fstream>
 #include <random>
 
+#include "bool.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -47,7 +48,7 @@ namespace {
 
 bool isEnabled() {
   auto enabled = std::getenv("DD_TRACE_ENABLED");
-  if (enabled != nullptr && std::string(enabled) == "false") {
+  if (enabled != nullptr && !stob(enabled, true)) {
     return false;
   }
   return true;
