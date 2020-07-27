@@ -109,6 +109,8 @@ struct MockBuffer : public WritingSpanBuffer {
 
   PendingTrace& traces(uint64_t id) { return traces_[id]; };
 
+  void setEnabled(bool enabled) { options_.enabled = enabled; };
+
   void setHostname(std::string hostname) { options_.hostname = hostname; };
 
   void setAnalyticsRate(double rate) { options_.analytics_rate = rate; };

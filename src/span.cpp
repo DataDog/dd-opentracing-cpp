@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <string>
+#include "bool.h"
 #include "sample.h"
 #include "span_buffer.h"
 #include "tracer.h"
@@ -147,9 +148,11 @@ void Span::FinishWithOptions(
   }
   tag = span_->meta.find(::ot::ext::error);
   if (tag != span_->meta.end()) {
-    // tag->second is the JSON-serialized value of the variadic type given to SetTag. If it's
-    // clearly falsey then set the error flag.
-    if (tag->second == "0" || tag->second == "" || tag->second == "false") {
+    // tag->second is the JSON-serialized value of the variadic type given to SetTag.
+    // Errors can be a flag or a detailed message.
+    // Empty or false-y values indicate no error.
+    // Any other value will mark the span to indicate an error occured.
+    if (tag->second == "" || !stob(tag->second, true)) {
       span_->error = 0;
     } else {
       span_->error = 1;
@@ -159,11 +162,18 @@ void Span::FinishWithOptions(
   tag = span_->meta.find(tags::analytics_event);
   if (tag != span_->meta.end()) {
     // tag->second is the JSON-serialized value of the variadic type given to SetTag.
-    // Apply boolean, valid integer and valid double's.
-    if (tag->second == "true" || tag->second == "1") {
-      span_->metrics[event_sample_rate_metric] = 1.0;
-    } else if (tag->second == "false" || tag->second == "0" || tag->second == "") {
+    // An empty value means it was set, but a sample rate of zero is applied.
+    // A bool value indicates a rate of 0.0 for false, or 1.0 for true.
+    // A double value between 0.0 and 1.0 (inclusive) is applied as-is.
+    // Other values are ignored.
+    if (tag->second.empty()) {
       span_->metrics[event_sample_rate_metric] = 0.0;
+    } else if (isbool(tag->second)) {
+      if (stob(tag->second, false)) {
+        span_->metrics[event_sample_rate_metric] = 1.0;
+      } else {
+        span_->metrics[event_sample_rate_metric] = 0.0;
+      }
     } else {
       // Check if the value is a double between 0.0 and 1.0 (inclusive).
       try {

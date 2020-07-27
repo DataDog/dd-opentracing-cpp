@@ -1,16 +1,17 @@
-#include "tracer_options.h"
-
-#include <iterator>
-#include <sstream>
+#include <regex>
 
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
+
+#include "bool.h"
+#include "tracer_options.h"
 
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
+namespace {
 // Extracts key-value pairs from a string.
 // Duplicates are overwritten. Empty keys are ignored.
 // Intended use is for settings tags from DD_TAGS options.
@@ -71,6 +72,19 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
 
   return kvp;
 }
+
+// Expands a string into tokens that are separated by commas or whitespace.
+// Intended for expanding the propagation style environment variables.
+std::vector<std::string> tokenize_propagation_style(const std::string &input) {
+  const std::regex word_separator("[\\s,]+");
+  std::vector<std::string> result;
+  std::copy_if(std::sregex_token_iterator(input.begin(), input.end(), word_separator, -1),
+               std::sregex_token_iterator(), std::back_inserter(result),
+               [](const std::string &s) { return !s.empty(); });
+  return result;
+}
+
+}  // namespace
 
 ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     const TracerOptions &input) {
@@ -136,9 +150,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
 
   auto extract = std::getenv("DD_PROPAGATION_STYLE_EXTRACT");
   if (extract != nullptr && std::strlen(extract) > 0) {
-    std::stringstream words{extract};
-    auto style_maybe = asPropagationStyle(std::vector<std::string>{
-        std::istream_iterator<std::string>{words}, std::istream_iterator<std::string>{}});
+    auto style_maybe = asPropagationStyle(tokenize_propagation_style(extract));
     if (!style_maybe) {
       return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid");
     }
@@ -147,9 +159,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
 
   auto inject = std::getenv("DD_PROPAGATION_STYLE_INJECT");
   if (inject != nullptr && std::strlen(inject) > 0) {
-    std::stringstream words{inject};
-    auto style_maybe = asPropagationStyle(std::vector<std::string>{
-        std::istream_iterator<std::string>{words}, std::istream_iterator<std::string>{}});
+    auto style_maybe = asPropagationStyle(tokenize_propagation_style(inject));
     if (!style_maybe) {
       return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_INJECT is invalid");
     }
@@ -159,10 +169,8 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
   auto report_hostname = std::getenv("DD_TRACE_REPORT_HOSTNAME");
   if (report_hostname != nullptr) {
     auto value = std::string(report_hostname);
-    if (value == "true" || value == "1") {
-      opts.report_hostname = true;
-    } else if (value == "false" || value == "0" || value == "") {
-      opts.report_hostname = false;
+    if (value.empty() || isbool(value)) {
+      opts.report_hostname = stob(value, false);
     } else {
       return ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid");
     }
@@ -171,12 +179,13 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
   auto analytics_enabled = std::getenv("DD_TRACE_ANALYTICS_ENABLED");
   if (analytics_enabled != nullptr) {
     auto value = std::string(analytics_enabled);
-    if (value == "true" || value == "1") {
-      opts.analytics_enabled = true;
-      opts.analytics_rate = 1.0;
-    } else if (value == "false" || value == "0" || value == "") {
-      opts.analytics_enabled = false;
-      opts.analytics_rate = std::nan("");
+    if (value.empty() || isbool(value)) {
+      opts.analytics_enabled = stob(value, false);
+      if (opts.analytics_enabled) {
+        opts.analytics_rate = 1.0;
+      } else {
+        opts.analytics_rate = std::nan("");
+      }
     } else {
       return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid");
     }

@@ -48,6 +48,7 @@ class SpanBuffer {
 };
 
 struct WritingSpanBufferOptions {
+  bool enabled = true;
   std::string hostname;
   double analytics_rate = std::nan("");
 };
