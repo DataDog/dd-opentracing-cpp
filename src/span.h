@@ -3,6 +3,7 @@
 
 #include <msgpack.hpp>
 #include "clock.h"
+#include "logger.h"
 #include "propagation.h"
 
 namespace ot = opentracing;
@@ -89,11 +90,11 @@ class DatadogSpan : public ot::Span {
 class Span : public DatadogSpan {
  public:
   // Creates a new Span.
-  Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
-       TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
-       SpanContext context, TimePoint start_time, std::string span_service, std::string span_type,
-       std::string span_name, std::string resource, std::string operation_name_override,
-       bool legacy_obfuscation = false);
+  Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> tracer,
+       std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time, uint64_t span_id,
+       uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
+       std::string span_service, std::string span_type, std::string span_name,
+       std::string resource, std::string operation_name_override, bool legacy_obfuscation = false);
 
   Span() = delete;
   ~Span() override;
@@ -129,6 +130,7 @@ class Span : public DatadogSpan {
   std::atomic<bool> is_finished_{false};
 
   // Set in constructor initializer:
+  std::shared_ptr<const Logger> logger_;
   std::shared_ptr<const Tracer> tracer_;
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
@@ -139,6 +141,7 @@ class Span : public DatadogSpan {
 
   // Set in constructor initializer, depends on previous constructor initializer-set members:
   std::unique_ptr<SpanData> span_;
+  std::string span_description_;
 };
 
 }  // namespace opentracing

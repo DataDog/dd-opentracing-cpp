@@ -25,12 +25,14 @@ TEST_CASE("span") {
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   const ot::FinishSpanOptions finish_options;
+  auto logger = std::make_shared<const MockLogger>();
 
   SECTION("receives id") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
     span.FinishWithOptions(finish_options);
 
     auto& result = buffer->traces(100).finished_spans->at(0);
@@ -41,9 +43,10 @@ TEST_CASE("span") {
 
   SECTION("registers with SpanBuffer") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
     REQUIRE(buffer->traces().size() == 1);
     REQUIRE(buffer->traces().find(100) != buffer->traces().end());
     REQUIRE(buffer->traces(100).finished_spans->size() == 0);
@@ -52,9 +55,10 @@ TEST_CASE("span") {
 
   SECTION("timed correctly") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
     advanceTime(time, std::chrono::seconds(10));
     span.FinishWithOptions(finish_options);
 
@@ -78,19 +82,10 @@ TEST_CASE("span") {
     std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
     for (auto& test_case : test_cases) {
       auto span_id = get_id();
-      Span span{nullptr,
-                buffer_ptr,
-                get_time,
-                span_id,
-                span_id,
-                0,
-                SpanContext{span_id, span_id, "", {}},
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+      Span span{logger,     nullptr, buffer_ptr, get_time,
+                span_id,    span_id, 0,          SpanContext{logger, span_id, span_id, "", {}},
+                get_time(), "",      "",         "",
+                "",         ""};
       span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
@@ -129,20 +124,10 @@ TEST_CASE("span") {
     std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
     for (auto& test_case : test_cases) {
       auto span_id = get_id();
-      Span span{nullptr,
-                buffer_ptr,
-                get_time,
-                span_id,
-                span_id,
-                0,
-                SpanContext{span_id, span_id, "", {}},
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                "",
-                true};
+      Span span{logger,     nullptr, buffer_ptr, get_time,
+                span_id,    span_id, 0,          SpanContext{logger, span_id, span_id, "", {}},
+                get_time(), "",      "",         "",
+                "",         "",      true};
       span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
@@ -154,9 +139,10 @@ TEST_CASE("span") {
 
   SECTION("finishes once") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++) {
       threads.emplace_back([&]() { span.FinishWithOptions(finish_options); });
@@ -169,9 +155,10 @@ TEST_CASE("span") {
 
   SECTION("handles tags") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
 
     span.SetTag("bool", true);
     span.SetTag("double", 6.283185);
@@ -209,9 +196,10 @@ TEST_CASE("span") {
 
   SECTION("replaces colons with dots in tag key") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
 
     span.SetTag("foo:bar:baz", "x");
 
@@ -225,13 +213,14 @@ TEST_CASE("span") {
 
   SECTION("maps datadog tags to span data") {
     auto span_id = get_id();
-    Span span{nullptr,
+    Span span{logger,
+              nullptr,
               buffer,
               get_time,
               span_id,
               span_id,
               0,
-              SpanContext{span_id, span_id, "", {}},
+              SpanContext{logger, span_id, span_id, "", {}},
               get_time(),
               "original service",
               "original type",
@@ -260,9 +249,10 @@ TEST_CASE("span") {
 
   SECTION("values for analytics_event tag") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
 
     struct AnalyticsEventTagTestCase {
       ot::Value tag_value;
@@ -299,9 +289,10 @@ TEST_CASE("span") {
 
   SECTION("error tag sets error") {
     auto span_id = get_id();
-    Span span{
-        nullptr,    buffer, get_time, span_id, span_id, 0, SpanContext{span_id, span_id, "", {}},
-        get_time(), "",     "",       "",      "",      ""};
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
 
     struct ErrorTagTestCase {
       ot::Value value;
@@ -334,13 +325,14 @@ TEST_CASE("span") {
 
   SECTION("operation name can be overridden") {
     auto span_id = get_id();
-    Span span{nullptr,
+    Span span{logger,
+              nullptr,
               buffer,
               get_time,
               span_id,
               span_id,
               0,
-              SpanContext{span_id, span_id, "", {}},
+              SpanContext{logger, span_id, span_id, "", {}},
               get_time(),
               "original service",
               "original type",
@@ -361,13 +353,14 @@ TEST_CASE("span") {
 
   SECTION("special resource tag has priority over operation name override") {
     auto span_id = get_id();
-    Span span{nullptr,
+    Span span{logger,
+              nullptr,
               buffer,
               get_time,
               span_id,
               span_id,
               0,
-              SpanContext{span_id, span_id, "", {}},
+              SpanContext{logger, span_id, span_id, "", {}},
               get_time(),
               "original service",
               "original type",
@@ -389,13 +382,14 @@ TEST_CASE("span") {
 
   SECTION("OpenTracing operation name works") {
     auto span_id = get_id();
-    Span span{nullptr,
+    Span span{logger,
+              nullptr,
               buffer,
               get_time,
               span_id,
               span_id,
               0,
-              SpanContext{span_id, span_id, "", {}},
+              SpanContext{logger, span_id, span_id, "", {}},
               get_time(),
               "original service",
               "original type",
@@ -426,13 +420,14 @@ TEST_CASE("span") {
 
   SECTION("SetOperationName updates the tag but not the overridden name") {
     auto span_id = get_id();
-    Span span{nullptr,
+    Span span{logger,
+              nullptr,
               buffer,
               get_time,
               span_id,
               span_id,
               0,
-              SpanContext{span_id, span_id, "", {}},
+              SpanContext{logger, span_id, span_id, "", {}},
               get_time(),
               "original service",
               "original type",
@@ -451,8 +446,10 @@ TEST_CASE("span") {
 
   SECTION("priority sampling") {
     SECTION("root spans may be sampled") {
-      Span span{nullptr,    buffer, get_time, 100, 100, 0, SpanContext{100, 100, "", {}},
-                get_time(), "",     "",       "",  "",  ""};
+      Span span{logger,     nullptr, buffer, get_time,
+                100,        100,     0,      SpanContext{logger, 100, 100, "", {}},
+                get_time(), "",      "",     "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(100).finished_spans->at(0);
@@ -461,19 +458,13 @@ TEST_CASE("span") {
     }
 
     SECTION("non-root spans may be sampled, as long as the trace is not yet distributed") {
-      Span span{nullptr,
-                buffer,
-                get_time,
-                100,
-                42,
-                42,
-                SpanContext{100, 42, "", {}},  // Non-distributed SpanContext
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+      Span span{logger,     nullptr,
+                buffer,     get_time,
+                100,        42,
+                42,         SpanContext{logger, 100, 42, "", {}},  // Non-distributed SpanContext
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
       REQUIRE(*buffer->traces(42).sampling_priority == SamplingPriority::SamplerKeep);
@@ -490,20 +481,14 @@ TEST_CASE("span") {
             "trace_id": "42",
             "parent_id": "100"
           })");
-      auto context = SpanContext::deserialize(ctx);
-      Span span{nullptr,
-                buffer,
-                get_time,
-                100,
-                42,
-                42,
-                std::move(*static_cast<SpanContext*>(context.value().get())),
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+      auto context = SpanContext::deserialize(logger, ctx);
+      Span span{logger,     nullptr,
+                buffer,     get_time,
+                100,        42,
+                42,         std::move(*static_cast<SpanContext*>(context.value().get())),
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(42).finished_spans->at(0);
@@ -517,20 +502,14 @@ TEST_CASE("span") {
             "parent_id": "100",
             "sampling_priority": -1
           })");
-      auto context = SpanContext::deserialize(ctx);
-      Span span{nullptr,
-                buffer,
-                get_time,
-                100,
-                100,
-                0,
-                std::move(*static_cast<SpanContext*>(context.value().get())),
-                get_time(),
-                "",
-                "",
-                "",
-                "",
-                ""};
+      auto context = SpanContext::deserialize(logger, ctx);
+      Span span{logger,     nullptr,
+                buffer,     get_time,
+                100,        100,
+                0,          std::move(*static_cast<SpanContext*>(context.value().get())),
+                get_time(), "",
+                "",         "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(100).finished_spans->at(0);
@@ -548,8 +527,10 @@ TEST_CASE("span") {
     auto buffer = std::make_shared<MockBuffer>(rules_sampler);
 
     SECTION("spans are tagged with rules sampler rates") {
-      Span span{nullptr,    buffer, get_time, 100, 100, 0, SpanContext{100, 100, "", {}},
-                get_time(), "",     "",       "",  "",  ""};
+      Span span{logger,     nullptr, buffer, get_time,
+                100,        100,     0,      SpanContext{logger, 100, 100, "", {}},
+                get_time(), "",      "",     "",
+                "",         ""};
       span.FinishWithOptions(finish_options);
 
       auto& result = buffer->traces(100).finished_spans->at(0);

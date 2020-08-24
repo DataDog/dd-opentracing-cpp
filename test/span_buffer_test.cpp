@@ -13,7 +13,8 @@ TEST_CASE("span buffer") {
       std::make_shared<WritingSpanBuffer>(writer_ptr, sampler, WritingSpanBufferOptions{});
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
-    return SpanContext{span.span_id, span.trace_id, "", {}};
+    auto logger = std::make_shared<const MockLogger>();
+    return SpanContext{logger, span.span_id, span.trace_id, "", {}};
   };
 
   SECTION("can write a single-span trace") {

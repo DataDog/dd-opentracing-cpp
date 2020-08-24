@@ -6,6 +6,7 @@
 #include <mutex>
 #include <set>
 #include <unordered_map>
+#include "logger.h"
 
 namespace ot = opentracing;
 
@@ -21,6 +22,7 @@ const ot::string_view baggage_prefix = "ot-baggage-";
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 
+class Tracer;
 class SpanBuffer;
 struct HeadersImpl;
 
@@ -47,12 +49,13 @@ OptionalSamplingPriority asSamplingPriority(int i);
 
 class SpanContext : public ot::SpanContext {
  public:
-  SpanContext(uint64_t id, uint64_t trace_id, std::string origin,
-              std::unordered_map<std::string, std::string> &&baggage);
+  SpanContext(std::shared_ptr<const Logger> logger, uint64_t id, uint64_t trace_id,
+              std::string origin, std::unordered_map<std::string, std::string> &&baggage);
 
   // Enables a hack, see the comment below on nginx_opentracing_compatibility_hack_.
   static SpanContext NginxOpenTracingCompatibilityHackSpanContext(
-      uint64_t id, uint64_t trace_id, std::unordered_map<std::string, std::string> &&baggage);
+      std::shared_ptr<const Logger> logger, uint64_t id, uint64_t trace_id,
+      std::unordered_map<std::string, std::string> &&baggage);
 
   SpanContext(SpanContext &&other);
   SpanContext &operator=(SpanContext &&other);
@@ -78,9 +81,11 @@ class SpanContext : public ot::SpanContext {
   SpanContext withId(uint64_t id) const;
 
   // Returns a new context from the given reader.
-  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(std::istream &reader);
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader, std::set<PropagationStyle> styles);
+      std::shared_ptr<const Logger> tracer, std::istream &reader);
+  static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
+      std::shared_ptr<const Logger> tracer, const ot::TextMapReader &reader,
+      std::set<PropagationStyle> styles);
 
   uint64_t id() const;
   uint64_t traceId() const;
@@ -93,7 +98,8 @@ class SpanContext : public ot::SpanContext {
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
-      const ot::TextMapReader &reader, const HeadersImpl &headers_impl);
+      std::shared_ptr<const Logger> tracer, const ot::TextMapReader &reader,
+      const HeadersImpl &headers_impl);
   ot::expected<void> serialize(const ot::TextMapWriter &writer,
                                const std::shared_ptr<SpanBuffer> pending_traces,
                                const HeadersImpl &headers_impl,
@@ -117,10 +123,10 @@ class SpanContext : public ot::SpanContext {
   // make it more of a pain to do and less obvious what's happening.
   bool nginx_opentracing_compatibility_hack_ = false;
 
-  OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
-
+  std::shared_ptr<const Logger> logger_;
   uint64_t id_;
   uint64_t trace_id_;
+  OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
   std::string origin_;
 
   mutable std::mutex mutex_;

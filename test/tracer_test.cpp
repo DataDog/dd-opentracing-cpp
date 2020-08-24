@@ -22,6 +22,7 @@ TEST_CASE("tracer") {
   auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
+  auto logger = std::make_shared<const MockLogger>();
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, get_time, get_id}};
   const ot::StartSpanOptions span_options;
@@ -53,7 +54,7 @@ TEST_CASE("tracer") {
 
   SECTION("span context is propagated") {
     MockTextMapCarrier carrier;
-    SpanContext context{420, 69, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
+    SpanContext context{logger, 420, 69, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     auto success = tracer->Inject(context, carrier);
     REQUIRE(success);
     auto span_context_maybe = tracer->Extract(carrier);

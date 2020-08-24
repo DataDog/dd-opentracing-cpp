@@ -4,6 +4,7 @@
 #include <opentracing/tracer.h>
 
 #include <cmath>
+#include <iostream>
 #include <map>
 #include <set>
 
@@ -11,6 +12,17 @@ namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
+
+// Log levels used within the datadog tracer. The numberic values are arbitrary,
+// and the logging function is responsible for mapping these levels to the
+// application-specific logger's levels.
+enum class LogLevel {
+  debug = 1,
+  info = 2,
+  error = 3,
+};
+
+using LogFunc = std::function<void(LogLevel, ot::string_view)>;
 
 // The type of headers that are used for propagating distributed traces.
 // B3 headers only support 64 bit trace IDs.
@@ -87,6 +99,24 @@ struct TracerOptions {
   // If no scheme is set in the URL, a path to a UNIX domain socket is assumed.
   // Can also be set by the environment variable DD_TRACE_AGENT_URL.
   std::string agent_url = "";
+  // A logging function that is called by the tracer when noteworthy events occur.
+  // The default value uses std::cerr, and applications can inject their own logging function.
+  LogFunc log_func = [](LogLevel level, ot::string_view message) {
+    switch (level) {
+      case LogLevel::debug:
+        std::cerr << "debug: " << message << std::endl;
+        break;
+      case LogLevel::info:
+        std::cerr << "info: " << message << std::endl;
+        break;
+      case LogLevel::error:
+        std::cerr << "error: " << message << std::endl;
+        break;
+      default:
+        std::cerr << "<unknown level>: " << message << std::endl;
+        break;
+    }
+  };
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

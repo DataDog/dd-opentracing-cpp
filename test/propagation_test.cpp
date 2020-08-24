@@ -24,11 +24,12 @@ dict getBaggage(SpanContext* ctx) {
 }
 
 TEST_CASE("SpanContext") {
+  auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  SpanContext context{420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{logger, 420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
       GENERATE(std::set<PropagationStyle>{PropagationStyle::Datadog},
@@ -60,7 +61,7 @@ TEST_CASE("SpanContext") {
     }
 
     SECTION("can be deserialized") {
-      auto sc = SpanContext::deserialize(carrier, propagation_styles);
+      auto sc = SpanContext::deserialize(logger, carrier, propagation_styles);
       auto received_context = dynamic_cast<SpanContext*>(sc->get());
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
@@ -74,7 +75,7 @@ TEST_CASE("SpanContext") {
 
       SECTION("even with extra keys") {
         carrier.Set("some junk thingy", "ayy lmao");
-        auto sc = SpanContext::deserialize(carrier, propagation_styles);
+        auto sc = SpanContext::deserialize(logger, carrier, propagation_styles);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
         REQUIRE(received_context->id() == 420);
@@ -88,7 +89,7 @@ TEST_CASE("SpanContext") {
           REQUIRE(received_context->serialize(carrier2, buffer, propagation_styles,
                                               priority_sampling));
           carrier2.Set("more junk", "ayy lmao");
-          auto sc2 = SpanContext::deserialize(carrier2, propagation_styles);
+          auto sc2 = SpanContext::deserialize(logger, carrier2, propagation_styles);
           auto received_context2 = dynamic_cast<SpanContext*>(sc2->get());
           REQUIRE(*received_context2 == *received_context);
         }
@@ -114,11 +115,12 @@ TEST_CASE("SpanContext") {
 }
 
 TEST_CASE("deserialise fails") {
+  auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
+  SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
     std::set<PropagationStyle> styles;
@@ -142,7 +144,7 @@ TEST_CASE("deserialise fails") {
   SECTION("when there are missing keys") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
     carrier.Set("but where is parent-id??", "420");
-    auto err = SpanContext::deserialize(carrier, test_case.styles);
+    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -150,7 +152,7 @@ TEST_CASE("deserialise fails") {
   SECTION("when there are formatted keys") {
     carrier.Set(test_case.x_datadog_trace_id, "The madman! This isn't even a number!");
     carrier.Set(test_case.x_datadog_parent_id, "420");
-    auto err = SpanContext::deserialize(carrier, test_case.styles);
+    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -159,7 +161,7 @@ TEST_CASE("deserialise fails") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
     carrier.Set(test_case.x_datadog_parent_id, "456");
     carrier.Set(test_case.x_datadog_sampling_priority, "420");
-    auto err = SpanContext::deserialize(carrier, test_case.styles);
+    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -168,7 +170,7 @@ TEST_CASE("deserialise fails") {
     carrier.Set(test_case.x_datadog_trace_id, "123");
     carrier.Set(test_case.x_datadog_parent_id, "456");
     carrier.Set(test_case.x_datadog_origin, "madeuporigin");
-    auto err = SpanContext::deserialize(carrier, test_case.styles);
+    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
@@ -182,14 +184,15 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
        {SamplingPriority::SamplerKeep, SamplingPriority::SamplerKeep},
        {SamplingPriority::UserKeep, SamplingPriority::SamplerKeep}}));
 
+  auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
-  SpanContext context{420, 123, "", {}};
+  SpanContext context{logger, 420, 123, "", {}};
 
   REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
 
-  auto sc = SpanContext::deserialize(carrier, {PropagationStyle::B3});
+  auto sc = SpanContext::deserialize(logger, carrier, {PropagationStyle::B3});
   auto received_context = dynamic_cast<SpanContext*>(sc->get());
   REQUIRE(received_context);
   REQUIRE(received_context->id() == 420);
@@ -200,6 +203,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
 }
 
 TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers") {
+  auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   carrier.Set("x-datadog-trace-id", "420");
   carrier.Set("x-datadog-parent-id", "421");
@@ -220,12 +224,14 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
                                                    {"X-B3-Sampled", "2"}}));
   carrier.Set(test_case.first, test_case.second);
 
-  auto err = SpanContext::deserialize(carrier, {PropagationStyle::Datadog, PropagationStyle::B3});
+  auto err =
+      SpanContext::deserialize(logger, carrier, {PropagationStyle::Datadog, PropagationStyle::B3});
   REQUIRE(!err);
   REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
 TEST_CASE("Binary Span Context") {
+  auto logger = std::make_shared<const MockLogger>();
   std::stringstream carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
@@ -233,11 +239,11 @@ TEST_CASE("Binary Span Context") {
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
-    SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
+    SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     REQUIRE(context.serialize(carrier, buffer, priority_sampling));
 
     SECTION("can be deserialized") {
-      auto sc = SpanContext::deserialize(carrier);
+      auto sc = SpanContext::deserialize(logger, carrier);
       auto received_context = dynamic_cast<SpanContext*>(sc->get());
       REQUIRE(received_context);
       REQUIRE(received_context->id() == 420);
@@ -253,7 +259,7 @@ TEST_CASE("Binary Span Context") {
   }
 
   SECTION("serialise fails") {
-    SpanContext context{420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
+    SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
       auto err = context.serialize(carrier, buffer, priority_sampling);
@@ -266,35 +272,35 @@ TEST_CASE("Binary Span Context") {
   SECTION("deserialize fails") {
     SECTION("when traceId is missing") {
       carrier << "{ \"parent_id\": \"420\" }";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when parent_id is missing") {
       carrier << "{ \"trace_id\": \"123\" }";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when the sampling priority is whack") {
       carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when sampling priority is missing but origin is set") {
       carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"origin\": \"synthetics\" }";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when given invalid json data") {
       carrier << "something that isn't JSON";
-      auto err = SpanContext::deserialize(carrier);
+      auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == std::make_error_code(std::errc::invalid_argument));
     }
@@ -531,13 +537,14 @@ TEST_CASE("force tracing behaviour") {
 }
 
 TEST_CASE("origin header propagation") {
+  auto logger = std::make_shared<const MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces()[123].sampling_priority =
       std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-  SpanContext context{420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
+  SpanContext context{logger, 420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
   ot::Tracer::InitGlobal(tracer);
 
   SECTION("the origin header is injected") {

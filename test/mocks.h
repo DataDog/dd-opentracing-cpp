@@ -11,11 +11,63 @@
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "../src/span_buffer.h"
+#include "../src/tracer.h"
 #include "../src/transport.h"
 #include "../src/writer.h"
 
 namespace datadog {
 namespace opentracing {
+
+// Exists just so we can see that opts was set correctly.
+struct MockTracer : public Tracer {
+  TracerOptions opts;
+
+  MockTracer(TracerOptions opts, std::shared_ptr<Writer> writer,
+             std::shared_ptr<RulesSampler> sampler)
+      : Tracer(opts, writer, sampler), opts(opts) {}
+
+  std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
+                                                 const ot::StartSpanOptions& /* options */) const
+      noexcept override {
+    return nullptr;
+  }
+
+  // This is here to avoid a warning about hidden overloaded-virtual methods.
+  using ot::Tracer::Extract;
+  using ot::Tracer::Inject;
+
+  ot::expected<void> Inject(const ot::SpanContext& /* sc */,
+                            std::ostream& /* writer */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  ot::expected<void> Inject(const ot::SpanContext& /* sc */,
+                            const ot::TextMapWriter& /* writer */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  ot::expected<void> Inject(const ot::SpanContext& /* sc */,
+                            const ot::HTTPHeadersWriter& /* writer */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
+      std::istream& /* reader */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
+      const ot::TextMapReader& /* reader */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
+      const ot::HTTPHeadersReader& /* reader */) const override {
+    return ot::make_unexpected(ot::invalid_carrier_error);
+  }
+
+  void Close() noexcept override {}
+};
 
 // Allows creation of a SpanData.
 struct TestSpanData : public SpanData {
@@ -266,6 +318,17 @@ struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
   mutable std::unordered_map<std::string, std::string> text_map;
   // Count-down to method failing. Negative means no failures.
   mutable int set_fails_after = -1;
+};
+
+struct MockLogger : public Logger {
+ public:
+  MockLogger() : Logger([](LogLevel, ot::string_view) {}) {}
+  void Log(LogLevel, ot::string_view) const noexcept override {}
+  void Log(LogLevel, uint64_t, ot::string_view) const noexcept override {}
+  void Log(LogLevel, uint64_t, uint64_t, ot::string_view) const noexcept override {}
+  void Trace(ot::string_view) const noexcept override {}
+  void Trace(uint64_t, ot::string_view) const noexcept override {}
+  void Trace(uint64_t, uint64_t, ot::string_view) const noexcept override {}
 };
 
 }  // namespace opentracing
