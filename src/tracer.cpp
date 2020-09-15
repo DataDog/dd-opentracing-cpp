@@ -48,6 +48,7 @@ namespace {
 
 bool isEnabled() {
   auto enabled = std::getenv("DD_TRACE_ENABLED");
+  // defaults to true unless env var is set to "false"
   if (enabled != nullptr && !stob(enabled, true)) {
     return false;
   }
@@ -56,10 +57,11 @@ bool isEnabled() {
 
 bool isDebug() {
   auto debug = std::getenv("DD_TRACE_DEBUG");
-  if (debug != nullptr && !stob(debug, true)) {
-    return false;
+  // defaults to false unless env var is set to "true"
+  if (debug != nullptr && stob(debug, false)) {
+    return true;
   }
-  return true;
+  return false;
 }
 
 std::string reportingHostname(TracerOptions options) {
