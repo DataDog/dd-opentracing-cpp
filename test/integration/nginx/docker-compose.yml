@@ -4,5 +4,3 @@ services:
     build:
       context: ../../..
       dockerfile: test/integration/nginx/Dockerfile
-    environment:
-    - DD_TRACE_STARTUP_LOGS=false
