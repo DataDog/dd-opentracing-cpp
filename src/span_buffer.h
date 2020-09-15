@@ -19,10 +19,16 @@ using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 struct PendingTrace {
   PendingTrace(std::shared_ptr<const Logger> logger)
-      : logger(logger), finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}), all_spans() {}
+      : logger(logger),
+        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
+        all_spans() {}
   // This constructor is only used in propagation tests.
-  PendingTrace(std::shared_ptr<const Logger> logger, std::unique_ptr<SamplingPriority> sampling_priority)
-      : logger(logger), finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}), all_spans(), sampling_priority(std::move(sampling_priority)) {}
+  PendingTrace(std::shared_ptr<const Logger> logger,
+               std::unique_ptr<SamplingPriority> sampling_priority)
+      : logger(logger),
+        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
+        all_spans(),
+        sampling_priority(std::move(sampling_priority)) {}
 
   void finish();
 
@@ -60,8 +66,8 @@ struct WritingSpanBufferOptions {
 // A SpanBuffer that sends completed traces to a Writer.
 class WritingSpanBuffer : public SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer, std::shared_ptr<RulesSampler> sampler,
-                    WritingSpanBufferOptions options);
+  WritingSpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
+                    std::shared_ptr<RulesSampler> sampler, WritingSpanBufferOptions options);
 
   void registerSpan(const SpanContext& context) override;
   void finishSpan(std::unique_ptr<SpanData> span) override;

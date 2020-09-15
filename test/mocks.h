@@ -159,9 +159,11 @@ struct MockWriter : public Writer {
 
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr,
+                          std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
   MockBuffer(std::shared_ptr<RulesSampler> sampler)
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+                          WritingSpanBufferOptions{}){};
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.

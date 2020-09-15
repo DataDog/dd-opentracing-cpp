@@ -202,7 +202,7 @@ TEST_CASE("env overrides") {
     }
     REQUIRE(maybe_options);
     TracerOptions opts = maybe_options.value();
-    opts.log_func = [](LogLevel, ot::string_view) {}; // noise suppression
+    opts.log_func = [](LogLevel, ot::string_view) {};  // noise suppression
     std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 
     // Create span
@@ -258,9 +258,7 @@ TEST_CASE("startup log") {
   opts.tags.emplace("themeaningoflifetheuniverseandeverything", "42");
   opts.operation_name_override = "meaningful.name";
   std::stringstream ss;
-  opts.log_func = [&](LogLevel, ot::string_view message) {
-    ss << message;
-  };
+  opts.log_func = [&](LogLevel, ot::string_view message) { ss << message; };
 
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
@@ -270,7 +268,7 @@ TEST_CASE("startup log") {
   std::string log_message = ss.str();
   std::string prefix = "DATADOG TRACER CONFIGURATION - ";
   REQUIRE(log_message.substr(0, prefix.size()) == prefix);
-  json j = json::parse(log_message.substr(prefix.size())); // may throw an exception
+  json j = json::parse(log_message.substr(prefix.size()));  // may throw an exception
   REQUIRE(j["date"].get<std::string>().size() == 24);
   REQUIRE(j["agent_url"] == opts.agent_url);
   REQUIRE(j["analytics_sample_rate"] == opts.analytics_rate);
