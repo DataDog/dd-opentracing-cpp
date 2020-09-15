@@ -93,7 +93,7 @@ bool legacyObfuscationEnabled() {
 
 void startupLog(TracerOptions &options) {
   auto env_setting = std::getenv("DD_TRACE_STARTUP_LOGS");
-  if (env_setting != nullptr && std::string(env_setting) == "0") {
+  if (env_setting != nullptr && !stob(env_setting, true)) {
     // Startup logs are disabled.
     return;
   }

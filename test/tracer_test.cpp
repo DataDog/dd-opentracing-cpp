@@ -251,6 +251,11 @@ TEST_CASE("env overrides") {
 }
 
 TEST_CASE("startup log") {
+  auto enabled = GENERATE(false, true);
+  std::string env_var = "DD_TRACE_STARTUP_LOGS";
+  if (!enabled) {
+    ::setenv(env_var.c_str(), "false", 0);
+  }
   TracerOptions opts;
   opts.agent_url = "/path/to/unix.socket";
   opts.analytics_rate = 0.3;
@@ -264,14 +269,19 @@ TEST_CASE("startup log") {
   auto writer = std::make_shared<MockWriter>(sampler);
   std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 
-  REQUIRE(!ss.str().empty());
-  std::string log_message = ss.str();
-  std::string prefix = "DATADOG TRACER CONFIGURATION - ";
-  REQUIRE(log_message.substr(0, prefix.size()) == prefix);
-  json j = json::parse(log_message.substr(prefix.size()));  // may throw an exception
-  REQUIRE(j["date"].get<std::string>().size() == 24);
-  REQUIRE(j["agent_url"] == opts.agent_url);
-  REQUIRE(j["analytics_sample_rate"] == opts.analytics_rate);
-  REQUIRE(j["tags"] == opts.tags);
-  REQUIRE(j["operation_name_override"] == opts.operation_name_override);
+  if (enabled) {
+    REQUIRE(!ss.str().empty());
+    std::string log_message = ss.str();
+    std::string prefix = "DATADOG TRACER CONFIGURATION - ";
+    REQUIRE(log_message.substr(0, prefix.size()) == prefix);
+    json j = json::parse(log_message.substr(prefix.size()));  // may throw an exception
+    REQUIRE(j["date"].get<std::string>().size() == 24);
+    REQUIRE(j["agent_url"] == opts.agent_url);
+    REQUIRE(j["analytics_sample_rate"] == opts.analytics_rate);
+    REQUIRE(j["tags"] == opts.tags);
+    REQUIRE(j["operation_name_override"] == opts.operation_name_override);
+  } else {
+    REQUIRE(ss.str().empty());
+  }
+  ::unsetenv(env_var.c_str());
 }
