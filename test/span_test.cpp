@@ -35,7 +35,7 @@ TEST_CASE("span") {
               "",         ""};
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
@@ -49,8 +49,8 @@ TEST_CASE("span") {
               "",         ""};
     REQUIRE(buffer->traces().size() == 1);
     REQUIRE(buffer->traces().find(100) != buffer->traces().end());
-    REQUIRE(buffer->traces(100).finished_spans->size() == 0);
-    REQUIRE(buffer->traces(100).all_spans.size() == 1);
+    REQUIRE(buffer->traces().at(100).finished_spans->size() == 0);
+    REQUIRE(buffer->traces().at(100).all_spans.size() == 1);
   }
 
   SECTION("timed correctly") {
@@ -62,7 +62,7 @@ TEST_CASE("span") {
     advanceTime(time, std::chrono::seconds(10));
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->duration == 10000000000);
   }
 
@@ -90,7 +90,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(span_id).finished_spans->back();
+      auto& result = buffer->traces().at(span_id).finished_spans->back();
       REQUIRE(result->meta.find(ot::ext::http_url)->second == test_case.second);
     }
   }
@@ -132,7 +132,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(span_id).finished_spans->back();
+      auto& result = buffer->traces().at(span_id).finished_spans->back();
       REQUIRE(result->meta.find(ot::ext::http_url)->second == test_case.second);
     }
   }
@@ -150,7 +150,7 @@ TEST_CASE("span") {
     std::for_each(threads.begin(), threads.end(), std::mem_fn(&std::thread::join));
     REQUIRE(buffer->traces().size() == 1);
     REQUIRE(buffer->traces().find(100) != buffer->traces().end());
-    REQUIRE(buffer->traces(100).finished_spans->size() == 1);
+    REQUIRE(buffer->traces().at(100).finished_spans->size() == 1);
   }
 
   SECTION("handles tags") {
@@ -175,7 +175,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     // Check "map" seperately, because JSON key order is non-deterministic therefore we can't do
     // simple string matching.
     REQUIRE(json::parse(result->meta["map"]) ==
@@ -205,7 +205,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
                                 {"foo.bar.baz", "x"},
                             });
@@ -235,7 +235,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     // Datadog special tags aren't kept, they just set the Span values.
     REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
                                 {"tag with no special meaning", "ayy lmao"}});
@@ -276,7 +276,7 @@ TEST_CASE("span") {
 
     span.SetTag(tags::analytics_event, test_case.tag_value);
     span.FinishWithOptions(finish_options);
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     auto metric = result->metrics.find("_dd1.sr.eausr");
 
     if (test_case.expected) {
@@ -317,7 +317,7 @@ TEST_CASE("span") {
 
     span.SetTag("error", error_tag_test_case.value);
     span.FinishWithOptions(finish_options);
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
 
     REQUIRE(result->error == error_tag_test_case.span_error);
     REQUIRE(result->meta["error"] == error_tag_test_case.span_tag);
@@ -342,7 +342,7 @@ TEST_CASE("span") {
 
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
@@ -371,7 +371,7 @@ TEST_CASE("span") {
     span.SetTag("resource.name", "new resource");
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->meta ==
             std::unordered_map<std::string, std::string>{{"operation", "original span name"}});
     REQUIRE(result->name == "overridden operation name");
@@ -402,7 +402,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(100).finished_spans->at(0);
+      auto& result = buffer->traces().at(100).finished_spans->at(0);
       REQUIRE(result->name == "operation name");
       REQUIRE(result->resource == "operation name");
     }
@@ -412,7 +412,7 @@ TEST_CASE("span") {
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(100).finished_spans->at(0);
+      auto& result = buffer->traces().at(100).finished_spans->at(0);
       REQUIRE(result->name == "operation name");
       REQUIRE(result->resource == "resource tag override");
     }
@@ -438,7 +438,7 @@ TEST_CASE("span") {
     const ot::FinishSpanOptions finish_options;
     span.FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->name == "overridden name");
     REQUIRE(result->resource == "updated operation name");
     REQUIRE(result->meta[tags::operation_name] == "updated operation name");
@@ -452,7 +452,7 @@ TEST_CASE("span") {
                 "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(100).finished_spans->at(0);
+      auto& result = buffer->traces().at(100).finished_spans->at(0);
       REQUIRE(result->metrics.find("_sampling_priority_v1") != result->metrics.end());
       REQUIRE(result->metrics["_sampling_priority_v1"] == 1);
     }
@@ -467,7 +467,7 @@ TEST_CASE("span") {
                 "",         ""};
       span.FinishWithOptions(finish_options);
 
-      REQUIRE(*buffer->traces(42).sampling_priority == SamplingPriority::SamplerKeep);
+      REQUIRE(*buffer->traces().at(42).sampling_priority == SamplingPriority::SamplerKeep);
     }
 
     SECTION(
@@ -491,7 +491,7 @@ TEST_CASE("span") {
                 "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(42).finished_spans->at(0);
+      auto& result = buffer->traces().at(42).finished_spans->at(0);
       REQUIRE(result->metrics.find("_sampling_priority_v1") != result->metrics.end());
       REQUIRE(result->metrics["_sampling_priority_v1"] == 1);
     }
@@ -512,7 +512,7 @@ TEST_CASE("span") {
                 "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(100).finished_spans->at(0);
+      auto& result = buffer->traces().at(100).finished_spans->at(0);
       REQUIRE(result->metrics.find("_sampling_priority_v1") != result->metrics.end());
       REQUIRE(result->metrics["_sampling_priority_v1"] == -1);
     }
@@ -533,7 +533,7 @@ TEST_CASE("span") {
                 "",         ""};
       span.FinishWithOptions(finish_options);
 
-      auto& result = buffer->traces(100).finished_spans->at(0);
+      auto& result = buffer->traces().at(100).finished_spans->at(0);
       REQUIRE(result->metrics.find("_dd.rule_psr") != result->metrics.end());
       REQUIRE(result->metrics.find("_dd.limit_psr") != result->metrics.end());
       REQUIRE(result->metrics["_dd.rule_psr"] == 0.42);

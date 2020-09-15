@@ -6,11 +6,11 @@
 using namespace datadog::opentracing;
 
 TEST_CASE("span buffer") {
+  auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<RulesSampler>();
-  auto writer_ptr = std::make_shared<MockWriter>(sampler);
-  MockWriter* writer = writer_ptr.get();
+  auto writer = std::make_shared<MockWriter>(sampler);
   auto buffer =
-      std::make_shared<WritingSpanBuffer>(writer_ptr, sampler, WritingSpanBufferOptions{});
+      std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
     auto logger = std::make_shared<const MockLogger>();

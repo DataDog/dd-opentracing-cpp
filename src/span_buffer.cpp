@@ -56,16 +56,18 @@ void PendingTrace::finish() {
   }
 }
 
-WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<Writer> writer,
+WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<const Logger> logger,
+                                     std::shared_ptr<Writer> writer,
                                      std::shared_ptr<RulesSampler> sampler,
                                      WritingSpanBufferOptions options)
-    : writer_(writer), sampler_(sampler), options_(options) {}
+    : logger_(logger), writer_(writer), sampler_(sampler), options_(options) {}
+
 void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   uint64_t trace_id = context.traceId();
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end() || trace->second.all_spans.empty()) {
-    traces_.emplace(std::make_pair(trace_id, PendingTrace{}));
+    traces_.emplace(std::make_pair(trace_id, PendingTrace{logger_}));
     trace = traces_.find(trace_id);
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
     trace->second.sampling_priority_locked = p != nullptr;
@@ -121,7 +123,7 @@ OptionalSamplingPriority WritingSpanBuffer::getSamplingPriority(uint64_t trace_i
 OptionalSamplingPriority WritingSpanBuffer::getSamplingPriorityImpl(uint64_t trace_id) const {
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end()) {
-    std::cerr << "Missing trace in getSamplingPriority" << std::endl;
+    logger_->Trace(trace_id, "cannot get sampling priority, trace not found");
     return nullptr;
   }
   if (trace->second.sampling_priority == nullptr) {
@@ -140,7 +142,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
     uint64_t trace_id, OptionalSamplingPriority priority) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
-    std::cerr << "Missing trace in setSamplingPriority" << std::endl;
+    logger_->Trace(trace_id, "cannot set sampling priority, trace not found");
     return nullptr;
   }
   PendingTrace& trace = trace_entry->second;
@@ -149,7 +151,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
         *priority == SamplingPriority::UserDrop) {
       // Only print an error if a user is taking this action. This case is legitimate (albeit with
       // the same outcome) if the Sampler itself is trying to assignSamplingPriority.
-      std::cerr << "Sampling priority locked, trace already propagated" << std::endl;
+      logger_->Trace(trace_id, "sampling priority already set and cannot be reassigned");
     }
     return getSamplingPriorityImpl(trace_id);
   }
@@ -183,7 +185,7 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const Spa
 void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, SampleResult& sample_result) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
-    std::cerr << "Missing trace in setSamplerResult" << std::endl;
+    logger_->Trace(trace_id, "cannot assign rules sampler result, trace not found");
     return;
   }
   PendingTrace& trace = trace_entry->second;

@@ -27,8 +27,7 @@ TEST_CASE("SpanContext") {
   auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
-  buffer->traces()[123].sampling_priority =
-      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  buffer->traces().emplace(std::make_pair(123, PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
@@ -118,8 +117,7 @@ TEST_CASE("deserialise fails") {
   auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
-  buffer->traces()[123].sampling_priority =
-      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  buffer->traces().emplace(std::make_pair(123, PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
@@ -187,7 +185,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
-  buffer->traces()[123].sampling_priority = std::make_unique<SamplingPriority>(priority.first);
+  buffer->traces().emplace(std::make_pair(123, PendingTrace{logger, std::make_unique<SamplingPriority>(priority.first)}));
   SpanContext context{logger, 420, 123, "", {}};
 
   REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
@@ -234,8 +232,7 @@ TEST_CASE("Binary Span Context") {
   auto logger = std::make_shared<const MockLogger>();
   std::stringstream carrier{};
   auto buffer = std::make_shared<MockBuffer>();
-  buffer->traces()[123].sampling_priority =
-      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  buffer->traces().emplace(std::make_pair(123, PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
@@ -308,9 +305,10 @@ TEST_CASE("Binary Span Context") {
 }
 
 TEST_CASE("sampling behaviour") {
+  auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, sampler, WritingSpanBufferOptions{});
+  auto buffer = std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -516,9 +514,10 @@ TEST_CASE("sampling behaviour") {
 }
 
 TEST_CASE("force tracing behaviour") {
+  auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<WritingSpanBuffer>(writer, sampler, WritingSpanBufferOptions{});
+  auto buffer = std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -540,8 +539,7 @@ TEST_CASE("origin header propagation") {
   auto logger = std::make_shared<const MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto buffer = std::make_shared<MockBuffer>();
-  buffer->traces()[123].sampling_priority =
-      std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+  buffer->traces().emplace(std::make_pair(123, PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
 
   std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
   SpanContext context{logger, 420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
@@ -590,7 +588,10 @@ TEST_CASE("origin header propagation") {
     spanB->Finish();
     spanA->Finish();
 
-    auto& spans = buffer->traces(123).finished_spans;
+    auto& traces = buffer->traces();
+    auto it = traces.find(123);
+    REQUIRE(it != traces.end());
+    auto& spans = it->second.finished_spans;
     REQUIRE(spans->size() == 3);
     // The local root span should have the tag
     auto& meta = spans->at(2)->meta;

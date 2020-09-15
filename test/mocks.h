@@ -18,6 +18,17 @@
 namespace datadog {
 namespace opentracing {
 
+struct MockLogger : public Logger {
+ public:
+  MockLogger() : Logger([](LogLevel, ot::string_view) {}) {}
+  void Log(LogLevel, ot::string_view) const noexcept override {}
+  void Log(LogLevel, uint64_t, ot::string_view) const noexcept override {}
+  void Log(LogLevel, uint64_t, uint64_t, ot::string_view) const noexcept override {}
+  void Trace(ot::string_view) const noexcept override {}
+  void Trace(uint64_t, ot::string_view) const noexcept override {}
+  void Trace(uint64_t, uint64_t, ot::string_view) const noexcept override {}
+};
+
 // Exists just so we can see that opts was set correctly.
 struct MockTracer : public Tracer {
   TracerOptions opts;
@@ -148,9 +159,9 @@ struct MockWriter : public Writer {
 
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(nullptr, std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
   MockBuffer(std::shared_ptr<RulesSampler> sampler)
-      : WritingSpanBuffer(nullptr, sampler, WritingSpanBufferOptions{}){};
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, WritingSpanBufferOptions{}){};
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.
@@ -158,8 +169,6 @@ struct MockBuffer : public WritingSpanBuffer {
   };
 
   std::unordered_map<uint64_t, PendingTrace>& traces() { return traces_; };
-
-  PendingTrace& traces(uint64_t id) { return traces_[id]; };
 
   void setEnabled(bool enabled) { options_.enabled = enabled; };
 
@@ -318,17 +327,6 @@ struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
   mutable std::unordered_map<std::string, std::string> text_map;
   // Count-down to method failing. Negative means no failures.
   mutable int set_fails_after = -1;
-};
-
-struct MockLogger : public Logger {
- public:
-  MockLogger() : Logger([](LogLevel, ot::string_view) {}) {}
-  void Log(LogLevel, ot::string_view) const noexcept override {}
-  void Log(LogLevel, uint64_t, ot::string_view) const noexcept override {}
-  void Log(LogLevel, uint64_t, uint64_t, ot::string_view) const noexcept override {}
-  void Trace(ot::string_view) const noexcept override {}
-  void Trace(uint64_t, ot::string_view) const noexcept override {}
-  void Trace(uint64_t, uint64_t, ot::string_view) const noexcept override {}
 };
 
 }  // namespace opentracing

@@ -32,7 +32,7 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->type == "web");
     REQUIRE(result->service == "service_name");
     REQUIRE(result->name == "/what_up");
@@ -46,7 +46,7 @@ TEST_CASE("tracer") {
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
 
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
@@ -62,7 +62,7 @@ TEST_CASE("tracer") {
     auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
-    auto& result = buffer->traces(69).finished_spans->at(0);
+    auto& result = buffer->traces().at(69).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 69);
     REQUIRE(result->parent_id == 420);
@@ -74,7 +74,7 @@ TEST_CASE("tracer") {
     auto span = tracer->StartSpan("fred", {ChildOf(span_context_maybe->get())});
     const ot::FinishSpanOptions finish_options;
     span->FinishWithOptions(finish_options);
-    auto& result = buffer->traces(100).finished_spans->at(0);
+    auto& result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(result->span_id == 100);
     REQUIRE(result->trace_id == 100);
     REQUIRE(result->parent_id == 0);
@@ -92,11 +92,11 @@ TEST_CASE("tracer") {
     buffer->setHostname("");
 
     // Tag should exist with the correct value on the root / local-root span.
-    auto& root_result = buffer->traces(100).finished_spans->at(1);
+    auto& root_result = buffer->traces().at(100).finished_spans->at(1);
     REQUIRE(root_result->meta["_dd.hostname"] == "testhostname");
 
     // Tag should not exist on the child span(s).
-    auto& child_result = buffer->traces(100).finished_spans->at(0);
+    auto& child_result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(child_result->meta.find("_dd.hostname") == child_result->meta.end());
   }
 
@@ -112,11 +112,11 @@ TEST_CASE("tracer") {
     buffer->setAnalyticsRate(std::nan(""));
 
     // Metric should exist with the correct value on the root / local-root span.
-    auto& root_result = buffer->traces(100).finished_spans->at(1);
+    auto& root_result = buffer->traces().at(100).finished_spans->at(1);
     REQUIRE(root_result->metrics["_dd1.sr.eausr"] == 1.0);
 
     // Tag should not exist on the child span(s).
-    auto& child_result = buffer->traces(100).finished_spans->at(0);
+    auto& child_result = buffer->traces().at(100).finished_spans->at(0);
     REQUIRE(child_result->metrics.find("_dd1.sr.eausr") == child_result->metrics.end());
   }
 }
@@ -134,8 +134,7 @@ TEST_CASE("env overrides") {
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
   auto sampler = std::make_shared<RulesSampler>();
-  auto mwriter = std::make_shared<MockWriter>(sampler);
-  auto writer = std::shared_ptr<Writer>(mwriter);
+  auto writer = std::make_shared<MockWriter>(sampler);
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   const ot::StartSpanOptions span_options;
 
@@ -203,6 +202,7 @@ TEST_CASE("env overrides") {
     }
     REQUIRE(maybe_options);
     TracerOptions opts = maybe_options.value();
+    opts.log_func = [](LogLevel, ot::string_view) {}; // noise suppression
     std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 
     // Create span
@@ -211,7 +211,7 @@ TEST_CASE("env overrides") {
     span->FinishWithOptions(finish_options);
 
     if (env_test.enabled) {
-      auto& result = mwriter->traces[0][0];
+      auto& result = writer->traces[0][0];
       // Check the hostname matches the expected value.
       if (env_test.hostname.empty()) {
         REQUIRE(result->meta.find("_dd.hostname") == result->meta.end());
@@ -242,7 +242,7 @@ TEST_CASE("env overrides") {
         REQUIRE(result->meta[tag.first] == tag.second);
       }
     } else {
-      REQUIRE(mwriter->traces.empty());
+      REQUIRE(writer->traces.empty());
     }
 
     // Tear-down
@@ -257,14 +257,20 @@ TEST_CASE("startup log") {
   opts.tags.emplace("foo", "bar");
   opts.tags.emplace("themeaningoflifetheuniverseandeverything", "42");
   opts.operation_name_override = "meaningful.name";
-
-  auto now = std::chrono::system_clock::now();
   std::stringstream ss;
-  logTracerOptions(now, opts, ss);
+  opts.log_func = [&](LogLevel, ot::string_view message) {
+    ss << message;
+  };
+
+  auto sampler = std::make_shared<RulesSampler>();
+  auto writer = std::make_shared<MockWriter>(sampler);
+  std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 
   REQUIRE(!ss.str().empty());
-  json j;
-  ss >> j;  // May throw an exception
+  std::string log_message = ss.str();
+  std::string prefix = "DATADOG TRACER CONFIGURATION - ";
+  REQUIRE(log_message.substr(0, prefix.size()) == prefix);
+  json j = json::parse(log_message.substr(prefix.size())); // may throw an exception
   REQUIRE(j["date"].get<std::string>().size() == 24);
   REQUIRE(j["agent_url"] == opts.agent_url);
   REQUIRE(j["analytics_sample_rate"] == opts.analytics_rate);

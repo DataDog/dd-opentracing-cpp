@@ -54,7 +54,6 @@ bool isEnabled() {
   return true;
 }
 
-/*
 bool isDebug() {
   auto debug = std::getenv("DD_TRACE_DEBUG");
   if (debug != nullptr && !stob(debug, true)) {
@@ -62,7 +61,6 @@ bool isDebug() {
   }
   return true;
 }
-*/
 
 std::string reportingHostname(TracerOptions options) {
   // This returns the machine name when the tracer has been configured
@@ -97,6 +95,43 @@ void startupLog(TracerOptions &options) {
     // Startup logs are disabled.
     return;
   }
+
+  json j;
+  std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&t), "%FT%T%z");
+  j["date"] = ss.str();
+  j["version"] = datadog::version::tracer_version;
+  j["lang"] = "cpp";
+  j["lang_version"] = datadog::version::cpp_version;
+  j["env"] = options.environment;
+  j["enabled"] = true;
+  j["service"] = options.service;
+  if (!options.agent_url.empty()) {
+    j["agent_url"] = options.agent_url;
+  } else {
+    j["agent_url"] =
+        std::string("http://") + options.agent_host + ":" + std::to_string(options.agent_port);
+  }
+  j["analytics_enabled"] = options.analytics_enabled;
+  j["analytics_sample_rate"] = options.analytics_rate;
+  j["sampling_rules"] = options.sampling_rules;
+  if (!options.tags.empty()) {
+    j["tags"] = options.tags;
+  }
+  if (!options.version.empty()) {
+    j["dd_version"] = options.version;
+  }
+  j["report_hostname"] = options.report_hostname;
+  if (!options.operation_name_override.empty()) {
+    j["operation_name_override"] = options.operation_name_override;
+  }
+
+  std::string message;
+  message += "DATADOG TRACER CONFIGURATION - ";
+  message += j.dump();
+  options.log_func(LogLevel::info, message);
+  /*
   // C++17's filesystem api would be really nice to have right now..
   std::string startup_log_path = "/var/tmp/dd-opentracing-cpp";
   struct stat s;
@@ -127,6 +162,7 @@ void startupLog(TracerOptions &options) {
   }
   logTracerOptions(now, options, log_file);
   log_file.close();
+  */
 }
 
 }  // namespace
@@ -198,41 +234,6 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
       std::string("rules sampler: unable to parse JSON config for rules sampler: ", error.what()));
 }
 
-void logTracerOptions(std::chrono::time_point<std::chrono::system_clock> timestamp,
-                      TracerOptions &options, std::ostream &out) {
-  json j;
-  std::time_t t = std::chrono::system_clock::to_time_t(timestamp);
-  std::stringstream ss;
-  ss << std::put_time(std::localtime(&t), "%FT%T%z");
-  j["date"] = ss.str();
-  j["version"] = datadog::version::tracer_version;
-  j["lang"] = "cpp";
-  j["lang_version"] = datadog::version::cpp_version;
-  j["env"] = options.environment;
-  j["enabled"] = true;
-  j["service"] = options.service;
-  if (!options.agent_url.empty()) {
-    j["agent_url"] = options.agent_url;
-  } else {
-    j["agent_url"] =
-        std::string("http://") + options.agent_host + ":" + std::to_string(options.agent_port);
-  }
-  j["analytics_enabled"] = options.analytics_enabled;
-  j["analytics_sample_rate"] = options.analytics_rate;
-  j["sampling_rules"] = options.sampling_rules;
-  if (!options.tags.empty()) {
-    j["tags"] = options.tags;
-  }
-  if (!options.version.empty()) {
-    j["dd_version"] = options.version;
-  }
-  j["report_hostname"] = options.report_hostname;
-  if (!options.operation_name_override.empty()) {
-    j["operation_name_override"] = options.operation_name_override;
-  }
-  out << j << std::endl;
-}
-
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id)
     : opts_(options),
@@ -247,11 +248,15 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
-  logger_ = std::make_shared<StandardLogger>(opts_.log_func);
+  if (isDebug()) {
+    logger_ = std::make_shared<VerboseLogger>(opts_.log_func);
+  } else {
+    logger_ = std::make_shared<StandardLogger>(opts_.log_func);
+  }
   configureRulesSampler(sampler);
   startupLog(options);
   buffer_ = std::make_shared<WritingSpanBuffer>(
-      writer, sampler,
+      logger_, writer, sampler,
       WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
 }
 
