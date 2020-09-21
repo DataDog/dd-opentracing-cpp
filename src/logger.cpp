@@ -5,12 +5,12 @@ namespace opentracing {
 
 namespace {
 
-ot::string_view format_message(uint64_t trace_id, ot::string_view message) {
+std::string format_message(uint64_t trace_id, ot::string_view message) {
   return std::string("[trace_id: ") + std::to_string(trace_id) + std::string("] ") +
          std::string(message);
 }
 
-ot::string_view format_message(uint64_t trace_id, uint64_t span_id, ot::string_view message) {
+std::string format_message(uint64_t trace_id, uint64_t span_id, ot::string_view message) {
   return std::string("[trace_id: ") + std::to_string(trace_id) + std::string(", span_id: ") +
          std::to_string(span_id) + std::string("] ") + std::string(message);
 }
@@ -18,12 +18,12 @@ ot::string_view format_message(uint64_t trace_id, uint64_t span_id, ot::string_v
 }  // namespace
 
 void StandardLogger::Log(LogLevel level, ot::string_view message) const noexcept {
-  log_func_(level, message);
+  log_func_(level, ot::string_view{message});
 }
 
 void StandardLogger::Log(LogLevel level, uint64_t trace_id, ot::string_view message) const
     noexcept {
-  log_func_(level, format_message(trace_id, message));
+  log_func_(level, ot::string_view{format_message(trace_id, message)});
 }
 
 void StandardLogger::Log(LogLevel level, uint64_t trace_id, uint64_t span_id,
