@@ -69,7 +69,7 @@ endif()
 if(BUILD_STATIC)
   add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-static)
-  set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing)
+  set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing POSITION_INDEPENDENT_CODE ON)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
