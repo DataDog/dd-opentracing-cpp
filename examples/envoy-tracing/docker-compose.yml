@@ -24,8 +24,36 @@ services:
     volumes:
       - './envoy-ed6a1b8.yaml:/etc/envoy/envoy.yaml:ro'
 
+  envoy-v1.16:
+    image: envoyproxy/envoy:v1.16.1
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.16.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.15:
+    image: envoyproxy/envoy:v1.15.3
+    depends_on:
+      - dd-agent
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.15.yaml:/etc/envoy/envoy.yaml:ro'
+
   envoy-v1.14:
-    image: envoyproxy/envoy:v1.14.1
+    image: envoyproxy/envoy:v1.14.6
     depends_on:
       - dd-agent
     entrypoint: []
@@ -39,7 +67,7 @@ services:
       - './envoy-v1.14.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.13:
-    image: envoyproxy/envoy:v1.13.1
+    image: envoyproxy/envoy:v1.13.7
     depends_on:
       - dd-agent
     entrypoint: []

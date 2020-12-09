@@ -11,7 +11,13 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           generate_request_id: true
-          tracing: {}
+          tracing:
+            provider:
+              name: envoy.tracers.datadog
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
+                collector_cluster: datadog_agent
+                service_name: envoy-example-v1.15
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -67,15 +73,6 @@ static_resources:
               socket_address:
                 address: dd-agent
                 port_value: 8126
-
-tracing:
-  # Use the datadog tracer
-  http:
-    name: envoy.tracers.datadog
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
-      collector_cluster: datadog_agent   # matched against the named cluster below
-      service_name: envoy-example-v1.14  # user-defined service name
 
 admin:
   access_log_path: "/dev/null"
