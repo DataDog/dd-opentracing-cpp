@@ -8,6 +8,8 @@ cc_library(
         "src/encoder.h",
         "src/limiter.cpp",
         "src/limiter.h",
+        "src/logger.cpp",
+        "src/logger.h",
         "src/opentracing_external.cpp",
         "src/propagation.cpp",
         "src/propagation.h",
