@@ -9,57 +9,6 @@
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
-// Exists just so we can see that opts was set correctly.
-struct MockTracer : public ot::Tracer {
-  TracerOptions opts;
-
-  MockTracer(TracerOptions opts_, std::shared_ptr<Writer> & /* writer */,
-             std::shared_ptr<RulesSampler> /* sampler */)
-      : opts(opts_) {}
-
-  std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
-                                                 const ot::StartSpanOptions & /* options */) const
-      noexcept override {
-    return nullptr;
-  }
-
-  // This is here to avoid a warning about hidden overloaded-virtual methods.
-  using ot::Tracer::Extract;
-  using ot::Tracer::Inject;
-
-  ot::expected<void> Inject(const ot::SpanContext & /* sc */,
-                            std::ostream & /* writer */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  ot::expected<void> Inject(const ot::SpanContext & /* sc */,
-                            const ot::TextMapWriter & /* writer */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  ot::expected<void> Inject(const ot::SpanContext & /* sc */,
-                            const ot::HTTPHeadersWriter & /* writer */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
-      std::istream & /* reader */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
-      const ot::TextMapReader & /* reader */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  ot::expected<std::unique_ptr<ot::SpanContext>> Extract(
-      const ot::HTTPHeadersReader & /* reader */) const override {
-    return ot::make_unexpected(ot::invalid_carrier_error);
-  }
-
-  void Close() noexcept override {}
-};
-
 TEST_CASE("tracer factory") {
   TracerFactory<MockTracer> factory;
 
