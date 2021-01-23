@@ -7,6 +7,8 @@
 #include <random>
 #include "clock.h"
 #include "encoder.h"
+#include "logger.h"
+#include "propagation.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
@@ -23,8 +25,6 @@ class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;
 
 uint64_t getId();
-void logTracerOptions(std::chrono::time_point<std::chrono::system_clock> timestamp,
-                      TracerOptions &options, std::ostream &out);
 
 class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:
@@ -36,7 +36,7 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   // The writer is either an AgentWriter that sends trace data directly to the Datadog Agent, or
   // an ExternalWriter that requires an external HTTP client to encode and submit to the Datadog
   // Agent.
-  Tracer(TracerOptions options, std::shared_ptr<Writer> &writer,
+  Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
          std::shared_ptr<RulesSampler> sampler);
 
   Tracer() = delete;
@@ -69,6 +69,9 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   void Close() noexcept override;
 
  private:
+  void configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept;
+
+  std::shared_ptr<const Logger> logger_;
   const TracerOptions opts_;
   // Keeps finished spans until their entire trace is finished.
   std::shared_ptr<SpanBuffer> buffer_;

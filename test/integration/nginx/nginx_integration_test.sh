@@ -5,6 +5,9 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
+# Disable tracer startup logs for test purposes
+export DD_TRACE_STARTUP_LOGS=false
+
 NGINX_CONF_PATH=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
 NGINX_CONF=$(cat ${NGINX_CONF_PATH})
 TRACER_CONF_PATH=/etc/dd-config.json

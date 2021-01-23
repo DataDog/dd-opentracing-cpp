@@ -57,12 +57,13 @@ std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
 
 std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
 
-Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buffer,
-           TimeProvider get_time, uint64_t span_id, uint64_t trace_id, uint64_t parent_id,
-           SpanContext context, TimePoint start_time, std::string span_service,
-           std::string span_type, std::string span_name, std::string resource,
-           std::string operation_name_override, bool legacy_obfuscation)
-    : tracer_(std::move(tracer)),
+Span::Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> tracer,
+           std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time, uint64_t span_id,
+           uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
+           std::string span_service, std::string span_type, std::string span_name,
+           std::string resource, std::string operation_name_override, bool legacy_obfuscation)
+    : logger_(std::move(logger)),
+      tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       context_(std::move(context)),
@@ -73,7 +74,9 @@ Span::Span(std::shared_ptr<const Tracer> tracer, std::shared_ptr<SpanBuffer> buf
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
                              start_time_.absolute_time.time_since_epoch())
-                             .count())) {
+                             .count())),
+      span_description_(std::string("[trace_id=") + std::to_string(trace_id) +
+                        std::string(",span_id=") + std::to_string(span_id) + std::string("]")) {
   if (!operation_name_override.empty()) {
     span_->meta[tags::operation_name] = span_->name;
     span_->name = operation_name_override;
@@ -357,9 +360,11 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
       }
       setSamplingPriority(std::move(sampling_priority));
     } catch (const std::invalid_argument &ia) {
-      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
+      logger_->Log(LogLevel::debug, span_->trace_id, span_->span_id,
+                   "unable to parse sampling priority tag");
     } catch (const std::out_of_range &oor) {
-      std::cerr << "Unable to parse " << ::ot::ext::sampling_priority << " tag" << std::endl;
+      logger_->Log(LogLevel::debug, span_->trace_id, span_->span_id,
+                   "unable to parse sampling priority tag");
     }
   } else if (k == tags::manual_keep) {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
