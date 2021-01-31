@@ -75,7 +75,7 @@ tracing:
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
       collector_cluster: datadog_agent   # matched against the named cluster below
-      service_name: envoy-example        # user-defined service name
+      service_name: envoy-example-v1.12  # user-defined service name
 
 admin:
   access_log_path: "/dev/null"
