@@ -10,10 +10,14 @@ services:
       - '/proc/:/host/proc/:ro'
       - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
 
-  envoy-ed6a1b8:
-    image: envoyproxy/envoy-dev:ed6a1b8b60a23e6bae7f08f990d1680b26b26cde
+  service1:
+    image: 'nginx'
+
+  envoy-634c931:
+    image: envoyproxy/envoy-dev:634c931e338b70f2a2a707dc7abecd7e3dcdff31
     depends_on:
       - dd-agent
+      - service1
     entrypoint: []
     command:
       - envoy
@@ -22,12 +26,58 @@ services:
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
-      - './envoy-ed6a1b8.yaml:/etc/envoy/envoy.yaml:ro'
+      - './envoy-634c931.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.17:
+    image: envoyproxy/envoy:v1.17.0
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.17.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.16:
+    image: envoyproxy/envoy:v1.16.1
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.16.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.15:
+    image: envoyproxy/envoy:v1.15.3
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.15.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.14:
     image: envoyproxy/envoy:v1.14.1
     depends_on:
       - dd-agent
+      - service1
     entrypoint: []
     command:
       - envoy
@@ -42,6 +92,7 @@ services:
     image: envoyproxy/envoy:v1.13.1
     depends_on:
       - dd-agent
+      - service1
     entrypoint: []
     command:
       - envoy
@@ -56,6 +107,7 @@ services:
     image: envoyproxy/envoy:v1.12.3
     depends_on:
       - dd-agent
+      - service1
     entrypoint: []
     command:
       - envoy
@@ -70,6 +122,7 @@ services:
     image: envoyproxy/envoy:v1.11.2
     depends_on:
       - dd-agent
+      - service1
     entrypoint: []
     command:
       - envoy

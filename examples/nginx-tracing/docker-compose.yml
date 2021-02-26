@@ -6,6 +6,9 @@ services:
       dockerfile: Dockerfile
     labels:
       com.datadoghq.ad.logs: '[{"source": "nginx", "service": "traced-nginx"}]'
+    environment:
+      - DD_ENV=prod
+      - DD_AGENT_HOST=dd-agent
     volumes:
       - './nginx.conf:/etc/nginx/nginx.conf:ro'
       - './dd-config.json:/etc/nginx/dd-config.json:ro'
@@ -13,7 +16,6 @@ services:
     ports:
       - "8080:80"
   dd-agent:
-    container_name: dd-agent
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
       - '/proc/:/host/proc/:ro'
