@@ -18,7 +18,6 @@ function reset_test() {
   kill $NGINX_PID
   wait $NGINX_PID
   pkill -x java # Kill wiremock
-  echo ${NGINX_CONF} > ${NGINX_CONF_PATH}
   echo ${TRACER_CONF} > ${TRACER_CONF_PATH}
   echo "" > /tmp/curl_log.txt
   echo "" > /tmp/nginx_log.txt

@@ -92,42 +92,51 @@ jobs:
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
     docker:
-      - image: datadog/docker-library:dd_opentracing_cpp_test_0_3_1
+      - image: cgilmour/nginx-opentracing:v0.11.0-6-gb6884e2
     environment:
-      NGINX_VERSION: 1.14.0
-      OPENTRACING_NGINX_VERSION: 0.8.0
+      CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      CFLAGS: -march=x86-64 -fPIC
+      CXXFLAGS: -march=x86-64 -fPIC
+      LDFLAGS: -fPIC
     steps:
       - checkout
-      - attach_workspace:
-          at: .
       - run:
-          name: Install nginx
+          name: Build source dependencies
           command: |
-            CODENAME=$(lsb_release -s -c) # eg "bionic", "xenial"
-            wget http://nginx.org/keys/nginx_signing.key
-            apt-key add nginx_signing.key
-            echo deb http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            echo deb-src http://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list
-            apt-get update
-            apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
+            ./scripts/install_dependencies.sh
+      - run:
+          name: Build (with cmake)
+          command: |
+            rm -rf .build
+            mkdir -p .build
+            mkdir -p /tmp/build/
+            cd .build
+            cmake $CMAKE_ARGS ..
+            make
+            make install
+            cp libdd_opentracing_plugin.so /usr/local/lib/libdd_opentracing_plugin.so
+      - run:
+          name: Tools required by integration test script
+          command: |
+            mkdir -p /usr/share/man/man1 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199#23
+            DEBIAN_FRONTEND=noninteractive apt-get -y install iproute2 jq openjdk-11-jre
+            wget https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar -O wiremock-standalone-2.18.0.jar
+            printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock
+            chmod a+x /usr/local/bin/wiremock
+            go get github.com/jakm/msgpack-cli
       - run:
           name: Integration test
           command: |
-            # Install OpenTracing module
-            wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${OPENTRACING_NGINX_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz
-            NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p')
-            tar zxvf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
-            # Install the Datadog plugin
-            cp ./build/libdd_opentracing_plugin.so "/usr/local/lib/libdd_opentracing_plugin.so"
             # Change the config to use it.
             cd ./test/integration/nginx/
-            NGINX_CONF=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
-            cp nginx.conf $NGINX_CONF
+            cp nginx.conf /etc/nginx/nginx.conf
             cp dd-config.json /etc/dd-config.json
             mkdir -p /var/www/
             cp index.html /var/www/
+            # Remove container symlinks
+            rm /var/log/nginx/access.log /var/log/nginx/error.log
             # Run the tests.
-            ./nginx_integration_test.sh
+            bash -x ./nginx_integration_test.sh
 
 _workflow_filters:
   _version_tag: &version_tag

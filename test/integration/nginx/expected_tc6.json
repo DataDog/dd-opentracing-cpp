@@ -9,7 +9,9 @@
         "http.status_code": "200",
         "http.status_line": "200 OK",
         "http.url": "http://localhost/proxy/",
-        "operation": "GET /proxy/"
+        "operation": "GET /proxy/",
+        "upstream.address": "127.0.0.1:8080",
+        "upstream.name": "127.0.0.1"
       },
       "metrics": {
         "_sampling_priority_v1": 1
