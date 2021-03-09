@@ -6,7 +6,6 @@ services:
     depends_on:
       - dd-agent
   dd-agent:
-    container_name: dd-agent
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
       - '/proc/:/host/proc/:ro'

@@ -134,6 +134,32 @@ SpanContext SpanContext::NginxOpenTracingCompatibilityHackSpanContext(
   return c;
 }
 
+SpanContext::SpanContext(const SpanContext &other)
+    : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
+      id_(other.id_),
+      trace_id_(other.trace_id_),
+      origin_(other.origin_),
+      baggage_(other.baggage_) {
+  if (other.propagated_sampling_priority_ != nullptr) {
+    propagated_sampling_priority_.reset(
+        new SamplingPriority(*other.propagated_sampling_priority_));
+  }
+}
+
+SpanContext &SpanContext::operator=(const SpanContext &other) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  id_ = other.id_;
+  trace_id_ = other.trace_id_;
+  origin_ = other.origin_;
+  baggage_ = other.baggage_;
+  nginx_opentracing_compatibility_hack_ = other.nginx_opentracing_compatibility_hack_;
+  if (other.propagated_sampling_priority_ != nullptr) {
+    propagated_sampling_priority_.reset(
+        new SamplingPriority(*other.propagated_sampling_priority_));
+  }
+  return *this;
+}
+
 SpanContext::SpanContext(SpanContext &&other)
     : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
       logger_(other.logger_),
@@ -180,6 +206,15 @@ void SpanContext::ForeachBaggageItem(
     }
   }
 }
+
+std::unique_ptr<ot::SpanContext> SpanContext::Clone() const noexcept {
+  std::lock_guard<std::mutex> lock{mutex_};
+  return std::unique_ptr<opentracing::SpanContext>(new SpanContext(*this));
+}
+
+std::string SpanContext::ToTraceID() const noexcept { return std::to_string(trace_id_); }
+
+std::string SpanContext::ToSpanID() const noexcept { return std::to_string(id_); }
 
 uint64_t SpanContext::id() const {
   // Not locked, since id_ never modified.

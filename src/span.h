@@ -71,6 +71,12 @@ class DatadogSpan : public ot::Span {
   virtual std::string BaggageItem(ot::string_view restricted_key) const noexcept override = 0;
   virtual void Log(
       std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override = 0;
+  virtual void Log(
+      ot::SystemTime timestamp,
+      std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override = 0;
+  virtual void Log(
+      ot::SystemTime timestamp,
+      const std::vector<std::pair<ot::string_view, ot::Value>> &fields) noexcept override = 0;
   virtual const ot::SpanContext &context() const noexcept override = 0;
   virtual const ot::Tracer &tracer() const noexcept override = 0;
 
@@ -111,6 +117,13 @@ class Span : public DatadogSpan {
   std::string BaggageItem(ot::string_view restricted_key) const noexcept override;
 
   void Log(std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override;
+  virtual void Log(
+      ot::SystemTime timestamp,
+      std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override;
+
+  virtual void Log(
+      ot::SystemTime timestamp,
+      const std::vector<std::pair<ot::string_view, ot::Value>> &fields) noexcept override;
 
   const ot::SpanContext &context() const noexcept override;
 
