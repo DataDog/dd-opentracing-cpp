@@ -8,7 +8,8 @@
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/",
-        "operation": "GET /index.html"
+        "operation": "GET /index.html",
+        "upstream.address": ""
       },
       "metrics": {
         "_dd.limit_psr": 1,
@@ -30,7 +31,8 @@
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/",
-        "operation": "GET /index.html"
+        "operation": "GET /index.html",
+        "upstream.address": ""
       },
       "metrics": {
         "_dd.limit_psr": 1,
@@ -52,7 +54,8 @@
         "http.status_code": "200",
         "http.status_line": "",
         "http.url": "http://localhost/",
-        "operation": "GET /index.html"
+        "operation": "GET /index.html",
+        "upstream.address": ""
       },
       "metrics": {
         "_dd.limit_psr": 1,

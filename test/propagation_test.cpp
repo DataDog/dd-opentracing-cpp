@@ -96,6 +96,23 @@ TEST_CASE("SpanContext") {
         }
       }
     }
+    SECTION("can access ids") {
+      REQUIRE(context.ToTraceID() == "123");
+      REQUIRE(context.ToSpanID() == "420");
+    }
+    SECTION("can be cloned") {
+      auto cloned_context = context.Clone();
+      REQUIRE(cloned_context != nullptr);
+      auto cloned = dynamic_cast<SpanContext&>(*cloned_context);
+      REQUIRE(context.id() == cloned.id());
+      REQUIRE(context.traceId() == cloned.traceId());
+      REQUIRE(context.origin() == cloned.origin());
+      REQUIRE(getBaggage(&context) == getBaggage(&cloned));
+      REQUIRE(context.getPropagatedSamplingPriority() == cloned.getPropagatedSamplingPriority());
+      // Modifications don't affect the original.
+      cloned.setBaggageItem("this", "that");
+      REQUIRE(getBaggage(&context) != getBaggage(&cloned));
+    }
   }
 
   SECTION("serialise fails") {
