@@ -1,8 +1,6 @@
 # An nginx container that includes the module and plugin required for Datadog tracing.
 FROM nginx:1.17.3
 
-ARG NGINX_VERSION=1.17.3
-
 RUN apt-get update && \
   apt-get install -y wget tar
 
@@ -10,6 +8,7 @@ RUN apt-get update && \
 RUN get_latest_release() { \
   wget -qO- "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'; \
   } && \
+  NGINX_VERSION=`nginx -v 2>&1 > /dev/null | sed -E "s/^.*nginx\/(.*)/\\1/"`&& \
   OPENTRACING_NGINX_VERSION="$(get_latest_release opentracing-contrib/nginx-opentracing)" && \
   DD_OPENTRACING_CPP_VERSION="$(get_latest_release DataDog/dd-opentracing-cpp)" && \
   \
