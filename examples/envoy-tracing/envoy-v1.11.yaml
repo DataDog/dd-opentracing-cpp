@@ -43,7 +43,6 @@ static_resources:
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -76,7 +75,7 @@ tracing:
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
       collector_cluster: datadog_agent   # matched against the named cluster below
-      service_name: envoy-example        # user-defined service name
+      service_name: envoy-v1.11          # user-defined service name
 
 admin:
   access_log_path: "/dev/null"
