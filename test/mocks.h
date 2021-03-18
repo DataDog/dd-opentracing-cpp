@@ -229,6 +229,14 @@ struct MockHandle : public Handle {
     return rcode;
   }
 
+  CURLcode setopt(CURLoption key, size_t value) override {
+    std::unique_lock<std::mutex> lock(mutex);
+    if (rcode == CURLE_OK) {
+      options[key] = std::to_string(value);
+    }
+    return rcode;
+  }
+
   void setHeaders(std::map<std::string, std::string> headers_) override {
     for (auto& header : headers_) {
       headers[header.first] = header.second;  // Overwrite.

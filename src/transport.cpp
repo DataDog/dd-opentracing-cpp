@@ -63,6 +63,10 @@ CURLcode CurlHandle::setopt(CURLoption key, long value) {
   return curl_easy_setopt(handle_, key, value);
 }
 
+CURLcode CurlHandle::setopt(CURLoption key, size_t value) {
+  return curl_easy_setopt(handle_, key, value);
+}
+
 void CurlHandle::setHeaders(std::map<std::string, std::string> headers) {
   for (auto& header : headers) {
     headers_[header.first] = header.second;  // Overwrite.
