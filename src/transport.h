@@ -16,6 +16,7 @@ class Handle {
   virtual ~Handle() {}
   virtual CURLcode setopt(CURLoption key, const char* value) = 0;
   virtual CURLcode setopt(CURLoption key, long value) = 0;
+  virtual CURLcode setopt(CURLoption key, size_t value) = 0;
   virtual void setHeaders(std::map<std::string, std::string> headers) = 0;
   virtual CURLcode perform() = 0;
   virtual std::string getError() = 0;
@@ -30,6 +31,7 @@ class CurlHandle : public Handle {
   ~CurlHandle() override;
   CURLcode setopt(CURLoption key, const char* value) override;
   CURLcode setopt(CURLoption key, long value) override;
+  CURLcode setopt(CURLoption key, size_t value) override;
   void setHeaders(std::map<std::string, std::string> headers) override;
   CURLcode perform() override;
   std::string getError() override;

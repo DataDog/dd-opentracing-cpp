@@ -1,6 +1,21 @@
 #ifndef DD_INCLUDE_OPENTRACING_TRACER_H
 #define DD_INCLUDE_OPENTRACING_TRACER_H
 
+#ifdef _MSC_VER
+#ifndef DD_OPENTRACING_STATIC
+// dllexport/dllimport declspecs need to be applied when building a DLL
+#ifdef DD_OPENTRACING_SHARED
+#define DD_OPENTRACING_API __declspec(dllexport)
+#else  // DD_OPENTRACING_SHARED
+#define DD_OPENTRACING_API __declspec(dllimport)
+#endif  // DD_OPENTRACING_SHARED
+#else   // DD_OPENTRACING_STATIC
+#define DD_OPENTRACING_API
+#endif  // DD_OPENTRACING_STATIC
+#else   // _MSC_VER
+#define DD_OPENTRACING_API
+#endif  // _MSC_VER
+
 #include <opentracing/tracer.h>
 
 #include <cmath>
@@ -140,7 +155,7 @@ class TraceEncoder {
 
 // makeTracer returns an opentracing::Tracer that submits traces to the Datadog Agent.
 // This should be used when control over the HTTP requests to the Datadog Agent is not required.
-std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions& options);
+DD_OPENTRACING_API std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions& options);
 // makeTracerAndEncoder initializes an opentracing::Tracer and provides an encoder
 // to use when submitting traces to the Datadog Agent.
 // This should be used in applications that need to also control the HTTP requests to the Datadog

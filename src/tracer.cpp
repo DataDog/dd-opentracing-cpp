@@ -2,9 +2,15 @@
 #include <datadog/tags.h>
 #include <errno.h>
 #include <opentracing/ext/tags.h>
-#include <pthread.h>
 #include <sys/stat.h>
+
+#ifdef _MSC_VER
+#include <winsock.h>
+#else
+#include <pthread.h>
 #include <unistd.h>
+#endif
+
 #include <fstream>
 #include <random>
 
@@ -24,7 +30,14 @@ namespace opentracing {
 namespace {
 class TlsRandomNumberGenerator {
  public:
-  TlsRandomNumberGenerator() { pthread_atfork(nullptr, nullptr, onFork); }
+  TlsRandomNumberGenerator() {
+#ifdef _MSC_VER
+// When compiling with MSVC, pthreads are not used.
+// TODO: investigate equivalent of pthread_atfork for MSVC
+#else
+    pthread_atfork(nullptr, nullptr, onFork);
+#endif
+  }
 
   static std::mt19937_64 &generator() { return random_number_generator_; }
 
