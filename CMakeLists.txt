@@ -48,7 +48,14 @@ find_package(Sanitizers)
 # Code
 install(DIRECTORY include/datadog DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
-add_compile_options(-Wall -Wextra -Werror -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
+  add_compile_options(-Wall -Wextra -Werror -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+  add_compile_options(/W3)
+else()
+  message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
 
 # Outputs
 set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads)
@@ -59,7 +66,7 @@ if(BUILD_SHARED)
   add_sanitizers(dd_opentracing)
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
-
+  target_compile_definitions(dd_opentracing PRIVATE DD_OPENTRACING_SHARED)
   install(TARGETS dd_opentracing
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -70,6 +77,7 @@ if(BUILD_STATIC)
   add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-static)
   set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing POSITION_INDEPENDENT_CODE ON)
+  target_compile_definitions(dd_opentracing PRIVATE DD_OPENTRACING_STATIC)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

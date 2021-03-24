@@ -17,7 +17,7 @@ For some quick-start examples, see the [examples](examples/) folder.
 
 Before considering contributions to the project, please take a moment to read our brief [contribution guidelines](CONTRIBUTING.md).
 
-## Build and Test
+## Build and Test (Linux and macOS)
 
 ### Dependencies
 
@@ -61,6 +61,39 @@ Additional libraries are installed via a script.
     ```
 
 If you want [sanitizers](https://github.com/google/sanitizers) to be enabled, then add either the `-DSANITIZE_THREAD=ON -DSANITIZE_UNDEFINED=ON` or `-DSANITIZE_ADDRESS=ON` flags to cmake, running the tests will now also check with the sanitizers.
+
+### Build (Windows)
+
+**NOTE**: This is currently Early Access, and issues should be reported only via GitHub Issues. Installation steps are likely to change based on user feedback and becoming available via Vcpkg.
+
+### Dependencies
+
+Building this project requires the following tools installed:
+
+- Visual Studio 2019 with "Desktop development for C++" installed
+- Vcpkg
+- Git
+
+### Build Steps
+
+The commands below should be executed in an `x64 Native Tools Command Prompt` shell.
+
+- Clone the repository
+    ```sh
+    cd %HOMEPATH%
+    git clone https://github.com/DataDog/dd-opentracing-cpp
+    ```
+- Generate build files using `cmake`
+    ```bat
+    cd dd-opentracing-cpp
+    mkdir .build
+    cd .build
+    cmake -DCMAKE_TOOLCHAIN_FILE=%HOMEPATH%\vcpkg\scripts\buildsystems\vcpkg.cmake ..
+    ```
+- Run the build
+    ```bat
+    cmake --build . -- -p:Configuration=RelWithDebInfo
+    ```
 
 ### Integration tests
 

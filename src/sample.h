@@ -1,6 +1,12 @@
 #ifndef DD_OPENTRACING_SAMPLE_H
 #define DD_OPENTRACING_SAMPLE_H
 
+#ifdef _MSC_VER
+// When compiling with MSVC, std::numeric_limits::max is confused the the max macro,
+// and causes compilation errors.
+#undef max
+#endif
+
 #include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
 #include <iostream>
