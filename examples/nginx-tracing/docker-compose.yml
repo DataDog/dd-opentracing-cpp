@@ -15,8 +15,6 @@ services:
       - './index.html:/usr/share/nginx/html/index.html:ro'
     ports:
       - "8080:80"
-    environment:
-      DD_AGENT_HOST: dd-agent
 
   dd-agent:
     volumes:
