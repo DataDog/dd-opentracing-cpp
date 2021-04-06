@@ -42,6 +42,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("environment") != config.end()) {
       config.at("environment").get_to(options.environment);
     }
+    if (config.find("tags") != config.end()) {
+      config.at("tags").get_to(options.tags);
+    }
     if (config.find("version") != config.end()) {
       config.at("version").get_to(options.version);
     }
