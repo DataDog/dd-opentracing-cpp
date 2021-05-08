@@ -92,13 +92,18 @@ jobs:
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
     docker:
-      - image: cgilmour/nginx-opentracing:v0.11.0-6-gb6884e2
+      - image: opentracing/nginx-opentracing:0.16.0
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
       LDFLAGS: -fPIC
     steps:
+      - run:
+          name: Tools required to build code and dependencies
+          command: |
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get -y install git cmake g++-7
       - checkout
       - run:
           name: Build source dependencies
@@ -119,7 +124,7 @@ jobs:
           name: Tools required by integration test script
           command: |
             mkdir -p /usr/share/man/man1 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199#23
-            DEBIAN_FRONTEND=noninteractive apt-get -y install iproute2 jq openjdk-11-jre
+            DEBIAN_FRONTEND=noninteractive apt-get -y install iproute2 jq openjdk-11-jre golang
             wget https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar -O wiremock-standalone-2.18.0.jar
             printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock
             chmod a+x /usr/local/bin/wiremock
