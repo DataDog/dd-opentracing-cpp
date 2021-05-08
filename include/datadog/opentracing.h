@@ -28,7 +28,7 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-// Log levels used within the datadog tracer. The numberic values are arbitrary,
+// Log levels used within the datadog tracer. The numeric values are arbitrary,
 // and the logging function is responsible for mapping these levels to the
 // application-specific logger's levels.
 enum class LogLevel {
