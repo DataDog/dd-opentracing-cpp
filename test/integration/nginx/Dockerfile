@@ -1,7 +1,7 @@
 # Creates an image with nginx and the Datadog OpenTracing nginx module installed.
 # Runs a simple integration test.
-ARG NGINX_VERSION=1.14.0
-ARG OPENTRACING_NGINX_VERSION=0.8.0
+ARG NGINX_VERSION=1.14.2
+ARG OPENTRACING_NGINX_VERSION=0.16.0
 
 # The nginx testbed. Build this image first since we don't want it rebuilt if just the code changes.
 FROM ubuntu:18.04 as nginx-testbed
