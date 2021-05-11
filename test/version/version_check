@@ -17,8 +17,8 @@ fi
 
 REPO=$(git rev-parse --show-toplevel)
 
-if ! g++ -I$REPO/include -o current_version \
-        current_version.cc $REPO/src/version.cpp; then
+if ! g++ -I"$REPO"/include -o current_version \
+        current_version.cc "$REPO"/src/version.cpp; then
     echo "failed to compile current_version.cc"
     exit 1
 fi
