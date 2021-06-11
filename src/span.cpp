@@ -1,10 +1,13 @@
 #include "span.h"
+
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
+
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <string>
+
 #include "bool.h"
 #include "sample.h"
 #include "span_buffer.h"
@@ -104,16 +107,16 @@ std::regex &PATH_MIXED_ALPHANUMERICS() {
 }
 }  // namespace
 
-// Imperfectly audits the data in a Span, removing some things that could cause information leaks
-// or cardinality issues.
-// If you want to add any more steps to this function, we should use a more
-// sophisticated architecture. For now, YAGNI.
+// Imperfectly audits the data in a Span, removing some things that could cause
+// information leaks or cardinality issues. If you want to add any more steps to
+// this function, we should use a more sophisticated architecture. For now,
+// YAGNI.
 void audit(bool legacy_obfuscation, SpanData *span) {
   auto http_tag = span->meta.find(ot::ext::http_url);
   if (http_tag != span->meta.end()) {
     if (legacy_obfuscation) {
-      // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics, fragments and
-      // parameters.
+      // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics,
+      // fragments and parameters.
       http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
     } else {
       // Just trim the parameter portion of the URL.
@@ -151,22 +154,23 @@ void Span::FinishWithOptions(
   }
   tag = span_->meta.find(::ot::ext::error);
   if (tag != span_->meta.end()) {
-    // tag->second is the JSON-serialized value of the variadic type given to SetTag.
-    // Errors can be a flag or a detailed message.
-    // Empty or false-y values indicate no error.
-    // Any other value will mark the span to indicate an error occured.
+    // tag->second is the JSON-serialized value of the variadic type given to
+    // SetTag. Errors can be a flag or a detailed message. Empty or false-y
+    // values indicate no error. Any other value will mark the span to indicate
+    // an error occured.
     if (tag->second == "" || !stob(tag->second, true)) {
       span_->error = 0;
     } else {
       span_->error = 1;
     }
-    // Don't erase the tag, in case it is populated with interesting information.
+    // Don't erase the tag, in case it is populated with interesting
+    // information.
   }
   tag = span_->meta.find(tags::analytics_event);
   if (tag != span_->meta.end()) {
-    // tag->second is the JSON-serialized value of the variadic type given to SetTag.
-    // An empty value means it was set, but a sample rate of zero is applied.
-    // A bool value indicates a rate of 0.0 for false, or 1.0 for true.
+    // tag->second is the JSON-serialized value of the variadic type given to
+    // SetTag. An empty value means it was set, but a sample rate of zero is
+    // applied. A bool value indicates a rate of 0.0 for false, or 1.0 for true.
     // A double value between 0.0 and 1.0 (inclusive) is applied as-is.
     // Other values are ignored.
     if (tag->second.empty()) {
@@ -196,8 +200,9 @@ void Span::FinishWithOptions(
   // Audit and finish span.
   audit(legacy_obfuscation_, span_.get());
   buffer_->finishSpan(std::move(span_));
-  // According to the OT lifecycle, no more methods should be called on this Span. But just in case
-  // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
+  // According to the OT lifecycle, no more methods should be called on this
+  // Span. But just in case let's make sure that span_ isn't nullptr. Fine line
+  // between defensive programming and voodoo.
   span_ = stubSpanData();
 } catch (const std::bad_alloc &) {
   // At least don't crash.
@@ -214,18 +219,19 @@ void Span::SetOperationName(ot::string_view operation_name) noexcept {
 }
 
 namespace {
-// Visits and serializes an arbitrarily-nested variant type. Serialisation of value types is to
-// string while any composite types are expressed in JSON. eg. string("fred") -> "fred"
-// vector<string>{"felicity"} -> "[\"felicity\"]"
+// Visits and serializes an arbitrarily-nested variant type. Serialisation of
+// value types is to string while any composite types are expressed in JSON. eg.
+// string("fred") -> "fred" vector<string>{"felicity"} -> "[\"felicity\"]"
 struct VariantVisitor {
   // Populated with the final result.
   std::string &result;
   VariantVisitor(std::string &result_) : result(result_) {}
 
  private:
-  // Only set if VariantVisitor is recursing. Unfortunately we only really need an explicit
-  // distinction (and all the conditionals below) to avoid the case of a simple string being
-  // serialized to "\"string\"" - which is valid JSON but very silly never-the-less.
+  // Only set if VariantVisitor is recursing. Unfortunately we only really need
+  // an explicit distinction (and all the conditionals below) to avoid the case
+  // of a simple string being serialized to "\"string\"" - which is valid JSON
+  // but very silly never-the-less.
   json *json_result = nullptr;
   VariantVisitor(std::string &result_, json *json_result_)
       : result(result_), json_result(json_result_) {}
@@ -321,7 +327,20 @@ struct VariantVisitor {
     }
   }
 };
-}  // namespace
+
+// Return the user sampling priority corresponding to the specified
+// `tag_value`, or return `nullptr` if an error occurs.
+std::unique_ptr<UserSamplingPriority> parseSamplingPriority(const std::string &tag_value) {
+  std::unique_ptr<UserSamplingPriority> sampling_priority;
+  try {
+    const int priority_value = std::stoi(tag_value);
+    return std::make_unique<UserSamplingPriority>(
+        priority_value == 0 ? UserSamplingPriority::UserDrop : UserSamplingPriority::UserKeep);
+  } catch (const std::invalid_argument &) {
+  } catch (const std::out_of_range &) {
+  }
+  return nullptr;
+}
 
 // Normalizes the tag key.
 // For now:
@@ -334,6 +353,8 @@ std::string normalizeTagKey(std::string tag) {
   return tag;
 }
 
+}  // namespace
+
 void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
   std::string k = normalizeTagKey(key);
   std::string result;
@@ -343,26 +364,19 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     span_->meta[k] = result;
   }
 
-  // Normally special tags are processed at Span Finish, but this cannot be done for
-  // sampling tags because if no sampling is set before the Span Finishes then one is
-  // assigned immutably.
-  // The sampling tags are "sampling.priority", "manual.keep" and "manual.drop".
-  // Doesn't need to be in the same mutex lock as above.
+  // Normally special tags are processed at Span Finish, but this cannot be done
+  // for sampling tags because if no sampling is set before the Span Finishes
+  // then one is assigned immutably. The sampling tags are "sampling.priority",
+  // "manual.keep" and "manual.drop". Doesn't need to be in the same mutex lock
+  // as above.
   if (k == ::ot::ext::sampling_priority) {
     // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
     // "sampling.priority"
-    try {
-      std::unique_ptr<UserSamplingPriority> sampling_priority = nullptr;
-      if (result != "") {
-        sampling_priority = std::make_unique<UserSamplingPriority>(
-            std::stoi(result) == 0 ? UserSamplingPriority::UserDrop
-                                   : UserSamplingPriority::UserKeep);
-      }
+    if (result.empty()) {
+      // There's no sampling priority to parse.
+    } else if (auto sampling_priority = parseSamplingPriority(result)) {
       setSamplingPriority(std::move(sampling_priority));
-    } catch (const std::invalid_argument &ia) {
-      logger_->Log(LogLevel::debug, span_->trace_id, span_->span_id,
-                   "unable to parse sampling priority tag");
-    } catch (const std::out_of_range &oor) {
+    } else {
       logger_->Log(LogLevel::debug, span_->trace_id, span_->span_id,
                    "unable to parse sampling priority tag");
     }
@@ -408,13 +422,15 @@ OptionalSamplingPriority Span::getSamplingPriority() const {
 
 const ot::SpanContext &Span::context() const noexcept {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  // First apply sampling. This concern sits more reasonably upon the destructor/Finish method - to
-  // ensure that users have every chance to apply their own SamplingPriority before one is decided.
-  // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
-  // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
-  // here, when the context is fetched before being serialized. The negative side-effect is that if
-  // anything else happens to want to get and/or serialize a SpanContext, that will end up having
-  // this spooky action at a distance of assigning a SamplingPriority.
+  // First apply sampling. This concern sits more reasonably upon the
+  // destructor/Finish method - to ensure that users have every chance to apply
+  // their own SamplingPriority before one is decided. However, OpenTracing
+  // serializes the SpanContext from a Span *before* finishing that Span. So
+  // on-Span-finishing is too late to work out whether to sample or not.
+  // Therefore, we must do it here, when the context is fetched before being
+  // serialized. The negative side-effect is that if anything else happens to
+  // want to get and/or serialize a SpanContext, that will end up having this
+  // spooky action at a distance of assigning a SamplingPriority.
   buffer_->assignSamplingPriority(span_.get() /* Doesn't take ownership */);
   return context_;
 }
