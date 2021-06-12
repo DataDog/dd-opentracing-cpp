@@ -66,7 +66,7 @@ if(BUILD_SHARED)
   add_sanitizers(dd_opentracing)
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
-  target_compile_definitions(dd_opentracing PRIVATE DD_OPENTRACING_SHARED)
+  target_compile_definitions(dd_opentracing PUBLIC DD_OPENTRACING_SHARED)
   install(TARGETS dd_opentracing
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -76,8 +76,9 @@ endif()
 if(BUILD_STATIC)
   add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-static)
+  target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing POSITION_INDEPENDENT_CODE ON)
-  target_compile_definitions(dd_opentracing-static PRIVATE DD_OPENTRACING_STATIC)
+  target_compile_definitions(dd_opentracing-static PUBLIC DD_OPENTRACING_STATIC)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
