@@ -1,4 +1,5 @@
 #include "tracer_factory.h"
+#include "string_view.h"
 
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -10,87 +11,81 @@ using json = nlohmann::json;
 
 namespace datadog {
 namespace opentracing {
+namespace {
 
-ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
-                                              std::string &error_message) {
+// Search for the specified `key` in the specified JSON `object`.  If `object`
+// has a value at `key`, then invoke the specified `handle_value` callback with
+// the found value as an argument.
+template <typename Callback>
+void for_key(const json& object, const ot::string_view key, Callback&& handle_value) {
+  const auto found = object.find(key);
+  if (found != object.end()) {
+    handle_value(*found);
+  }
+}
+
+}  // namespace
+
+ot::expected<TracerOptions> optionsFromConfig(const char* configuration,
+                                              std::string& error_message) {
   TracerOptions options{"localhost", 8126, "", "web", "", 1.0};
   json config;
   try {
     config = json::parse(configuration);
-  } catch (const json::parse_error &) {
+  } catch (const json::parse_error&) {
     error_message = "configuration is not valid JSON";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
+
+  // `parse_option` is a shorthand for assigning an option based on a config
+  // key, if present.
+  const auto parse_option = [&config](const ot::string_view key, auto& destination) {
+    for_key(config, key, [&](const auto& value) { value.get_to(destination); });
+  };
   try {
     // Mandatory config, but may be set via environment.
-    if (config.find("service") != config.end()) {
-      config.at("service").get_to(options.service);
-    }
+    parse_option("service", options.service);
     // Optional.
-    if (config.find("agent_host") != config.end()) {
-      config.at("agent_host").get_to(options.agent_host);
-    }
-    if (config.find("agent_port") != config.end()) {
-      config.at("agent_port").get_to(options.agent_port);
-    }
-    if (config.find("agent_url") != config.end()) {
-      config.at("agent_url").get_to(options.agent_url);
-    }
-    if (config.find("type") != config.end()) {
-      config.at("type").get_to(options.type);
-    }
-    if (config.find("environment") != config.end()) {
-      config.at("environment").get_to(options.environment);
-    }
-    if (config.find("tags") != config.end()) {
-      config.at("tags").get_to(options.tags);
-    }
-    if (config.find("version") != config.end()) {
-      config.at("version").get_to(options.version);
-    }
-    if (config.find("sample_rate") != config.end()) {
-      config.at("sample_rate").get_to(options.sample_rate);
-    }
-    if (config.find("sampling_rules") != config.end()) {
-      options.sampling_rules = config.at("sampling_rules").dump();
-    }
-    if (config.find("operation_name_override") != config.end()) {
-      config.at("operation_name_override").get_to(options.operation_name_override);
-    }
-    if (config.find("propagation_style_extract") != config.end()) {
-      auto styles = asPropagationStyle(
-          config.at("propagation_style_extract").get<std::vector<std::string>>());
+    parse_option("agent_host", options.agent_host);
+    parse_option("agent_port", options.agent_port);
+    parse_option("agent_url", options.agent_url);
+    parse_option("type", options.type);
+    parse_option("environment", options.environment);
+    parse_option("tags", options.tags);
+    parse_option("version", options.version);
+    parse_option("sample_rate", options.sample_rate);
+    for_key(config, "sampling_rules",
+            [&](const json& value) { options.sampling_rules = value.dump(); });
+    parse_option("operation_name_override", options.operation_name_override);
+    for_key(config, "propagation_style_extract", [&](const json& value) {
+      const auto styles = asPropagationStyle(value.get<std::vector<std::string>>());
       if (!styles || styles.value().size() == 0) {
         error_message =
             "Invalid value for propagation_style_extract, must be a list of at least one element "
             "with value 'Datadog', or 'B3'";
-        return styles.get_unexpected();
+        throw styles.get_unexpected();
       }
       options.extract = styles.value();
-    }
-    if (config.find("propagation_style_inject") != config.end()) {
-      auto styles = asPropagationStyle(
-          config.at("propagation_style_inject").get<std::vector<std::string>>());
+    });
+    for_key(config, "propagation_style_inject", [&](const json& value) {
+      auto styles = asPropagationStyle(value.get<std::vector<std::string>>());
       if (!styles || styles.value().size() == 0) {
         error_message =
             "Invalid value for propagation_style_inject, must be a list of at least one element "
             "with value 'Datadog', or 'B3'";
-        return styles.get_unexpected();
+        throw styles.get_unexpected();
       }
       options.inject = styles.value();
-    }
-    if (config.find("dd.trace.report-hostname") != config.end()) {
-      config.at("dd.trace.report-hostname").get_to(options.report_hostname);
-    }
-    if (config.find("dd.trace.analytics-enabled") != config.end()) {
-      config.at("dd.trace.analytics-enabled").get_to(options.analytics_enabled);
-    }
-    if (config.find("dd.trace.analytics-sample-rate") != config.end()) {
-      config.at("dd.trace.analytics-sample-rate").get_to(options.analytics_rate);
-    }
-  } catch (const nlohmann::detail::type_error &) {
-    error_message = "configuration has an argument with an incorrect type";
+    });
+    parse_option("dd.trace.report-hostname", options.report_hostname);
+    parse_option("dd.trace.analytics-enabled", options.analytics_enabled);
+    parse_option("dd.trace.analytics-sample-rate", options.analytics_rate);
+  } catch (const nlohmann::detail::type_error& error) {
+    error_message = "configuration has an argument with an incorrect type: ";
+    error_message += error.what();
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  } catch (const ot::unexpected_type<std::error_code>& error) {
+    return error;
   }
 
   auto maybe_options = applyTracerOptionsFromEnvironment(options);
@@ -133,7 +128,7 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 // Extra keys will be ignored.
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
-    const char *configuration, std::string &error_message) const noexcept try {
+    const char* configuration, std::string& error_message) const noexcept try {
   auto maybe_options = optionsFromConfig(configuration, error_message);
   if (!maybe_options) {
     return ot::make_unexpected(maybe_options.error());
@@ -146,7 +141,7 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
                       std::chrono::milliseconds(llabs(options.write_period_ms)), sampler)};
 
   return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer, sampler}};
-} catch (const std::bad_alloc &) {
+} catch (const std::bad_alloc&) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
 

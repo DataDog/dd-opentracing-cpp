@@ -19,6 +19,8 @@ cc_library(
         "src/span.h",
         "src/span_buffer.cpp",
         "src/span_buffer.h",
+        "src/string_view.cpp",
+        "src/string_view.h",
         "src/tracer.cpp",
         "src/tracer.h",
         "src/tracer_options.cpp",
