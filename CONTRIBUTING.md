@@ -9,7 +9,7 @@ After a resolution is reached, a PR can be submitted for review.
 C++ code must be formatted using `clang-format`. Before submitting code changes, the following command should be run:
 
 ```shell 
-find include src test -iname '*.h' -o -iname '*.cpp' | xargs clang-format-6.0 -i
+$ scripts/format.sh
 ```
 
 Other source and documentation files should be consistently formatted, but this is not enforced in CI checks.

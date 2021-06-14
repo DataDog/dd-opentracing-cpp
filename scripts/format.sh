@@ -12,7 +12,7 @@ usage:
         Format the specified files in place.
 
     $argv0
-        Format in place all Datadog-owned C++ code in this repository.
+        Format all Datadog-owned C++ code in this repository.
 
     $argv0 -h
     $argv0 --help
@@ -25,13 +25,13 @@ if [ $# -eq 1 ] && [ "$1" = '-h' -o "$1" = '--help' ]; then
     exit
 fi
 
-formatter="$(dirname "$0")"/clang-format-6.0.sh
+formatter=clang-format-9
 
 if [ $# -eq 0 ]; then
     cd "$(git rev-parse --show-toplevel)"
     find src/ include/ test/ examples/ \
         -type f \( -name '*.h' -o -name '*.cpp' \) \
-    | xargs "$formatter" -i -style=file
+    | xargs "$formatter" -i --style=file
 else
-    exec "$formatter" -i -style=file "$@"
+    exec "$formatter" -i --style=file "$@"
 fi
