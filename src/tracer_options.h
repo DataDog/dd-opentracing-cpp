@@ -2,6 +2,7 @@
 #define DD_TRACER_OPTIONS_H
 
 #include <datadog/opentracing.h>
+
 #include <opentracing/expected/expected.hpp>
 
 namespace ot = opentracing;

@@ -2,12 +2,14 @@
 #define DD_OPENTRACING_TEST_MOCKS_H
 
 #include <curl/curl.h>
+
 #include <iostream>
 #include <list>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <unordered_map>
+
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "../src/span_buffer.h"

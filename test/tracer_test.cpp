@@ -1,13 +1,15 @@
 #include "../src/tracer.h"
+
+#include <datadog/tags.h>
 #include <unistd.h>
+
+#include <catch2/catch.hpp>
 #include <ctime>
+
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "../src/tracer_options.h"
 #include "mocks.h"
-
-#include <datadog/tags.h>
-#include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
 TEST_CASE("tracer") {

@@ -1,6 +1,8 @@
 #include <datadog/opentracing.h>
 #include <opentracing/dynamic_load.h>
+
 #include <iostream>
+
 #include "tracer.h"
 #include "tracer_factory.h"
 

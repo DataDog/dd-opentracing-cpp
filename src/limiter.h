@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <vector>
+
 #include "clock.h"
 
 namespace datadog {

@@ -1,5 +1,6 @@
 #include <datadog/opentracing.h>
 #include <datadog/tags.h>
+
 #include <iostream>
 #include <string>
 

@@ -1,5 +1,7 @@
 #include "agent_writer.h"
+
 #include <iostream>
+
 #include "encoder.h"
 #include "sample.h"
 #include "span.h"

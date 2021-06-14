@@ -3,9 +3,11 @@
 
 #include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
+
 #include <mutex>
 #include <set>
 #include <unordered_map>
+
 #include "logger.h"
 
 namespace ot = opentracing;

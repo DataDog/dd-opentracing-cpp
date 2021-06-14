@@ -1,12 +1,14 @@
 #include "../src/tracer_factory.h"
+
 #include "../src/tracer.h"
 #include "mocks.h"
 
 // Source file needed to ensure compilation of templated class TracerFactory<MockTracer>
-#include "../src/tracer_factory.cpp"
-
 #include <datadog/tags.h>
+
 #include <catch2/catch.hpp>
+
+#include "../src/tracer_factory.cpp"
 using namespace datadog::opentracing;
 
 TEST_CASE("tracer factory") {

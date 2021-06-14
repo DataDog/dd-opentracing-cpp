@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_TRANSPORT_H
 
 #include <curl/curl.h>
+
 #include <map>
 #include <sstream>
 #include <string>

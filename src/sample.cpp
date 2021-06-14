@@ -1,4 +1,5 @@
 #include "sample.h"
+
 #include <sstream>
 
 namespace datadog {

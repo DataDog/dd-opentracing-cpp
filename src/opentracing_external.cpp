@@ -6,6 +6,7 @@
 // See BAZEL.build for the files required to build this library using makeTracerAndEncoder.
 
 #include <datadog/opentracing.h>
+
 #include "sample.h"
 #include "tracer.h"
 #include "tracer_options.h"

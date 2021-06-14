@@ -7,6 +7,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+
 #include "encoder.h"
 
 namespace datadog {

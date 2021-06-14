@@ -1,4 +1,5 @@
 #include <datadog/tags.h>
+
 #include <string>
 
 namespace datadog {

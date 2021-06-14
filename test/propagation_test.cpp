@@ -1,13 +1,15 @@
 #include "../src/propagation.h"
+
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
+
+#include <catch2/catch.hpp>
 #include <string>
+
 #include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
-
-#include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;
 namespace ot = opentracing;

@@ -1,4 +1,5 @@
 #include <opentracing/dynamic_load.h>
+
 #include <iostream>
 #include <string>
 

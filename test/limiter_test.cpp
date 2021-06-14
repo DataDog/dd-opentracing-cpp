@@ -1,7 +1,8 @@
 #include "../src/limiter.h"
-#include "mocks.h"
 
 #include <catch2/catch.hpp>
+
+#include "mocks.h"
 using namespace datadog::opentracing;
 
 TEST_CASE("limiter") {
