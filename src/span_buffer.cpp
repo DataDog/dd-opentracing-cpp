@@ -1,4 +1,5 @@
 #include "span_buffer.h"
+#include <cassert>
 #include <iostream>
 #include "sample.h"
 #include "span.h"
@@ -15,43 +16,70 @@ const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
 const std::string priority_sampler_applied_rate = "_dd.agent_psr";
+
+// Return whether the specified `span` is without a parent among the specified
+// `all_spans_in_trace`.
+bool is_root(const SpanData& span, const std::unordered_set<uint64_t>& all_spans_in_trace) {
+  return
+      // root span
+      span.parent_id == 0 ||
+      // local root span of a distributed trace
+      all_spans_in_trace.find(span.parent_id) == all_spans_in_trace.end();
+}
+
+// Alter the specified non-root (i.e. having a parent in the local trace)
+// `span` to prepare it for encoding with the specified `trace`.
+void finish_span(const PendingTrace& trace, SpanData& span) {
+  // Propagate the trace origin in every span, if present.  This allows, for
+  // example, sampling to vary with the trace's stated origin.
+  if (!trace.origin.empty()) {
+    span.meta[datadog_origin_tag] = trace.origin;
+  }
+}
+
+// Alter the specified root (i.e. having no parent in the local trace) `span`
+// to prepare it for encoding with the specified `trace`.
+void finish_root_span(const PendingTrace& trace, SpanData& span) {
+  // Check for sampling.
+  if (trace.sampling_priority != nullptr) {
+    span.metrics[sampling_priority_metric] = static_cast<int>(*trace.sampling_priority);
+    // The span's datadog origin tag is set in `finish_span`, below.
+  }
+  if (!trace.hostname.empty()) {
+    span.meta[datadog_hostname_tag] = trace.hostname;
+  }
+  if (!std::isnan(trace.analytics_rate) &&
+      span.metrics.find(event_sample_rate_metric) == span.metrics.end()) {
+    span.metrics[event_sample_rate_metric] = trace.analytics_rate;
+  }
+  if (!std::isnan(trace.sample_result.rule_rate)) {
+    span.metrics[rules_sampler_applied_rate] = trace.sample_result.rule_rate;
+  }
+  if (!std::isnan(trace.sample_result.limiter_rate)) {
+    span.metrics[rules_sampler_limiter_rate] = trace.sample_result.limiter_rate;
+  }
+  if (!std::isnan(trace.sample_result.priority_rate)) {
+    span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
+  }
+  // Forward to the finisher that applies to all spans (not just root spans).
+  finish_span(trace, span);
+}
+
 }  // namespace
 
 void PendingTrace::finish() {
-  if (finished_spans->size() == 0) {
-    std::cerr << "finish called on trace with no spans" << std::endl;
-    return;  // I don't know why this would ever happen.
-  }
-  // Apply changes to root / local-root spans.
-  for (auto& span : *finished_spans) {
-    if (/* root span */
-        span->parent_id == 0 ||
-        /* local root span of a distributed trace */
-        all_spans.find(span->parent_id) == all_spans.end()) {
-      // Check for sampling.
-      if (sampling_priority != nullptr) {
-        span->metrics[sampling_priority_metric] = static_cast<int>(*sampling_priority);
-        if (!origin.empty()) {
-          span->meta[datadog_origin_tag] = origin;
-        }
-      }
-      if (!hostname.empty()) {
-        span->meta[datadog_hostname_tag] = hostname;
-      }
-      if (!std::isnan(analytics_rate) &&
-          span->metrics.find(event_sample_rate_metric) == span->metrics.end()) {
-        span->metrics[event_sample_rate_metric] = analytics_rate;
-      }
-      if (!std::isnan(sample_result.rule_rate)) {
-        span->metrics[rules_sampler_applied_rate] = sample_result.rule_rate;
-      }
-      if (!std::isnan(sample_result.limiter_rate)) {
-        span->metrics[rules_sampler_limiter_rate] = sample_result.limiter_rate;
-      }
-      if (!std::isnan(sample_result.priority_rate)) {
-        span->metrics[priority_sampler_applied_rate] = sample_result.priority_rate;
-      }
-      break;
+  // `finish` is called only in `WritingSpanBuffer::finishSpan`, but only after
+  // a call to `finished_spans.push_back`.  Thus `finished_spans` is not empty.
+  // TODO: do we care?
+  assert(finished_spans->size() != 0);
+
+  // Apply changes to spans, in particular treating the root / local-root
+  // span as special.
+  for (const auto& span : *finished_spans) {
+    if (is_root(*span, all_spans)) {
+      finish_root_span(*this, *span);  // TODO: is there always exactly (or at most) one?
+    } else {
+      finish_span(*this, *span);
     }
   }
 }
