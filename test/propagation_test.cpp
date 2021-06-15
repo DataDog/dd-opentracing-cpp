@@ -623,13 +623,13 @@ TEST_CASE("origin header propagation") {
     REQUIRE(it != traces.end());
     auto& spans = it->second.finished_spans;
     REQUIRE(spans->size() == 3);
-    // The local root span should have the tag
+    // The local root span should have the tag.
     auto& meta = spans->at(2)->meta;
     REQUIRE(meta["_dd.origin"] == "madeuporigin");
-    // The other spans should not have the tag
+    // The other spans should also have the tag.
     meta = spans->at(0)->meta;
-    REQUIRE(meta.find("_dd.origin") == meta.end());
+    REQUIRE(meta.find("_dd.origin") != meta.end());
     meta = spans->at(1)->meta;
-    REQUIRE(meta.find("_dd.origin") == meta.end());
+    REQUIRE(meta.find("_dd.origin") != meta.end());
   }
 }
