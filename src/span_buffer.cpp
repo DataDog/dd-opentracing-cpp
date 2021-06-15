@@ -68,16 +68,11 @@ void finish_root_span(const PendingTrace& trace, SpanData& span) {
 }  // namespace
 
 void PendingTrace::finish() {
-  // `finish` is called only in `WritingSpanBuffer::finishSpan`, but only after
-  // a call to `finished_spans.push_back`.  Thus `finished_spans` is not empty.
-  // TODO: do we care?
-  assert(finished_spans->size() != 0);
-
   // Apply changes to spans, in particular treating the root / local-root
   // span as special.
   for (const auto& span : *finished_spans) {
     if (is_root(*span, all_spans)) {
-      finish_root_span(*this, *span);  // TODO: is there always exactly (or at most) one?
+      finish_root_span(*this, *span);
     } else {
       finish_span(*this, *span);
     }
