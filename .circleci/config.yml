@@ -49,8 +49,8 @@ jobs:
       - run:
           name: Build (with bazel)
           command: |
-            export CC=clang-6.0
-            export CXX=clang++-6.0
+            export CC=clang-9
+            export CXX=clang++-9
             bazel build //:dd_opentracing_cpp
       - persist_to_workspace:
           root: /tmp/
