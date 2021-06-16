@@ -27,8 +27,8 @@ bool is_root(const SpanData& span, const std::unordered_set<uint64_t>& all_spans
       all_spans_in_trace.find(span.parent_id) == all_spans_in_trace.end();
 }
 
-// Alter the specified non-root (i.e. having a parent in the local trace)
-// `span` to prepare it for encoding with the specified `trace`.
+// Alter the specified `span` to prepare it for encoding with the specified
+// `trace`.
 void finish_span(const PendingTrace& trace, SpanData& span) {
   // Propagate the trace origin in every span, if present.  This allows, for
   // example, sampling to vary with the trace's stated origin.
