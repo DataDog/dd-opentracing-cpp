@@ -95,6 +95,32 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
   return result.first == prefix.end();
 }
 
+// If the result of `SpanContext::deserialize` can be determined solely from
+// the presence of the specified tags, return the appropriate result.  If the
+// result cannot be determined, return `nullptr`.  Note that `std::unique_ptr`
+// is here used as a substitute for `std::optional`.
+std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_presence_policy(
+  bool trace_id_set,
+  bool parent_id_set,
+  bool sampling_priority_set,
+  bool origin_set) {
+  using Result = ot::expected<std::unique_ptr<ot::SpanContext>>;
+
+  if (!trace_id_set && !parent_id_set) {
+    // both ids empty, return empty context
+    return std::make_unique<Result>();
+  }
+  if (!trace_id_set || (!parent_id_set && !origin_set)) {
+    // missing one id, return unexpected error
+    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+  }
+  if (origin_set && !sampling_priority_set) {
+    // origin should only be set if sampling priority is also set.
+    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
@@ -383,22 +409,13 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   json j;
 
   reader >> j;
-  bool trace_id_set = j.find(json_trace_id_key) != j.end();
-  bool parent_id_set = j.find(json_parent_id_key) != j.end();
-  bool sampling_priority_set = j.find(json_sampling_priority_key) != j.end();
-  bool origin_set = j.find(json_origin_key) != j.end();
 
-  if (!trace_id_set && !parent_id_set) {
-    // both ids empty, return empty context
-    return {};
-  }
-  if (!trace_id_set || (!parent_id_set && !origin_set)) {
-    // missing one id, return unexpected error
-    return ot::make_unexpected(ot::span_context_corrupted_error);
-  }
-  if (origin_set && !sampling_priority_set) {
-    // origin should only be set if sampling priority is also set.
-    return ot::make_unexpected(ot::span_context_corrupted_error);
+  if (const auto result = enforce_tag_presence_policy(
+    j.count(json_trace_id_key),
+    j.count(json_parent_id_key),
+    j.count(json_sampling_priority_key),
+    j.count(json_origin_key))) {
+    return std::move(*result);
   }
 
   std::string trace_id_str = j[json_trace_id_key];
@@ -503,16 +520,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (!result) {  // "if unexpected", hence "return {}" from above is fine.
     return ot::make_unexpected(result.error());
   }
-  if (!trace_id_set && !parent_id_set) {
-    return {};  // Empty context/no context provided.
-  }
-  if (!trace_id_set || (!parent_id_set && !origin_set)) {
-    // Partial context, this shouldn't happen.
-    return ot::make_unexpected(ot::span_context_corrupted_error);
-  }
-  if (origin_set && !sampling_priority_set) {
-    // Origin header should only be set if sampling priority is also set.
-    return ot::make_unexpected(ot::span_context_corrupted_error);
+  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set, sampling_priority_set, origin_set)) {
+    return std::move(*result);
   }
   auto context =
       std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
