@@ -100,10 +100,7 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 // result cannot be determined, return `nullptr`.  Note that `std::unique_ptr`
 // is here used as a substitute for `std::optional`.
 std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_presence_policy(
-  bool trace_id_set,
-  bool parent_id_set,
-  bool sampling_priority_set,
-  bool origin_set) {
+    bool trace_id_set, bool parent_id_set, bool sampling_priority_set, bool origin_set) {
   using Result = ot::expected<std::unique_ptr<ot::SpanContext>>;
 
   if (!trace_id_set && !parent_id_set) {
@@ -411,10 +408,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   reader >> j;
 
   if (const auto result = enforce_tag_presence_policy(
-    j.count(json_trace_id_key),
-    j.count(json_parent_id_key),
-    j.count(json_sampling_priority_key),
-    j.count(json_origin_key))) {
+          j.count(json_trace_id_key), j.count(json_parent_id_key),
+          j.count(json_sampling_priority_key), j.count(json_origin_key))) {
     return std::move(*result);
   }
 
@@ -520,7 +515,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (!result) {  // "if unexpected", hence "return {}" from above is fine.
     return ot::make_unexpected(result.error());
   }
-  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set, sampling_priority_set, origin_set)) {
+  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set,
+                                                      sampling_priority_set, origin_set)) {
     return std::move(*result);
   }
   auto context =

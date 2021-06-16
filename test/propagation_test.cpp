@@ -176,8 +176,8 @@ TEST_CASE("deserialize fails") {
     carrier.Set(test_case.x_datadog_sampling_priority, "1");
     // Parent ID is missing, but it's ok because Origin is nonempty.
     auto context = SpanContext::deserialize(logger, carrier, test_case.styles);
-    REQUIRE(context); // not an error
-    REQUIRE(*context); // not a null context
+    REQUIRE(context);   // not an error
+    REQUIRE(*context);  // not a null context
   }
 
   SECTION("when there are formatted keys") {
@@ -264,7 +264,7 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
 
 TEST_CASE("deserialize returns a null context if both trace ID and parent ID are missing") {
   auto logger = std::make_shared<const MockLogger>();
-  
+
   SECTION("from JSON") {
     std::istringstream json("{}");
     const auto result = SpanContext::deserialize(logger, json);
