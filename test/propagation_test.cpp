@@ -117,7 +117,7 @@ TEST_CASE("SpanContext") {
     }
   }
 
-  SECTION("serialise fails") {
+  SECTION("serialize fails") {
     SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
       auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
@@ -134,7 +134,7 @@ TEST_CASE("SpanContext") {
   }
 }
 
-TEST_CASE("deserialise fails") {
+TEST_CASE("deserialize fails") {
   auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
@@ -262,6 +262,24 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
   REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
+TEST_CASE("deserialize returns a null context if both trace ID and parent ID are missing") {
+  auto logger = std::make_shared<const MockLogger>();
+  
+  SECTION("from JSON") {
+    std::istringstream json("{}");
+    const auto result = SpanContext::deserialize(logger, json);
+    REQUIRE(result.has_value());
+    REQUIRE(!result.value());
+  }
+
+  SECTION("from a text map") {
+    MockTextMapCarrier carrier;
+    const auto result = SpanContext::deserialize(logger, carrier, {PropagationStyle::Datadog});
+    REQUIRE(result.has_value());
+    REQUIRE(!result.value());
+  }
+}
+
 TEST_CASE("Binary Span Context") {
   auto logger = std::make_shared<const MockLogger>();
   std::stringstream carrier{};
@@ -291,7 +309,7 @@ TEST_CASE("Binary Span Context") {
     }
   }
 
-  SECTION("serialise fails") {
+  SECTION("serialize fails") {
     SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
