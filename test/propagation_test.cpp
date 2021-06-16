@@ -170,6 +170,16 @@ TEST_CASE("deserialise fails") {
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
+  SECTION("but not if origin is nonempty") {
+    carrier.Set(test_case.x_datadog_origin, "The Shire");
+    carrier.Set(test_case.x_datadog_trace_id, "123");
+    carrier.Set(test_case.x_datadog_sampling_priority, "1");
+    // Parent ID is missing, but it's ok because Origin is nonempty.
+    auto context = SpanContext::deserialize(logger, carrier, test_case.styles);
+    REQUIRE(context); // not an error
+    REQUIRE(*context); // not a null context
+  }
+
   SECTION("when there are formatted keys") {
     carrier.Set(test_case.x_datadog_trace_id, "The madman! This isn't even a number!");
     carrier.Set(test_case.x_datadog_parent_id, "420");

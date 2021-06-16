@@ -392,7 +392,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     // both ids empty, return empty context
     return {};
   }
-  if (!trace_id_set || !parent_id_set) {
+  if (!trace_id_set || (!parent_id_set && !origin_set)) {
     // missing one id, return unexpected error
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
@@ -506,7 +506,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (!trace_id_set && !parent_id_set) {
     return {};  // Empty context/no context provided.
   }
-  if (!trace_id_set || !parent_id_set) {
+  if (!trace_id_set || (!parent_id_set && !origin_set)) {
     // Partial context, this shouldn't happen.
     return ot::make_unexpected(ot::span_context_corrupted_error);
   }
