@@ -96,23 +96,28 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 }
 
 // If the result of `SpanContext::deserialize` can be determined solely from
-// the presence of the specified tags, return the appropriate result.  If the
-// result cannot be determined, return `nullptr`.  Note that `std::unique_ptr`
-// is here used as a substitute for `std::optional`.
+// the presence of certain tags, return the appropriate result.  If the result
+// cannot be determined, return `nullptr`.  Each specified boolean indicates
+// whether the corresponding tag is set.  Note that `std::unique_ptr` is here
+// used as a substitute for `std::optional`.
 std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_presence_policy(
     bool trace_id_set, bool parent_id_set, bool sampling_priority_set, bool origin_set) {
   using Result = ot::expected<std::unique_ptr<ot::SpanContext>>;
 
   if (!trace_id_set && !parent_id_set) {
-    // both ids empty, return empty context
+    // Both IDs are empty; return an empty context.
     return std::make_unique<Result>();
   }
-  if (!trace_id_set || (!parent_id_set && !origin_set)) {
-    // missing one id, return unexpected error
+  if (!trace_id_set) {
+    // There's a parent ID without a trace ID.
+    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+  }
+  if (!parent_id_set && !origin_set) {
+    // Parent ID is required, except when origin is set.
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   if (origin_set && !sampling_priority_set) {
-    // origin should only be set if sampling priority is also set.
+    // Origin should only be set if sampling priority is also set.
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
