@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Exit if a non-conditional command returns a nonzero exit status.
+set -e
+
 usage() {
     argv0="$0"
     
@@ -20,7 +23,11 @@ usage:
 END_USAGE
 }
 
-if [ $# -eq 1 ] && [ "$1" = '-h' -o "$1" = '--help' ]; then
+is_help_flag() {
+    [ "$1" = '-h' ] || [ "$1" = '--help' ]
+}
+
+if [ $# -eq 1 ] && is_help_flag "$1"; then
     usage
     exit
 fi
@@ -29,7 +36,7 @@ formatter=clang-format-9
 
 if [ $# -eq 0 ]; then
     cd "$(git rev-parse --show-toplevel)"
-    find src/ include/ test/ examples/ \
+    find src/ include/ test/ examples/ -print0 \
         -type f \( -name '*.h' -o -name '*.cpp' \) \
     | xargs "$formatter" -i --style=file
 else
