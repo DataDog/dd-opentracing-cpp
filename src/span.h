@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_SPAN_H
 
 #include <msgpack.hpp>
+
 #include "clock.h"
 #include "logger.h"
 #include "propagation.h"

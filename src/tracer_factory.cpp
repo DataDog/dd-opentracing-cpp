@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <nlohmann/json.hpp>
+
 #include "agent_writer.h"
 #include "tracer.h"
 #include "tracer_options.h"

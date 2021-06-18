@@ -4,6 +4,7 @@
 // additional dependency and implementation details.
 
 #include <datadog/opentracing.h>
+
 #include "agent_writer.h"
 #include "sample.h"
 #include "tracer.h"

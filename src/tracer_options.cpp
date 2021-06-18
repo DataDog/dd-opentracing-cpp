@@ -1,10 +1,11 @@
-#include <regex>
+#include "tracer_options.h"
 
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
+#include <regex>
+
 #include "bool.h"
-#include "tracer_options.h"
 
 namespace ot = opentracing;
 

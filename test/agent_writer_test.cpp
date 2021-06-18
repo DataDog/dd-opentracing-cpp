@@ -1,11 +1,12 @@
 #include "../src/agent_writer.h"
-#include <datadog/version.h>
-#include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
-#include "mocks.h"
 
-#include <ctime>
+#include <datadog/version.h>
 
 #include <catch2/catch.hpp>
+#include <ctime>
+
+#include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
+#include "mocks.h"
 using namespace datadog::opentracing;
 
 Trace make_trace(std::initializer_list<TestSpanData> spans) {

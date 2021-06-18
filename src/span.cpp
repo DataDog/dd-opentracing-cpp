@@ -1,10 +1,13 @@
 #include "span.h"
+
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
+
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <string>
+
 #include "bool.h"
 #include "sample.h"
 #include "span_buffer.h"

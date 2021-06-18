@@ -1,12 +1,12 @@
 #include "../src/sample.h"
+
+#include <catch2/catch.hpp>
+#include <ctime>
+
 #include "../src/agent_writer.h"
 #include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
-
-#include <ctime>
-
-#include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
 TEST_CASE("priority sampler unit test") {

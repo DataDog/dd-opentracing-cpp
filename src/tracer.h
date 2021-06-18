@@ -3,8 +3,10 @@
 
 #include <datadog/opentracing.h>
 #include <datadog/version.h>
+
 #include <functional>
 #include <random>
+
 #include "clock.h"
 #include "encoder.h"
 #include "logger.h"

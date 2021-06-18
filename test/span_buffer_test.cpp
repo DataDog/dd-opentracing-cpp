@@ -1,8 +1,9 @@
 #include "../src/span_buffer.h"
-#include "../src/sample.h"
-#include "mocks.h"
 
 #include <catch2/catch.hpp>
+
+#include "../src/sample.h"
+#include "mocks.h"
 using namespace datadog::opentracing;
 
 TEST_CASE("span buffer") {

@@ -1,5 +1,7 @@
 #include "writer.h"
+
 #include <iostream>
+
 #include "encoder.h"
 #include "span.h"
 

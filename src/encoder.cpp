@@ -1,6 +1,9 @@
 #include "encoder.h"
+
 #include <datadog/version.h>
+
 #include <nlohmann/json.hpp>
+
 #include "sample.h"
 #include "span.h"
 

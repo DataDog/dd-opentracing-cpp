@@ -2,6 +2,7 @@
 #define DD_OPENTRACING_AGENT_WRITER_H
 
 #include <curl/curl.h>
+
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -10,6 +11,7 @@
 #include <sstream>
 #include <thread>
 #include <vector>
+
 #include "sample.h"
 #include "writer.h"
 

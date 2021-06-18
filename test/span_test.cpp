@@ -1,13 +1,15 @@
 #include "../src/span.h"
+
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
+
+#include <catch2/catch.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <thread>
+
 #include "../src/sample.h"
 #include "mocks.h"
-
-#include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;
 using json = nlohmann::json;

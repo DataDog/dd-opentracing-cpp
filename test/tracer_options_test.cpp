@@ -1,6 +1,7 @@
 #include "../src/tracer_options.h"
 
 #include <opentracing/ext/tags.h>
+
 #include <catch2/catch.hpp>
 using namespace datadog::opentracing;
 
