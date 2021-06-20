@@ -55,6 +55,20 @@ TEST_CASE("writer") {
     REQUIRE(handle->options == test_case.expected_opts);
   }
 
+  SECTION("rejects unsupported url schemes") {
+    std::atomic<bool> handle_destructed{false};
+    std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
+    auto sampler = std::make_shared<RulesSampler>();
+    CHECK_THROWS(AgentWriter{std::move(handle_ptr),
+                             std::chrono::seconds(1),
+                             100,
+                             {},
+                             "localhost",
+                             1234,
+                             "gopher://hostname:1234/v0.4/traces",
+                             sampler});
+  }
+
   std::atomic<bool> handle_destructed{false};
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{&handle_destructed}};
   MockHandle* handle = handle_ptr.get();
