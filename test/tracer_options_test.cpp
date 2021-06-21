@@ -39,7 +39,7 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const ch
     REQUIRE(lhs->analytics_rate == rhs->analytics_rate);
   }
   REQUIRE(lhs->tags == rhs->tags);
-};
+}
 
 TEST_CASE("tracer options from environment variables") {
   TracerOptions input{};
