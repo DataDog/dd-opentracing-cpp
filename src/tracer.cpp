@@ -332,10 +332,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
-  auto span = make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
-                                parent_id, std::move(span_context), get_time_(), opts_.service,
-                                opts_.type, operation_name, operation_name,
-                                opts_.operation_name_override, legacy_obfuscation_);
+  auto span = makeUnique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                               parent_id, std::move(span_context), get_time_(), opts_.service,
+                               opts_.type, operation_name, operation_name,
+                               opts_.operation_name_override, legacy_obfuscation_);
 
   if (!opts_.environment.empty()) {
     span->SetTag(datadog::tags::environment, opts_.environment);

@@ -360,9 +360,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     try {
       std::unique_ptr<UserSamplingPriority> sampling_priority = nullptr;
       if (result != "") {
-        sampling_priority = make_unique<UserSamplingPriority>(
-            std::stoi(result) == 0 ? UserSamplingPriority::UserDrop
-                                   : UserSamplingPriority::UserKeep);
+        sampling_priority = makeUnique<UserSamplingPriority>(std::stoi(result) == 0
+                                                                 ? UserSamplingPriority::UserDrop
+                                                                 : UserSamplingPriority::UserKeep);
       }
       setSamplingPriority(std::move(sampling_priority));
     } catch (const std::invalid_argument &ia) {
@@ -373,9 +373,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
                    "unable to parse sampling priority tag");
     }
   } else if (k == tags::manual_keep) {
-    setSamplingPriority(make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    setSamplingPriority(makeUnique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
   } else if (k == tags::manual_drop) {
-    setSamplingPriority(make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
+    setSamplingPriority(makeUnique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
   }
 }
 

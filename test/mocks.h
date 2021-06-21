@@ -106,7 +106,7 @@ struct MockPrioritySampler : public PrioritySampler {
     SampleResult result;
     result.priority_rate = sampling_rate;
     if (sampling_priority != nullptr) {
-      result.sampling_priority = make_unique<SamplingPriority>(*sampling_priority);
+      result.sampling_priority = makeUnique<SamplingPriority>(*sampling_priority);
     }
     return result;
   }
@@ -127,7 +127,7 @@ struct MockRulesSampler : public RulesSampler {
     if (sampling_priority != nullptr) {
       result.rule_rate = rule_rate;
       result.limiter_rate = limiter_rate;
-      result.sampling_priority = make_unique<SamplingPriority>(*sampling_priority);
+      result.sampling_priority = makeUnique<SamplingPriority>(*sampling_priority);
     }
     return result;
   }
