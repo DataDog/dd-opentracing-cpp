@@ -94,10 +94,10 @@ CURLcode CurlHandle::perform() {
   rcode = curl_easy_perform(handle_);
   curl_slist_free_all(http_headers);
   return rcode;
-};
+}
 
-std::string CurlHandle::getError() { return std::string(curl_error_buffer_); };
-std::string CurlHandle::getResponse() { return response_buffer_.str(); };
+std::string CurlHandle::getError() { return std::string(curl_error_buffer_); }
+std::string CurlHandle::getResponse() { return response_buffer_.str(); }
 
 }  // namespace opentracing
 }  // namespace datadog
