@@ -11,11 +11,11 @@
 #include <unistd.h>
 #endif
 
+#include <time.h>  // localtime_r (POSIX), localtime_s (Windows)
+
 #include <ctime>
 #include <fstream>
 #include <random>
-
-#include <time.h> // localtime_r (POSIX), localtime_s (Windows)
 
 #include "bool.h"
 #include "make_unique.h"
@@ -55,29 +55,30 @@ class TlsRandomNumberGenerator {
 // with one-second precision (i.e. no fractional seconds) and including the
 // local time zone offset, e.g. `std::string("2021-06-21T15:04:12-0400")`.
 std::string iso_8601_with_tz(std::chrono::system_clock::time_point timestamp) {
-    const char* const iso_8601_format = "%FT%T%z";  // one-second precision
-    // How large a buffer do we need?  In general,
-    //
-    //    YYYY-MM-DDTHH:MM:SSshhmm
-    //
-    // e.g.
-    //
-    //    2021-06-21T15:04:12-0400
-    //
-    // That's 24 characters, plus one for a null terminator 🠒 25.
-    // Let's use 32.
-    char buffer[32];
-    const std::time_t as_time_t = std::chrono::system_clock::to_time_t(timestamp);
-    // Use the platform specific functions `localtime_r` and `localtime_s`
-    // instead of `std::localtime`, which might not be thread safe.
-    std::tm parts;
-    #ifdef _MSC_VER
-    ::localtime_s(&as_time_t, &parts);
-    #else
-    ::localtime_r(&as_time_t, &parts);
-    #endif
-    const std::size_t formatted_length = std::strftime(buffer, sizeof buffer, iso_8601_format, &parts);
-    return std::string(buffer, formatted_length);
+  const char *const iso_8601_format = "%FT%T%z";  // one-second precision
+  // How large a buffer do we need?  In general,
+  //
+  //    YYYY-MM-DDTHH:MM:SSshhmm
+  //
+  // e.g.
+  //
+  //    2021-06-21T15:04:12-0400
+  //
+  // That's 24 characters, plus one for a null terminator 🠒 25.
+  // Let's use 32.
+  char buffer[32];
+  const std::time_t as_time_t = std::chrono::system_clock::to_time_t(timestamp);
+  // Use the platform specific functions `localtime_r` and `localtime_s`
+  // instead of `std::localtime`, which might not be thread safe.
+  std::tm parts;
+#ifdef _MSC_VER
+  ::localtime_s(&as_time_t, &parts);
+#else
+  ::localtime_r(&as_time_t, &parts);
+#endif
+  const std::size_t formatted_length =
+      std::strftime(buffer, sizeof buffer, iso_8601_format, &parts);
+  return std::string(buffer, formatted_length);
 }
 
 }  // namespace
@@ -331,10 +332,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
-  auto span = make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id,
-                                     trace_id, parent_id, std::move(span_context), get_time_(),
-                                     opts_.service, opts_.type, operation_name, operation_name,
-                                     opts_.operation_name_override, legacy_obfuscation_);
+  auto span = make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                                parent_id, std::move(span_context), get_time_(), opts_.service,
+                                opts_.type, operation_name, operation_name,
+                                opts_.operation_name_override, legacy_obfuscation_);
 
   if (!opts_.environment.empty()) {
     span->SetTag(datadog::tags::environment, opts_.environment);

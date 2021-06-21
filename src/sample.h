@@ -36,9 +36,8 @@ struct SamplingRate {
   double rate = std::nan("");
   uint64_t max_hash = 0;
 
-  SamplingRate(double rate, uint64_t max_hash)
-  : rate(rate), max_hash(max_hash) {}
-  
+  SamplingRate(double rate, uint64_t max_hash) : rate(rate), max_hash(max_hash) {}
+
   SamplingRate() {}
 };
 
@@ -61,8 +60,7 @@ struct RuleResult {
   bool matched = false;
   double rate = std::nan("");
 
-  RuleResult(bool matched, double rate)
-  : matched(matched), rate(rate) {}
+  RuleResult(bool matched, double rate) : matched(matched), rate(rate) {}
 };
 
 using RuleFunc = std::function<RuleResult(const std::string&, const std::string&)>;
