@@ -1,4 +1,5 @@
 #include "span_buffer.h"
+
 #include <iostream>
 
 #include "sample.h"
