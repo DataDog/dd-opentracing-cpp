@@ -117,7 +117,7 @@ TEST_CASE("SpanContext") {
     }
   }
 
-  SECTION("serialise fails") {
+  SECTION("serialize fails") {
     SECTION("when setting trace id fails") {
       carrier.set_fails_after = 0;
       auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
@@ -134,7 +134,7 @@ TEST_CASE("SpanContext") {
   }
 }
 
-TEST_CASE("deserialise fails") {
+TEST_CASE("deserialize fails") {
   auto logger = std::make_shared<const MockLogger>();
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
@@ -168,6 +168,16 @@ TEST_CASE("deserialise fails") {
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
+  }
+
+  SECTION("but not if origin is nonempty") {
+    carrier.Set(test_case.x_datadog_origin, "The Shire");
+    carrier.Set(test_case.x_datadog_trace_id, "123");
+    carrier.Set(test_case.x_datadog_sampling_priority, "1");
+    // Parent ID is missing, but it's ok because Origin is nonempty.
+    auto context = SpanContext::deserialize(logger, carrier, test_case.styles);
+    REQUIRE(context);   // not an error
+    REQUIRE(*context);  // not a null context
   }
 
   SECTION("when there are formatted keys") {
@@ -252,6 +262,24 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
   REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
+TEST_CASE("deserialize returns a null context if both trace ID and parent ID are missing") {
+  auto logger = std::make_shared<const MockLogger>();
+
+  SECTION("from JSON") {
+    std::istringstream json("{}");
+    const auto result = SpanContext::deserialize(logger, json);
+    REQUIRE(result.has_value());
+    REQUIRE(!result.value());
+  }
+
+  SECTION("from a text map") {
+    MockTextMapCarrier carrier;
+    const auto result = SpanContext::deserialize(logger, carrier, {PropagationStyle::Datadog});
+    REQUIRE(result.has_value());
+    REQUIRE(!result.value());
+  }
+}
+
 TEST_CASE("Binary Span Context") {
   auto logger = std::make_shared<const MockLogger>();
   std::stringstream carrier{};
@@ -281,7 +309,7 @@ TEST_CASE("Binary Span Context") {
     }
   }
 
-  SECTION("serialise fails") {
+  SECTION("serialize fails") {
     SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
     SECTION("when the writer is not 'good'") {
       carrier.clear(carrier.badbit);
@@ -623,13 +651,13 @@ TEST_CASE("origin header propagation") {
     REQUIRE(it != traces.end());
     auto& spans = it->second.finished_spans;
     REQUIRE(spans->size() == 3);
-    // The local root span should have the tag
+    // The local root span should have the tag.
     auto& meta = spans->at(2)->meta;
     REQUIRE(meta["_dd.origin"] == "madeuporigin");
-    // The other spans should not have the tag
+    // The other spans should also have the tag.
     meta = spans->at(0)->meta;
-    REQUIRE(meta.find("_dd.origin") == meta.end());
+    REQUIRE(meta.find("_dd.origin") != meta.end());
     meta = spans->at(1)->meta;
-    REQUIRE(meta.find("_dd.origin") == meta.end());
+    REQUIRE(meta.find("_dd.origin") != meta.end());
   }
 }
