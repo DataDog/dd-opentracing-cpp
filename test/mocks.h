@@ -39,9 +39,9 @@ struct MockTracer : public Tracer {
              std::shared_ptr<RulesSampler> sampler)
       : Tracer(opts, writer, sampler), opts(opts) {}
 
-  std::unique_ptr<ot::Span> StartSpanWithOptions(
-      ot::string_view /* operation_name */,
-      const ot::StartSpanOptions& /* options */) const noexcept override {
+  std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
+                                                 const ot::StartSpanOptions& /* options */) const
+      noexcept override {
     return nullptr;
   }
 
