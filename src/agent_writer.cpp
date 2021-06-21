@@ -130,7 +130,7 @@ void AgentWriter::write(Trace trace) {
 void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
   // Start worker that sends Traces to agent.
   // We can capture 'this' because destruction of this stops the thread and the lambda.
-  worker_ = make_unique<std::thread>(
+  worker_ = makeUnique<std::thread>(
       [this](std::unique_ptr<Handle> handle) {
         size_t num_traces = 0;
         std::map<std::string, std::string> headers;

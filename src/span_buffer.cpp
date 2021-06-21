@@ -154,7 +154,7 @@ OptionalSamplingPriority WritingSpanBuffer::getSamplingPriorityImpl(uint64_t tra
   if (trace->second.sampling_priority == nullptr) {
     return nullptr;
   }
-  return make_unique<SamplingPriority>(*trace->second.sampling_priority);
+  return makeUnique<SamplingPriority>(*trace->second.sampling_priority);
 }
 
 OptionalSamplingPriority WritingSpanBuffer::setSamplingPriority(
@@ -219,7 +219,7 @@ void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, SampleResult& sample
   trace.sample_result.priority_rate = sample_result.priority_rate;
   if (sample_result.sampling_priority != nullptr) {
     trace.sample_result.sampling_priority =
-        make_unique<SamplingPriority>(*sample_result.sampling_priority);
+        makeUnique<SamplingPriority>(*sample_result.sampling_priority);
   }
 }
 

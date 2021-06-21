@@ -46,9 +46,9 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
   SampleResult result;
   result.priority_rate = applied_rate.rate;
   if (hashed_id >= applied_rate.max_hash) {
-    result.sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    result.sampling_priority = makeUnique<SamplingPriority>(SamplingPriority::SamplerDrop);
   } else {
-    result.sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    result.sampling_priority = makeUnique<SamplingPriority>(SamplingPriority::SamplerKeep);
   }
   return result;
 }
@@ -88,16 +88,16 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
   auto max_hash = maxIdFromSampleRate(rule_result.rate);
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
   if (hashed_id >= max_hash) {
-    result.sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    result.sampling_priority = makeUnique<SamplingPriority>(SamplingPriority::SamplerDrop);
     return result;
   }
 
   auto limit_result = sampling_limiter_.allow();
   result.limiter_rate = limit_result.effective_rate;
   if (limit_result.allowed) {
-    result.sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    result.sampling_priority = makeUnique<SamplingPriority>(SamplingPriority::SamplerKeep);
   } else {
-    result.sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    result.sampling_priority = makeUnique<SamplingPriority>(SamplingPriority::SamplerDrop);
   }
   return result;
 }
