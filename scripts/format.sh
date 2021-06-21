@@ -38,7 +38,7 @@ if [ $# -eq 0 ]; then
     cd "$(git rev-parse --show-toplevel)"
     find src/ include/ test/ examples/ \
         -type f \( -name '*.h' -o -name '*.cpp' \) -print0 \
-    | xargs --null "$formatter" -i --style=file
+    | xargs -0 "$formatter" -i --style=file
 else
     exec "$formatter" -i --style=file "$@"
 fi
