@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <thread>
 
+#include "../src/make_unique.h"
 #include "../src/sample.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
@@ -523,7 +524,7 @@ TEST_CASE("span") {
   SECTION("rules sampling") {
     auto rules_sampler = std::make_shared<MockRulesSampler>();
     rules_sampler->sampling_priority =
-        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+        make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     rules_sampler->rule_rate = 0.42;
     rules_sampler->limiter_rate = 0.99;
     auto buffer = std::make_shared<MockBuffer>(rules_sampler);

@@ -7,6 +7,7 @@
 #include <catch2/catch.hpp>
 #include <string>
 
+#include "../src/make_unique.h"
 #include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
@@ -31,7 +32,7 @@ TEST_CASE("SpanContext") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
       123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      PendingTrace{logger, make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
@@ -140,7 +141,7 @@ TEST_CASE("deserialize fails") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
       123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      PendingTrace{logger, make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
@@ -219,7 +220,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123, PendingTrace{logger, std::make_unique<SamplingPriority>(priority.first)}));
+      123, PendingTrace{logger, make_unique<SamplingPriority>(priority.first)}));
   SpanContext context{logger, 420, 123, "", {}};
 
   REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
@@ -286,7 +287,7 @@ TEST_CASE("Binary Span Context") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
       123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      PendingTrace{logger, make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
@@ -392,7 +393,7 @@ TEST_CASE("sampling behaviour") {
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     auto p = setSamplingPriority(
         static_cast<Span*>(span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
     span->Finish();
@@ -405,7 +406,7 @@ TEST_CASE("sampling behaviour") {
   SECTION("sampling priority is assigned on a root span if otherwise unset") {
     // Root: ##########x
     //                 ^ Set here automatically if priority sampling enabled, should succeed
-    sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    sampler->sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     span->Finish();
 
@@ -422,7 +423,7 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
     auto p = setSamplingPriority(
         static_cast<Span*>(span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(!p);
 
     auto& result = writer->traces[0][0];
@@ -433,7 +434,7 @@ TEST_CASE("sampling behaviour") {
     // Root: ####P#####x
     //           ^  ^ Cannot set, since already propagated
     //           | Set here automatically, should succeed
-    sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    sampler->sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
 
     MockTextMapCarrier carrier;
@@ -462,7 +463,7 @@ TEST_CASE("sampling behaviour") {
 
     auto p = setSamplingPriority(
         static_cast<Span*>(child_span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
 
@@ -480,7 +481,7 @@ TEST_CASE("sampling behaviour") {
     // Root:  ##########x
     // Child: .#######x.^
     //                  | Set here automatically
-    sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    sampler->sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
     child_span->Finish();
@@ -502,7 +503,7 @@ TEST_CASE("sampling behaviour") {
 
     auto p = setSamplingPriority(
         static_cast<Span*>(span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
     REQUIRE(p);
     REQUIRE(*p == SamplingPriority::UserKeep);
 
@@ -525,10 +526,10 @@ TEST_CASE("sampling behaviour") {
     span->Finish();
     REQUIRE(!setSamplingPriority(
         static_cast<Span*>(span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
     REQUIRE(!setSamplingPriority(
         static_cast<Span*>(child_span.get()),
-        std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
+        make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep)));
 
     auto& trace = writer->traces[0];
     REQUIRE(trace[0]->metrics.find("_sampling_priority_v1") == trace[0]->metrics.end());
@@ -542,7 +543,7 @@ TEST_CASE("sampling behaviour") {
     // Child: .##P#####x..
     //           ^   ^ Cannot be set here, nor on Root.
     //           | Assigned automatically here
-    sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    sampler->sampling_priority = make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
 
@@ -597,7 +598,7 @@ TEST_CASE("origin header propagation") {
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
       123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      PendingTrace{logger, make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
 
   std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
   SpanContext context{logger, 420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
