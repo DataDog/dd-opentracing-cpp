@@ -36,9 +36,9 @@ formatter=clang-format-9
 
 if [ $# -eq 0 ]; then
     cd "$(git rev-parse --show-toplevel)"
-    find src/ include/ test/ examples/ -print0 \
-        -type f \( -name '*.h' -o -name '*.cpp' \) \
-    | xargs "$formatter" -i --style=file
+    find src/ include/ test/ examples/ \
+        -type f \( -name '*.h' -o -name '*.cpp' \) -print0 \
+    | xargs --null "$formatter" -i --style=file
 else
     exec "$formatter" -i --style=file "$@"
 fi
