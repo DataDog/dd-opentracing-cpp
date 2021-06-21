@@ -9,6 +9,7 @@
 #include <string>
 
 #include "bool.h"
+#include "make_unique.h"
 #include "sample.h"
 #include "span_buffer.h"
 #include "tracer.h"
@@ -117,7 +118,8 @@ void audit(bool legacy_obfuscation, SpanData *span) {
     if (legacy_obfuscation) {
       // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics, fragments and
       // parameters.
-      http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), "$1$2?");
+      static const std::string replacement("$1$2?");
+      http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), replacement);
     } else {
       // Just trim the parameter portion of the URL.
       http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));
@@ -357,7 +359,7 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     try {
       std::unique_ptr<UserSamplingPriority> sampling_priority = nullptr;
       if (result != "") {
-        sampling_priority = std::make_unique<UserSamplingPriority>(
+        sampling_priority = make_unique<UserSamplingPriority>(
             std::stoi(result) == 0 ? UserSamplingPriority::UserDrop
                                    : UserSamplingPriority::UserKeep);
       }
@@ -370,9 +372,9 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
                    "unable to parse sampling priority tag");
     }
   } else if (k == tags::manual_keep) {
-    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    setSamplingPriority(make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
   } else if (k == tags::manual_drop) {
-    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
+    setSamplingPriority(make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
   }
 }
 

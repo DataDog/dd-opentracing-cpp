@@ -10,6 +10,7 @@ cc_library(
         "src/limiter.h",
         "src/logger.cpp",
         "src/logger.h",
+        "src/make_unique.cpp",
         "src/opentracing_external.cpp",
         "src/propagation.cpp",
         "src/propagation.h",
