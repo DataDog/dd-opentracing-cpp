@@ -39,9 +39,9 @@ struct MockTracer : public Tracer {
              std::shared_ptr<RulesSampler> sampler)
       : Tracer(opts, writer, sampler), opts(opts) {}
 
-  std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
-                                                 const ot::StartSpanOptions& /* options */) const
-      noexcept override {
+  std::unique_ptr<ot::Span> StartSpanWithOptions(
+      ot::string_view /* operation_name */,
+      const ot::StartSpanOptions& /* options */) const noexcept override {
     return nullptr;
   }
 
@@ -94,7 +94,7 @@ struct TestSpanData : public SpanData {
   TestSpanData(const TestSpanData& other) : SpanData(other) {}
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
-                     trace_id, parent_id, error);
+                     trace_id, parent_id, error)
 };
 
 struct MockPrioritySampler : public PrioritySampler {
