@@ -119,7 +119,8 @@ void audit(bool legacy_obfuscation, SpanData *span) {
       // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics, fragments and
       // parameters.
       static const std::string replacement("$1$2?");
-      http_tag->second = std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), replacement);
+      http_tag->second =
+          std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), replacement);
     } else {
       // Just trim the parameter portion of the URL.
       http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));

@@ -442,8 +442,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     j.at(json_baggage_key).get_to(baggage);
   }
 
-  auto context =
-      make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
+  auto context = make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
@@ -529,8 +528,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
                                                       sampling_priority_set, origin_set)) {
     return std::move(*result);
   }
-  auto context =
-      make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
+  auto context = make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 }
