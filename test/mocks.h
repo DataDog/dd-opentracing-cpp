@@ -94,7 +94,7 @@ struct TestSpanData : public SpanData {
   TestSpanData(const TestSpanData& other) : SpanData(other) {}
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
-                     trace_id, parent_id, error);
+                     trace_id, parent_id, error)
 };
 
 struct MockPrioritySampler : public PrioritySampler {

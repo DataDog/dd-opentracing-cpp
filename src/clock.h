@@ -25,7 +25,7 @@ struct TimePoint {
 typedef std::function<TimePoint()> TimeProvider;
 
 // getRealTime returns the actual system time.
-inline TimePoint getRealTime() { return {system_clock::now(), steady_clock::now()}; };
+inline TimePoint getRealTime() { return {system_clock::now(), steady_clock::now()}; }
 
 }  // namespace opentracing
 }  // namespace datadog

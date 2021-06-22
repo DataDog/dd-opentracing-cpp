@@ -27,7 +27,7 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(Iterable styles) {
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
   }
   return propagation_styles;
-};
+}
 
 // TODO(cgilmour): refactor this so it returns a "finalized options" type.
 ot::expected<TracerOptions, const char*> applyTracerOptionsFromEnvironment(

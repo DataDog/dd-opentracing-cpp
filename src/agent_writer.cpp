@@ -26,7 +26,7 @@ AgentWriter::AgentWriter(std::string host, uint32_t port, std::string url,
                          std::chrono::milliseconds write_period,
                          std::shared_ptr<RulesSampler> sampler)
     : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
-                  default_retry_periods, host, port, url, sampler){};
+                  default_retry_periods, host, port, url, sampler) {}
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,
@@ -124,7 +124,7 @@ void AgentWriter::write(Trace trace) {
     return;
   }
   trace_encoder_->addTrace(std::move(trace));
-};
+}
 
 void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
   // Start worker that sends Traces to agent.
