@@ -61,7 +61,7 @@ using RuleFunc = std::function<RuleResult(const std::string&, const std::string&
 
 class RulesSampler {
  public:
-  RulesSampler();
+  RulesSampler(double sample_rate, int64_t rate_limit);
   RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
   virtual ~RulesSampler() {}
   void addRule(RuleFunc f);
@@ -71,6 +71,7 @@ class RulesSampler {
   virtual void updatePrioritySampler(json config);
 
  private:
+  double default_sample_rate_ = 1.0;
   Limiter sampling_limiter_;
   std::vector<RuleFunc> sampling_rules_;
   PrioritySampler priority_sampler_;

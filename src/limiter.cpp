@@ -14,22 +14,30 @@ Limiter::Limiter(TimeProvider now_func, long max_tokens, double refresh_rate,
       max_tokens_(max_tokens),
       tokens_per_refresh_(tokens_per_refresh),
       previous_rates_(9, 1.0) {
-  // calculate refresh interval: (1/rate) * tokens per refresh as nanoseconds
-  refresh_interval_ =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1)) /
-          refresh_rate) *
-      tokens_per_refresh_;
+  if (max_tokens_ > 0 && tokens_per_refresh_ > 0.0) {
+    // calculate refresh interval: (1/rate) * tokens per refresh as nanoseconds
+    refresh_interval_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1)) /
+            refresh_rate) *
+        tokens_per_refresh_;
 
-  auto now = now_func_().relative_time;
-  next_refresh_ = now + refresh_interval_;
-  current_period_ = std::chrono::time_point_cast<std::chrono::seconds>(now);
-  previous_rates_sum_ = std::accumulate(previous_rates_.begin(), previous_rates_.end(), 0.0);
+    auto now = now_func_().relative_time;
+    next_refresh_ = now + refresh_interval_;
+    current_period_ = std::chrono::time_point_cast<std::chrono::seconds>(now);
+    previous_rates_sum_ = std::accumulate(previous_rates_.begin(), previous_rates_.end(), 0.0);
+  }
 }
 
 LimitResult Limiter::allow() { return allow(1); }
 
 LimitResult Limiter::allow(long tokens_requested) {
+  // Handle zero and negative values for max_tokens.
+  if (max_tokens_ < 0) {
+    return {false, 1.0};
+  } else if (max_tokens_ == 0) {
+    return {false, 0.0};
+  }
   auto now = now_func_().relative_time;
   std::lock_guard<std::mutex> lock_guard{mutex_};
 

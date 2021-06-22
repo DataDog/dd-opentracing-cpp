@@ -66,7 +66,9 @@ void PrioritySampler::configure(json config) {
   }
 }
 
-RulesSampler::RulesSampler() : sampling_limiter_(getRealTime, 100, 100.0, 1) {}
+RulesSampler::RulesSampler(double sample_rate, int64_t rate_limit)
+    : default_sample_rate_(sample_rate),
+      sampling_limiter_(getRealTime, rate_limit, static_cast<double>(rate_limit), 1) {}
 
 RulesSampler::RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate,
                            long tokens_per_refresh)
@@ -78,7 +80,8 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
                                   const std::string& name, uint64_t trace_id) {
   auto rule_result = match(service, name);
   if (!rule_result.matched) {
-    return priority_sampler_.sample(environment, service, trace_id);
+    // return priority_sampler_.sample(environment, service, trace_id);
+    rule_result.rate = default_sample_rate_;
   }
 
   SampleResult result;
@@ -95,7 +98,9 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
   if (limit_result.allowed) {
     result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   } else {
-    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    auto fallback_result = priority_sampler_.sample(environment, service, trace_id);
+    result.sampling_priority = std::move(fallback_result.sampling_priority);
+    result.priority_rate = fallback_result.priority_rate;
   }
   return result;
 }

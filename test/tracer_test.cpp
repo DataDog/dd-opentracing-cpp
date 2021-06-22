@@ -135,7 +135,7 @@ TEST_CASE("env overrides") {
   // auto buffer = std::make_shared<MockBuffer>();
   TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   IdProvider get_id = [&id]() { return id++; };        // Mock ID provider.
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(1.0, 100);
   auto writer = std::make_shared<MockWriter>(sampler);
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   const ot::StartSpanOptions span_options;
@@ -267,7 +267,7 @@ TEST_CASE("startup log") {
   std::stringstream ss;
   opts.log_func = [&](LogLevel, ot::string_view message) { ss << message; };
 
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(1.0, 100);
   auto writer = std::make_shared<MockWriter>(sampler);
   std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
 

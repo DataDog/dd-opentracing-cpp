@@ -66,9 +66,9 @@ struct TracerOptions {
   // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
   // by the environment variable DD_ENV
   std::string environment = "";
-  // This option is deprecated and may be removed in future releases.
-  // It is equivalent to setting a sampling rule with only a "sample_rate".
-  // Values must be between 0.0 and 1.0 (inclusive)
+  // The default sample rate for new traces, when there is no matching sampling rule.
+  // Values must be between 0.0 and 1.0 (inclusive).
+  // Can also be set by the environment variable DD_TRACE_SAMPLE_RATE.
   double sample_rate = std::nan("");
   // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
@@ -132,6 +132,13 @@ struct TracerOptions {
         break;
     }
   };
+  // The rate limit applies to new traces that are sampled, either by a sampling rule or the
+  // default sampling rate.
+  // A positive value will allow N traces per second to be sampled by the rules sampler.
+  // A zero or negative value will not apply the rules sampler.
+  // All traces that were not sampled by the rules sampler will use agent-based rate sampling.
+  // Can also be set by the environment variable DD_TRACE_RATE_LIMIT.
+  int64_t rate_limit = 100;
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

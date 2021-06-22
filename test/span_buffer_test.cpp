@@ -8,7 +8,7 @@ using namespace datadog::opentracing;
 
 TEST_CASE("span buffer") {
   auto logger = std::make_shared<MockLogger>();
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(1.0, 100);
   auto writer = std::make_shared<MockWriter>(sampler);
   auto buffer =
       std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});

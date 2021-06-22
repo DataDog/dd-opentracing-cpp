@@ -139,9 +139,36 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     }
   }
 
+  auto sample_rate = std::getenv("DD_TRACE_SAMPLE_RATE");
+  if (sample_rate != nullptr) {
+    try {
+      double value = std::stod(sample_rate);
+      if (value >= 0.0 && value <= 1.0) {
+        opts.sample_rate = value;
+      } else {
+        return ot::make_unexpected("Value for DD_TRACE_SAMPLE_RATE is invalid");
+      }
+    } catch (const std::invalid_argument &ia) {
+      return ot::make_unexpected("Value for DD_TRACE_SAMPLE_RATE is invalid");
+    } catch (const std::out_of_range &oor) {
+      return ot::make_unexpected("Value for DD_TRACE_SAMPLE_RATE is invalid");
+    }
+  }
+
   auto sampling_rules = std::getenv("DD_TRACE_SAMPLING_RULES");
   if (sampling_rules != nullptr && std::strlen(sampling_rules) > 0) {
     opts.sampling_rules = sampling_rules;
+  }
+
+  auto rate_limit = std::getenv("DD_TRACE_RATE_LIMIT");
+  if (rate_limit != nullptr && std::strlen(rate_limit) > 0) {
+    try {
+      opts.rate_limit = std::stoi(rate_limit);
+    } catch (const std::invalid_argument &ia) {
+      return ot::make_unexpected("Value for DD_TRACE_RATE_LIMIT is invalid");
+    } catch (const std::out_of_range &oor) {
+      return ot::make_unexpected("Value for DD_TRACE_RATE_LIMIT is out of range");
+    }
   }
 
   auto trace_agent_url = std::getenv("DD_TRACE_AGENT_URL");

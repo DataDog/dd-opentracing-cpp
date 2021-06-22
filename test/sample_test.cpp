@@ -121,6 +121,9 @@ TEST_CASE("rules sampler") {
     span->FinishWithOptions(finish_options);
 
     auto& metrics = mwriter->traces[0][0]->metrics;
+    for (auto& m : metrics) {
+      std::cout << "metrics: " << m.first << " -> " << m.second << std::endl;
+    }
     REQUIRE(metrics.find("_dd.rule_psr") == metrics.end());
     REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
     REQUIRE(metrics.find("_dd.agent_psr") != metrics.end());

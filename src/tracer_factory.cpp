@@ -55,6 +55,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("sampling_rules") != config.end()) {
       options.sampling_rules = config.at("sampling_rules").dump();
     }
+    if (config.find("rate_limit") != config.end()) {
+      config.at("rate_limit").get_to(options.rate_limit);
+    }
     if (config.find("operation_name_override") != config.end()) {
       config.at("operation_name_override").get_to(options.operation_name_override);
     }
@@ -139,14 +142,14 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
   if (!maybe_options) {
     return ot::make_unexpected(maybe_options.error());
   }
-  TracerOptions options = maybe_options.value();
+  TracerOptions opts = maybe_options.value();
 
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(opts.sample_rate, opts.rate_limit);
   auto writer = std::shared_ptr<Writer>{
-      new AgentWriter(options.agent_host, options.agent_port, options.agent_url,
-                      std::chrono::milliseconds(llabs(options.write_period_ms)), sampler)};
+      new AgentWriter(opts.agent_host, opts.agent_port, opts.agent_url,
+                      std::chrono::milliseconds(llabs(opts.write_period_ms)), sampler)};
 
-  return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer, sampler}};
+  return std::shared_ptr<ot::Tracer>{new TracerImpl{opts, writer, sampler}};
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }

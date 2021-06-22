@@ -118,7 +118,7 @@ struct MockPrioritySampler : public PrioritySampler {
 };
 
 struct MockRulesSampler : public RulesSampler {
-  MockRulesSampler() {}
+  MockRulesSampler() : RulesSampler(0.0, 0) {}
 
   SampleResult sample(const std::string& /* environment */, const std::string& /* service */,
                       const std::string& /* name */, uint64_t /* trace_id */) override {
@@ -162,7 +162,7 @@ struct MockWriter : public Writer {
 struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr,
-                          std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+                          std::make_shared<RulesSampler>(0.0, 0), WritingSpanBufferOptions{}){};
   MockBuffer(std::shared_ptr<RulesSampler> sampler)
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
                           WritingSpanBufferOptions{}){};
