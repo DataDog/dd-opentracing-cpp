@@ -8,7 +8,7 @@
 //     unique_ptr<T> make_unique( Args&&... args );
 
 #include <memory>
-#include <type_traits>
+#include <utility>
 
 namespace datadog {
 namespace opentracing {
