@@ -201,6 +201,21 @@ TEST_CASE("tracer factory") {
     }
   }
 
+  SECTION("handles unsupported schemes") {
+    std::string input{R"(
+      {
+        "agent_url": "gopher://localhost:1234/path",
+        "service": "my-service"
+      }
+    )"};  // unsupported url scheme
+
+    std::string error = "";
+    auto result = factory.MakeTracer(input.c_str(), error);
+    REQUIRE(!result);
+    CHECK(result.error() == std::make_error_condition(std::errc::invalid_argument));
+    CHECK(error == "Unable to set agent URL: unknown url scheme: gopher://localhost:1234/path");
+  }
+
   SECTION("injected environment variables") {
     SECTION("DD_ENV overrides default") {
       ::setenv("DD_ENV", "injected-env", 0);
