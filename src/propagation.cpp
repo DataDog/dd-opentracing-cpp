@@ -111,19 +111,19 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
 
   if (!trace_id_set && !parent_id_set) {
     // Both IDs are empty; return an empty context.
-    return std::make_unique<Result>();
+    return makeUnique<Result>();
   }
   if (!trace_id_set) {
     // There's a parent ID without a trace ID.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   if (!parent_id_set && !origin_set) {
     // Parent ID is required, except when origin is set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   if (origin_set && !sampling_priority_set) {
     // Origin should only be set if sampling priority is also set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
 }
