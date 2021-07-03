@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Required utilities:
+# Required utilities (aside from GNU coreutils):
 # - cmake
 # - git
 # - gpg
@@ -59,18 +59,24 @@ elif [ -z "$BUILD_METRICS_GPG_SECRET_KEY_PASSPHRASE" ]; then
 fi
 
 cd "$(git rev-parse --show-toplevel)"
-git submodule update --init --recursive
-make --directory=scripts/compilation-metrics
+
+# Build the compilation metrics compiler wrapper.
+tmpdir=$(mktemp -d)
+git clone https://github.com/dgoffredo/compilation-metrics "$tmpdir"/compilation-metrics
+make "--directory=$tmpdir/compilation-metrics"
+
 mkdir -p .build
 cd .build
 cmake \
-    "-DCMAKE_CXX_COMPILER_LAUNCHER=$(realpath ../scripts/compilation-metrics/wrap_compiler.py)" \
+    "-DCMAKE_CXX_COMPILER_LAUNCHER=$tmpdir/compilation-metrics/wrap_compiler" \
     "$@" \
     ..
 
 COMPILATION_METRICS_DB=$(realpath metrics.db)
 export COMPILATION_METRICS_DB
 make
+
+rm -rf "$tmpdir"
 
 # Sign `metrics.db` and send it to the server.
 
@@ -86,6 +92,7 @@ keyid=$(echo "$BUILD_METRICS_GPG_SECRET_KEY" | \
 gpg \
     --batch \
     --detach-sign \
+    --yes \
     --passphrase "$BUILD_METRICS_GPG_SECRET_KEY_PASSPHRASE" \
     --pinentry-mode loopback \
     --armor \
