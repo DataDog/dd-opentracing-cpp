@@ -79,7 +79,6 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   std::shared_ptr<SpanBuffer> buffer_;
   TimeProvider get_time_;
   IdProvider get_id_;
-  bool legacy_obfuscation_ = false;
 };
 
 }  // namespace opentracing

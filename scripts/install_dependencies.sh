@@ -11,6 +11,15 @@ CURL_VERSION=${CURL_VERSION:-7.70.0}
 MSGPACK_VERSION=${MSGPACK_VERSION:-3.2.1}
 ZLIB_VERSION=${ZLIB_VERSION:-1.2.11}
 
+if command -v cmake >/dev/null; then
+    CMAKE=cmake
+elif command -v cmake3 >/dev/null; then
+    CMAKE=cmake3
+else
+    >&2 echo "Neither cmake nor cmake3 is installed."
+    exit 1
+fi
+
 # Just report versions and exit.
 if [[ "$1" == "versions" ]]; then
 	echo "opentracing:$OPENTRACING_VERSION"
@@ -51,7 +60,7 @@ if [ "$BUILD_OPENTRACING" -eq "1" ]; then
   tar zxf opentracing-cpp.tar.gz
   mkdir -p "opentracing-cpp-${OPENTRACING_VERSION}/.build"
   cd "opentracing-cpp-${OPENTRACING_VERSION}/.build"
-  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" \
+  "$CMAKE" -DCMAKE_INSTALL_PREFIX="$install_dir" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_FLAGS="-fPIC" \
         -DBUILD_SHARED_LIBS=OFF \
@@ -84,7 +93,7 @@ if [ "$BUILD_MSGPACK" -eq "1" ]; then
   tar zxf msgpack.tar.gz
   mkdir -p "msgpack-${MSGPACK_VERSION}/.build"
   cd "msgpack-${MSGPACK_VERSION}/.build"
-  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF ..
+  "$CMAKE" -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF ..
   make
   make install
   cd ../..

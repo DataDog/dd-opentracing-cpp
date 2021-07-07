@@ -5,7 +5,6 @@
 
 #include <iostream>
 #include <nlohmann/json.hpp>
-#include <regex>
 #include <string>
 
 #include "bool.h"
@@ -65,7 +64,7 @@ Span::Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> t
            std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time, uint64_t span_id,
            uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
            std::string span_service, std::string span_type, std::string span_name,
-           std::string resource, std::string operation_name_override, bool legacy_obfuscation)
+           std::string resource, std::string operation_name_override)
     : logger_(std::move(logger)),
       tracer_(std::move(tracer)),
       buffer_(std::move(buffer)),
@@ -73,7 +72,6 @@ Span::Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> t
       context_(std::move(context)),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
-      legacy_obfuscation_(legacy_obfuscation),
       span_(makeSpanData(span_type, span_service, resource, span_name, trace_id, span_id,
                          parent_id,
                          std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -94,37 +92,15 @@ Span::~Span() {
   }
 }
 
-namespace {
-// Matches path segments with numbers (except things that look like versions).
-// Similar to, but not the same as,
-// https://github.com/datadog/dd-trace-java/blob/master/dd-trace-ot/src/main/java/datadog/opentracing/decorators/URLAsResourceName.java#L14-L16
-std::regex &PATH_MIXED_ALPHANUMERICS() {
-  // Don't statically initialize a complex object.
-  // Thread safe as of C++11, as long as it's not reentrant.
-  static std::regex r{
-      "(\\/)(?:(?:([^?\\/&]*)(?:\\?[^\\/]+))|(?:(?![vV]\\d{1,2}\\/)[^\\/"
-      "\\d\\?]*[\\d-]+[^\\/]*))"};
-  return r;
-}
-}  // namespace
-
 // Imperfectly audits the data in a Span, removing some things that could cause information leaks
 // or cardinality issues.
 // If you want to add any more steps to this function, we should use a more
 // sophisticated architecture. For now, YAGNI.
-void audit(bool legacy_obfuscation, SpanData *span) {
+void audit(SpanData *span) {
   auto http_tag = span->meta.find(ot::ext::http_url);
   if (http_tag != span->meta.end()) {
-    if (legacy_obfuscation) {
-      // Heavy-handed obfuscation that replaces hostname, runs of alphanumerics, fragments and
-      // parameters.
-      static const std::string replacement("$1$2?");
-      http_tag->second =
-          std::regex_replace(http_tag->second, PATH_MIXED_ALPHANUMERICS(), replacement);
-    } else {
       // Just trim the parameter portion of the URL.
       http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));
-    }
   }
 }
 
@@ -200,7 +176,7 @@ void Span::FinishWithOptions(
     span_->meta.erase(tag);
   }
   // Audit and finish span.
-  audit(legacy_obfuscation_, span_.get());
+  audit(span_.get());
   buffer_->finishSpan(std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.

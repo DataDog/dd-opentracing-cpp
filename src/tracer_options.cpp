@@ -3,7 +3,7 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
-#include <regex>
+#include <cctype>
 
 #include "bool.h"
 
@@ -76,6 +76,7 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
 
 // Expands a string into tokens that are separated by commas or whitespace.
 // Intended for expanding the propagation style environment variables.
+/* TODO: write a unit test, make sure the new impl is the same as this.
 std::vector<std::string> tokenize_propagation_style(const std::string &input) {
   const std::regex word_separator("[\\s,]+");
   std::vector<std::string> result;
@@ -83,6 +84,31 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
                std::sregex_token_iterator(), std::back_inserter(result),
                [](const std::string &s) { return !s.empty(); });
   return result;
+}
+*/
+
+// Expands a string into tokens that are separated by commas or whitespace.
+// Intended for expanding the propagation style environment variables.
+std::vector<std::string> tokenize_propagation_style(const std::string &input) {
+    std::vector<std::string> result;
+    std::string current;
+
+    for (const char ch : input) {
+      if (ch == ',' || std::isspace(static_cast<unsigned char>(ch))) {
+        if (!current.empty()) {
+          result.push_back(current);
+          current.clear();
+        }
+      } else {
+        current += ch;
+      }
+    }
+
+    if (!current.empty()) {
+      result.push_back(current);
+    }
+    
+    return result;
 }
 
 }  // namespace

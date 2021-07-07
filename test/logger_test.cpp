@@ -6,7 +6,7 @@ using namespace datadog::opentracing;
 TEST_CASE("logger") {
   struct LoggerTest {
     std::shared_ptr<Logger> logger;
-    bool trace = false;
+    bool trace;
     std::string debug_no_id;
     std::string debug_trace_id;
     std::string debug_trace_span_ids;
