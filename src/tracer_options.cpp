@@ -105,7 +105,7 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
     }
 
     if (!current.empty()) {
-      result.push_back(current);
+      result.push_back(std::move(current));
     }
     
     return result;
