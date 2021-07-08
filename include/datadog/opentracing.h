@@ -39,84 +39,7 @@ enum class LogLevel {
 
 using LogFunc = std::function<void(LogLevel, ot::string_view)>;
 
-// The type of headers that are used for propagating distributed traces.
-// B3 headers only support 64 bit trace IDs.
-enum class PropagationStyle {
-  // Using Datadog headers.
-  Datadog,
-  // Use B3 headers.
-  // https://github.com/openzipkin/b3-propagation
-  B3,
-};
-
-struct TracerOptions {
-  // Hostname or IP address of the Datadog agent. Can also be set by the environment variable
-  // DD_AGENT_HOST.
-  std::string agent_host = "localhost";
-  // Port on which the Datadog agent is running. Can also be set by the environment variable
-  // DD_TRACE_AGENT_PORT
-  uint32_t agent_port = 8126;
-  // The name of the service being traced. Can also be set by the environment variable DD_SERVICE.
-  // See:
-  // https://help.datadoghq.com/hc/en-us/articles/115000702546-What-is-the-Difference-Between-Type-Service-Resource-and-Name-
-  std::string service;
-  // The type of service being traced.
-  // (see above URL for definition)
-  std::string type = "web";
-  // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
-  // by the environment variable DD_ENV
-  std::string environment = "";
-  // This option is deprecated and may be removed in future releases.
-  // It is equivalent to setting a sampling rule with only a "sample_rate".
-  // Values must be between 0.0 and 1.0 (inclusive)
-  double sample_rate = std::nan("");
-  // This option is deprecated, and may be removed in future releases.
-  bool priority_sampling = true;
-  // Rules sampling is applied when initiating traces to determine the sampling rate.
-  // Traces that do not match any rules fall back to using priority sampling, where the rate is
-  // determined by a combination of user-assigned priorities and configuration from the agent.
-  // Configuration is specified as a JSON array of objects. Each object must have a "sample_rate",
-  // and the "name" and "service" fields are optional. The "sample_rate" value must be between 0.0
-  // and 1.0 (inclusive). Rules are applied in configured order, so a specific match should be
-  // specified before a wider match. If any rules are invalid, they are ignored. Can also be set by
-  // the environment variable DD_TRACE_SAMPLING_RULES.
-  std::string sampling_rules = R"([{"sample_rate": 1.0}])";
-  // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
-  // than 10s, so that is the upper bound.
-  int64_t write_period_ms = 1000;
-  // If not empty, the given string overrides the operation name (and the overridden operation name
-  // is recorded in the tag "operation").
-  std::string operation_name_override = "";
-  // The style of propagation headers to accept/extract. Can also be set by the environment
-  // variable DD_PROPAGATION_STYLE_EXTRACT.
-  std::set<PropagationStyle> extract{PropagationStyle::Datadog};
-  // The style of propagation headers to emit/inject. Can also be set by the environment variable
-  // DD_PROPAGATION_STYLE_INJECT.
-  std::set<PropagationStyle> inject{PropagationStyle::Datadog};
-  // If true, injects the hostname into spans reported by this tracer. Can also be set by the
-  // environment variable DD_TRACE_REPORT_HOSTNAME.
-  bool report_hostname = false;
-  // If true and global analytics rate is not set, spans will be tagged with an analytics rate
-  // of 1.0. Can also be set by the environment variable DD_TRACE_ANALYTICS_ENABLED.
-  bool analytics_enabled = false;
-  // When set to a value between 0.0 and 1.0 (inclusive), spans will be tagged with the provided
-  // value for analytics sampling rate. Can also be set by the environment variable
-  // DD_TRACE_ANALYTICS_SAMPLE_RATE
-  double analytics_rate = std::nan("");
-  // Tags that are applied to all spans reported by this tracer. Can also be set by the environment
-  // variable DD_TAGS.
-  std::map<std::string, std::string> tags = {};
-  // The version of the overall application being traced. Can also be set by the environment
-  // variable DD_VERSION.
-  std::string version = "";
-  // The URL to use for submitting traces to the agent. If set, this will be used instead of
-  // agent_host / agent_port. This URL supports http, https and unix address schemes.
-  // If no scheme is set in the URL, a path to a UNIX domain socket is assumed.
-  // Can also be set by the environment variable DD_TRACE_AGENT_URL.
-  std::string agent_url = "";
-  // A logging function that is called by the tracer when noteworthy events occur.
-  // The default value uses std::cerr, and applications can inject their own logging function.
-  LogFunc log_func = [](LogLevel level, ot::string_view message) {
+inline void defaultLogFunc(LogLevel level, ot::string_view message) {
     switch (level) {
       case LogLevel::debug:
         std::cerr << "debug: " << message << std::endl;
@@ -131,7 +54,107 @@ struct TracerOptions {
         std::cerr << "<unknown level>: " << message << std::endl;
         break;
     }
-  };
+  }
+
+// The type of headers that are used for propagating distributed traces.
+// B3 headers only support 64 bit trace IDs.
+enum class PropagationStyle {
+  // Using Datadog headers.
+  Datadog,
+  // Use B3 headers.
+  // https://github.com/openzipkin/b3-propagation
+  B3,
+};
+
+struct TracerOptions {
+  // Hostname or IP address of the Datadog agent. Can also be set by the environment variable
+  // DD_AGENT_HOST.
+  std::string agent_host;
+  // Port on which the Datadog agent is running. Can also be set by the environment variable
+  // DD_TRACE_AGENT_PORT
+  uint32_t agent_port;
+  // The name of the service being traced. Can also be set by the environment variable DD_SERVICE.
+  // See:
+  // https://help.datadoghq.com/hc/en-us/articles/115000702546-What-is-the-Difference-Between-Type-Service-Resource-and-Name-
+  std::string service;
+  // The type of service being traced.
+  // (see above URL for definition)
+  std::string type;
+  // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
+  // by the environment variable DD_ENV
+  std::string environment;
+  // This option is deprecated and may be removed in future releases.
+  // It is equivalent to setting a sampling rule with only a "sample_rate".
+  // Values must be between 0.0 and 1.0 (inclusive)
+  double sample_rate;
+  // This option is deprecated, and may be removed in future releases.
+  bool priority_sampling;
+  // Rules sampling is applied when initiating traces to determine the sampling rate.
+  // Traces that do not match any rules fall back to using priority sampling, where the rate is
+  // determined by a combination of user-assigned priorities and configuration from the agent.
+  // Configuration is specified as a JSON array of objects. Each object must have a "sample_rate",
+  // and the "name" and "service" fields are optional. The "sample_rate" value must be between 0.0
+  // and 1.0 (inclusive). Rules are applied in configured order, so a specific match should be
+  // specified before a wider match. If any rules are invalid, they are ignored. Can also be set by
+  // the environment variable DD_TRACE_SAMPLING_RULES.
+  std::string sampling_rules;
+  // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
+  // than 10s, so that is the upper bound.
+  int64_t write_period_ms;
+  // If not empty, the given string overrides the operation name (and the overridden operation name
+  // is recorded in the tag "operation").
+  std::string operation_name_override;
+  // The style of propagation headers to accept/extract. Can also be set by the environment
+  // variable DD_PROPAGATION_STYLE_EXTRACT.
+  std::set<PropagationStyle> extract;
+  // The style of propagation headers to emit/inject. Can also be set by the environment variable
+  // DD_PROPAGATION_STYLE_INJECT.
+  std::set<PropagationStyle> inject;
+  // If true, injects the hostname into spans reported by this tracer. Can also be set by the
+  // environment variable DD_TRACE_REPORT_HOSTNAME.
+  bool report_hostname;
+  // If true and global analytics rate is not set, spans will be tagged with an analytics rate
+  // of 1.0. Can also be set by the environment variable DD_TRACE_ANALYTICS_ENABLED.
+  bool analytics_enabled;
+  // When set to a value between 0.0 and 1.0 (inclusive), spans will be tagged with the provided
+  // value for analytics sampling rate. Can also be set by the environment variable
+  // DD_TRACE_ANALYTICS_SAMPLE_RATE
+  double analytics_rate;
+  // Tags that are applied to all spans reported by this tracer. Can also be set by the environment
+  // variable DD_TAGS.
+  std::map<std::string, std::string> tags;
+  // The version of the overall application being traced. Can also be set by the environment
+  // variable DD_VERSION.
+  std::string version;
+  // The URL to use for submitting traces to the agent. If set, this will be used instead of
+  // agent_host / agent_port. This URL supports http, https and unix address schemes.
+  // If no scheme is set in the URL, a path to a UNIX domain socket is assumed.
+  // Can also be set by the environment variable DD_TRACE_AGENT_URL.
+  std::string agent_url;
+  // A logging function that is called by the tracer when noteworthy events occur.
+  // The default value uses std::cerr, and applications can inject their own logging function.
+  LogFunc log_func;
+
+  explicit TracerOptions(
+  std::string agent_host = "localhost",
+  uint32_t agent_port = 8126,
+  std::string service = "",
+  std::string type = "web",
+  std::string environment = "",
+  double sample_rate = std::nan(""),
+  bool priority_sampling = true,
+  std::string sampling_rules = R"([{"sample_rate": 1.0}])",
+  int64_t write_period_ms = 1000,
+  std::string operation_name_override = "",
+  std::set<PropagationStyle> extract = {PropagationStyle::Datadog},
+  std::set<PropagationStyle> inject = {PropagationStyle::Datadog},
+  bool report_hostname = false,
+  bool analytics_enabled = false,
+  double analytics_rate = std::nan(""),
+  std::map<std::string, std::string> tags = {},
+  std::string version = "",
+  std::string agent_url = "",
+  LogFunc log_func = &defaultLogFunc);
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

@@ -113,6 +113,46 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
 
 }  // namespace
 
+TracerOptions::TracerOptions(
+  std::string agent_host,
+  uint32_t agent_port,
+  std::string service,
+  std::string type,
+  std::string environment,
+  double sample_rate,
+  bool priority_sampling,
+  std::string sampling_rules,
+  int64_t write_period_ms,
+  std::string operation_name_override,
+  std::set<PropagationStyle> extract,
+  std::set<PropagationStyle> inject,
+  bool report_hostname,
+  bool analytics_enabled,
+  double analytics_rate,
+  std::map<std::string, std::string> tags,
+  std::string version,
+  std::string agent_url,
+  LogFunc log_func)
+  : agent_host(std::move(agent_host))
+  , agent_port(std::move(agent_port))
+  , service(std::move(service))
+  , type(std::move(type))
+  , environment(std::move(environment))
+  , sample_rate(std::move(sample_rate))
+  , priority_sampling(std::move(priority_sampling))
+  , sampling_rules(std::move(sampling_rules))
+  , write_period_ms(std::move(write_period_ms))
+  , operation_name_override(std::move(operation_name_override))
+  , extract(std::move(extract))
+  , inject(std::move(inject))
+  , report_hostname(std::move(report_hostname))
+  , analytics_enabled(std::move(analytics_enabled))
+  , analytics_rate(std::move(analytics_rate))
+  , tags(std::move(tags))
+  , version(std::move(version))
+  , agent_url(std::move(agent_url))
+  , log_func(std::move(log_func)) {}
+
 ot::expected<std::set<PropagationStyle>> asPropagationStyle(const std::vector<std::string>& styles) {
   std::set<PropagationStyle> propagation_styles;
   for (const std::string& style : styles) {

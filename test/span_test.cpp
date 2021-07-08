@@ -130,7 +130,7 @@ TEST_CASE("span") {
       Span span{logger,     nullptr, buffer_ptr, get_time,
                 span_id,    span_id, 0,          SpanContext{logger, span_id, span_id, "", {}},
                 get_time(), "",      "",         "",
-                "",         "",      true};
+                "",         ""};
       span.SetTag(ot::ext::http_url, test_case.first);
       const ot::FinishSpanOptions finish_options;
       span.FinishWithOptions(finish_options);

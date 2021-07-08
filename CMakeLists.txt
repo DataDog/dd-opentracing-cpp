@@ -49,12 +49,19 @@ find_package(Sanitizers)
 install(DIRECTORY include/datadog DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
   add_compile_options(-Wall -Wextra -Werror -pedantic -pedantic-errors -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++11)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/W3)
 else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+# There are various bugs in g++ before major version 5.
+# Add flags to work around them.
+if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION MATCHES "^4\\."))
+  add_compile_options(-Wno-missing-field-initializers)
 endif()
 
 # Outputs
