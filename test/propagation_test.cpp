@@ -592,7 +592,7 @@ TEST_CASE("origin header propagation") {
   buffer->traces().emplace(std::make_pair(
       123, PendingTrace{logger, makeUnique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
 
-  std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
+  std::shared_ptr<Tracer> tracer{new Tracer{TracerOptions{}, buffer, getRealTime, getId}};
   SpanContext context{logger, 420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
   ot::Tracer::InitGlobal(tracer);
 
