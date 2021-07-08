@@ -3,12 +3,12 @@
 #include <datadog/tags.h>
 #include <unistd.h>
 
-#include "catch.h"
 #include <ctime>
 
 #include "../src/sample.h"
 #include "../src/span.h"
 #include "../src/tracer_options.h"
+#include "catch.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 

@@ -3,13 +3,13 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
-#include "catch.h"
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <thread>
 
 #include "../src/make_unique.h"
 #include "../src/sample.h"
+#include "catch.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;

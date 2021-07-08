@@ -1,11 +1,11 @@
 #include "../src/sample.h"
 
-#include "catch.h"
 #include <ctime>
 
 #include "../src/agent_writer.h"
 #include "../src/span.h"
 #include "../src/tracer.h"
+#include "catch.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 

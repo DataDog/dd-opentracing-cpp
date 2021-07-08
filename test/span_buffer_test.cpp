@@ -1,9 +1,8 @@
 #include "../src/span_buffer.h"
 
-#include "catch.h"
-
 #include "../src/make_unique.h"
 #include "../src/sample.h"
+#include "catch.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 

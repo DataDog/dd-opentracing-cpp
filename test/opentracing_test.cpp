@@ -1,7 +1,6 @@
 #include <datadog/opentracing.h>
 
 #include "catch.h"
-
 #include "mocks.h"
 using namespace datadog::opentracing;
 
