@@ -123,7 +123,8 @@ if [ "$BUILD_CURL" -eq "1" ]; then
               --disable-rtsp \
               --enable-shared=no \
               --enable-static=yes \
-              --with-pic
+              --with-pic \
+              --without-brotli
   make && make install
   cd ..
   rm -r "curl-${CURL_VERSION}/"
