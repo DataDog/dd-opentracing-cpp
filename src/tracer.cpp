@@ -275,16 +275,11 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id)
-    : opts_(options),
-      buffer_(std::move(buffer)),
-      get_time_(get_time),
-      get_id_(get_id) {}
+    : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
                std::shared_ptr<RulesSampler> sampler)
-    : opts_(options),
-      get_time_(getRealTime),
-      get_id_(getId) {
+    : opts_(options), get_time_(getRealTime), get_id_(getId) {
   if (isDebug()) {
     logger_ = std::make_shared<VerboseLogger>(opts_.log_func);
   } else {
@@ -322,10 +317,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
-  auto span = makeUnique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
-                               parent_id, std::move(span_context), get_time_(), opts_.service,
-                               opts_.type, operation_name, operation_name,
-                               opts_.operation_name_override);
+  auto span =
+      makeUnique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                       parent_id, std::move(span_context), get_time_(), opts_.service, opts_.type,
+                       operation_name, operation_name, opts_.operation_name_override);
 
   if (!opts_.environment.empty()) {
     span->SetTag(datadog::tags::environment, opts_.environment);

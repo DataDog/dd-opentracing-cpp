@@ -10,7 +10,8 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-ot::expected<std::set<PropagationStyle>> asPropagationStyle(const std::vector<std::string>& styles);
+ot::expected<std::set<PropagationStyle>> asPropagationStyle(
+    const std::vector<std::string>& styles);
 
 // TODO(cgilmour): refactor this so it returns a "finalized options" type.
 ot::expected<TracerOptions, const char*> applyTracerOptionsFromEnvironment(

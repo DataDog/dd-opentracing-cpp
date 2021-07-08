@@ -99,8 +99,8 @@ Span::~Span() {
 void audit(SpanData *span) {
   auto http_tag = span->meta.find(ot::ext::http_url);
   if (http_tag != span->meta.end()) {
-      // Just trim the parameter portion of the URL.
-      http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));
+    // Just trim the parameter portion of the URL.
+    http_tag->second = http_tag->second.substr(0, http_tag->second.find_first_of('?'));
   }
 }
 

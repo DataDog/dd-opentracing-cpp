@@ -40,21 +40,21 @@ enum class LogLevel {
 using LogFunc = std::function<void(LogLevel, ot::string_view)>;
 
 inline void defaultLogFunc(LogLevel level, ot::string_view message) {
-    switch (level) {
-      case LogLevel::debug:
-        std::cerr << "debug: " << message << std::endl;
-        break;
-      case LogLevel::info:
-        std::cerr << "info: " << message << std::endl;
-        break;
-      case LogLevel::error:
-        std::cerr << "error: " << message << std::endl;
-        break;
-      default:
-        std::cerr << "<unknown level>: " << message << std::endl;
-        break;
-    }
+  switch (level) {
+    case LogLevel::debug:
+      std::cerr << "debug: " << message << std::endl;
+      break;
+    case LogLevel::info:
+      std::cerr << "info: " << message << std::endl;
+      break;
+    case LogLevel::error:
+      std::cerr << "error: " << message << std::endl;
+      break;
+    default:
+      std::cerr << "<unknown level>: " << message << std::endl;
+      break;
   }
+}
 
 // The type of headers that are used for propagating distributed traces.
 // B3 headers only support 64 bit trace IDs.
@@ -135,26 +135,18 @@ struct TracerOptions {
   // The default value uses std::cerr, and applications can inject their own logging function.
   LogFunc log_func;
 
-  explicit TracerOptions(
-  std::string agent_host = "localhost",
-  uint32_t agent_port = 8126,
-  std::string service = "",
-  std::string type = "web",
-  std::string environment = "",
-  double sample_rate = std::nan(""),
-  bool priority_sampling = true,
-  std::string sampling_rules = R"([{"sample_rate": 1.0}])",
-  int64_t write_period_ms = 1000,
-  std::string operation_name_override = "",
-  std::set<PropagationStyle> extract = {PropagationStyle::Datadog},
-  std::set<PropagationStyle> inject = {PropagationStyle::Datadog},
-  bool report_hostname = false,
-  bool analytics_enabled = false,
-  double analytics_rate = std::nan(""),
-  std::map<std::string, std::string> tags = {},
-  std::string version = "",
-  std::string agent_url = "",
-  LogFunc log_func = &defaultLogFunc);
+  explicit TracerOptions(std::string agent_host = "localhost", uint32_t agent_port = 8126,
+                         std::string service = "", std::string type = "web",
+                         std::string environment = "", double sample_rate = std::nan(""),
+                         bool priority_sampling = true,
+                         std::string sampling_rules = R"([{"sample_rate": 1.0}])",
+                         int64_t write_period_ms = 1000, std::string operation_name_override = "",
+                         std::set<PropagationStyle> extract = {PropagationStyle::Datadog},
+                         std::set<PropagationStyle> inject = {PropagationStyle::Datadog},
+                         bool report_hostname = false, bool analytics_enabled = false,
+                         double analytics_rate = std::nan(""),
+                         std::map<std::string, std::string> tags = {}, std::string version = "",
+                         std::string agent_url = "", LogFunc log_func = &defaultLogFunc);
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the
