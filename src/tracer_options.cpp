@@ -74,27 +74,18 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
   return kvp;
 }
 
-// Expands a string into tokens that are separated by commas or whitespace.
-// Intended for expanding the propagation style environment variables.
-/* TODO: write a unit test, make sure the new impl is the same as this.
-std::vector<std::string> tokenize_propagation_style(const std::string &input) {
-  const std::regex word_separator("[\\s,]+");
-  std::vector<std::string> result;
-  std::copy_if(std::sregex_token_iterator(input.begin(), input.end(), word_separator, -1),
-               std::sregex_token_iterator(), std::back_inserter(result),
-               [](const std::string &s) { return !s.empty(); });
-  return result;
-}
-*/
-
-// Expands a string into tokens that are separated by commas or whitespace.
-// Intended for expanding the propagation style environment variables.
-std::vector<std::string> tokenize_propagation_style(const std::string &input) {
+// Return tokens scanned from the specified `input` using the specified
+// `in_delimiter` predicate.  `in_delimiter` returns whether a character is
+// considered part of a delimiter.  Contiguous runs of characters for which
+// `in_delimiter` returns `true` are considered part of the same delimiter.
+// Empty tokens are excluded from the result.
+template <typename Predicate>
+std::vector<std::string> tokenize(const std::string &input, Predicate &&in_delimiter) {
   std::vector<std::string> result;
   std::string current;
 
   for (const char ch : input) {
-    if (ch == ',' || std::isspace(static_cast<unsigned char>(ch))) {
+    if (in_delimiter(ch)) {
       if (!current.empty()) {
         result.push_back(current);
         current.clear();
@@ -109,6 +100,13 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
   }
 
   return result;
+}
+
+// Expands a string into tokens that are separated by commas or whitespace.
+// Intended for expanding the propagation style environment variables.
+std::vector<std::string> tokenize_propagation_style(const std::string &input) {
+  return tokenize(
+      input, [](char ch) { return ch == ',' || std::isspace(static_cast<unsigned char>(ch)); });
 }
 
 }  // namespace
