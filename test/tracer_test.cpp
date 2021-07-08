@@ -3,7 +3,7 @@
 #include <datadog/tags.h>
 #include <unistd.h>
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 #include <ctime>
 
 #include "../src/sample.h"

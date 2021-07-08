@@ -1,6 +1,6 @@
 #include "../src/span_buffer.h"
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 
 #include "../src/make_unique.h"
 #include "../src/sample.h"

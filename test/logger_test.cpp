@@ -1,6 +1,6 @@
 #include "../src/logger.h"
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 using namespace datadog::opentracing;
 
 TEST_CASE("logger") {

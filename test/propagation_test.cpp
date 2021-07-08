@@ -4,7 +4,7 @@
 #include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 #include <string>
 
 #include "../src/make_unique.h"

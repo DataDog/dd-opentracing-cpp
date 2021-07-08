@@ -2,7 +2,7 @@
 
 #include <datadog/version.h>
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 #include <ctime>
 
 #include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.

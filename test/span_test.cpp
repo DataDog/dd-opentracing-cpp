@@ -3,7 +3,7 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <thread>
@@ -81,48 +81,6 @@ TEST_CASE("span") {
         {"http://i-012a3b45c6d78901e//api/v1/check_run?api_key=0abcdef1a23b4c5d67ef8a90b1cde234",
          "http://i-012a3b45c6d78901e//api/v1/check_run"},
     };
-
-    std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
-    for (auto& test_case : test_cases) {
-      auto span_id = get_id();
-      Span span{logger,     nullptr, buffer_ptr, get_time,
-                span_id,    span_id, 0,          SpanContext{logger, span_id, span_id, "", {}},
-                get_time(), "",      "",         "",
-                "",         ""};
-      span.SetTag(ot::ext::http_url, test_case.first);
-      const ot::FinishSpanOptions finish_options;
-      span.FinishWithOptions(finish_options);
-
-      auto& result = buffer->traces().at(span_id).finished_spans->back();
-      REQUIRE(result->meta.find(ot::ext::http_url)->second == test_case.second);
-    }
-  }
-
-  SECTION("audits span data (legacy)") {
-    std::list<std::pair<std::string, std::string>> test_cases{
-        // Should remove query params
-        {"/", "/"},
-        {"/?asdf", "/?"},
-        {"/search", "/search"},
-        {"/search?", "/search?"},
-        {"/search?id=100&private=true", "/search?"},
-        {"/search?id=100&private=true?", "/search?"},
-        {"http://i-012a3b45c6d78901e//api/v1/check_run?api_key=0abcdef1a23b4c5d67ef8a90b1cde234",
-         "http://?//api/v1/check_run?"},
-        // Should replace all digits
-        {"/1", "/?"},
-        {"/9999", "/?"},
-        {"/user/1", "/user/?"},
-        {"/user/1/", "/user/?/"},
-        {"/user/1/repo/50", "/user/?/repo/?"},
-        {"/user/1/repo/50/", "/user/?/repo/?/"},
-        // Should replace segments with mixed-characters
-        {"/a1/v2", "/?/?"},
-        {"/v3/1a", "/v3/?"},
-        {"/V01/v9/abc/-1?", "/V01/v9/abc/?"},
-        {"/ABC/av-1/b_2/c.3/d4d/v5f/v699/7", "/ABC/?/?/?/?/?/?/?"},
-        {"/user/asdf123/repository/01234567-9ABC-DEF0-1234", "/user/?/repository/?"},
-        {"/ABC/a-1/b_2/c.3/d4d/5f/6", "/ABC/?/?/?/?/?/?"}};
 
     std::shared_ptr<SpanBuffer> buffer_ptr{buffer};
     for (auto& test_case : test_cases) {
@@ -322,7 +280,7 @@ TEST_CASE("span") {
     span.FinishWithOptions(finish_options);
     auto& result = buffer->traces().at(100).finished_spans->at(0);
 
-    REQUIRE(result->error == error_tag_test_case.span_error);
+    REQUIRE(int64_t(result->error) == int64_t(error_tag_test_case.span_error));
     REQUIRE(result->meta["error"] == error_tag_test_case.span_tag);
   }
 

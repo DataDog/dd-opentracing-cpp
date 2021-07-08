@@ -1,6 +1,6 @@
 #include "../src/sample.h"
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 #include <ctime>
 
 #include "../src/agent_writer.h"
