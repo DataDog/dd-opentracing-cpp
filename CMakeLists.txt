@@ -69,7 +69,7 @@ endif()
 
 # There are various bugs in g++ before major version 5.
 # Add flags to work around them.
-if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION MATCHES "^4\\."))
+if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5"))
   add_compile_options(-Wno-missing-field-initializers)
 endif()
 
