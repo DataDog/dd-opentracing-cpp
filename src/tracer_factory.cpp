@@ -14,7 +14,8 @@ namespace opentracing {
 
 ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
                                               std::string &error_message) {
-  TracerOptions options{"localhost", 8126, "", "web", "", 1.0};
+  TracerOptions options;
+  options.sample_rate = 1.0;
   json config;
   try {
     config = json::parse(configuration);

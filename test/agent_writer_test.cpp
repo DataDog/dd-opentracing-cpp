@@ -2,10 +2,10 @@
 
 #include <datadog/version.h>
 
-#include <catch2/catch.hpp>
 #include <ctime>
 
 #include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
+#include "catch.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 

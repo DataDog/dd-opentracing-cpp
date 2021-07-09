@@ -62,6 +62,9 @@ struct WritingSpanBufferOptions {
   bool enabled = true;
   std::string hostname;
   double analytics_rate = std::nan("");
+
+  explicit WritingSpanBufferOptions(bool enabled = true, std::string hostname = "",
+                                    double analytics_rate = std::nan(""));
 };
 
 // A SpanBuffer that sends completed traces to a Writer.

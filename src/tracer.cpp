@@ -11,10 +11,14 @@
 #include <unistd.h>
 #endif
 
+#include <time.h>  // localtime_r (POSIX), localtime_s (Windows)
+
+#include <ctime>
 #include <fstream>
 #include <random>
 
 #include "bool.h"
+#include "make_unique.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -46,6 +50,37 @@ class TlsRandomNumberGenerator {
 
   static void onFork() { random_number_generator_.seed(std::random_device{}()); }
 };
+
+// Return the specified `timestamp` formatted as an ISO 8601 datetime string
+// with one-second precision (i.e. no fractional seconds) and including the
+// local time zone offset, e.g. `std::string("2021-06-21T15:04:12-0400")`.
+std::string iso_8601_with_tz(std::chrono::system_clock::time_point timestamp) {
+  const char *const iso_8601_format = "%FT%T%z";  // one-second precision
+  // How large a buffer do we need?  In general,
+  //
+  //    YYYY-MM-DDTHH:MM:SSshhmm
+  //
+  // e.g.
+  //
+  //    2021-06-21T15:04:12-0400
+  //
+  // That's 24 characters, plus one for a null terminator 🠒 25.
+  // Let's use 32.
+  char buffer[32];
+  const std::time_t as_time_t = std::chrono::system_clock::to_time_t(timestamp);
+  // Use the platform specific functions `localtime_r` and `localtime_s`
+  // instead of `std::localtime`, which might not be thread safe.
+  std::tm parts;
+#ifdef _MSC_VER
+  ::localtime_s(&as_time_t, &parts);
+#else
+  ::localtime_r(&as_time_t, &parts);
+#endif
+  const std::size_t formatted_length =
+      std::strftime(buffer, sizeof buffer, iso_8601_format, &parts);
+  return std::string(buffer, formatted_length);
+}
+
 }  // namespace
 
 thread_local std::mt19937_64 TlsRandomNumberGenerator::random_number_generator_{
@@ -96,14 +131,6 @@ double analyticsRate(TracerOptions options) {
   return std::nan("");
 }
 
-bool legacyObfuscationEnabled() {
-  auto obfuscation = std::getenv("DD_TRACE_CPP_LEGACY_OBFUSCATION");
-  if (obfuscation != nullptr && std::string(obfuscation) == "1") {
-    return true;
-  }
-  return false;
-}
-
 void startupLog(TracerOptions &options) {
   auto env_setting = std::getenv("DD_TRACE_STARTUP_LOGS");
   if (env_setting != nullptr && !stob(env_setting, true)) {
@@ -112,10 +139,7 @@ void startupLog(TracerOptions &options) {
   }
 
   json j;
-  std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  std::stringstream ss;
-  ss << std::put_time(std::localtime(&t), "%FT%T%z");
-  j["date"] = ss.str();
+  j["date"] = iso_8601_with_tz(std::chrono::system_clock::now());
   j["version"] = datadog::version::tracer_version;
   j["lang"] = "cpp";
   j["lang_version"] = datadog::version::cpp_version;
@@ -217,29 +241,29 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
       auto nm = rule.at("name").get<std::string>();
       sampler->addRule([=](const std::string &service, const std::string &name) -> RuleResult {
         if (service == svc && name == nm) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else if (has_service) {
       auto svc = rule.at("service").get<std::string>();
       sampler->addRule([=](const std::string &service, const std::string &) -> RuleResult {
         if (service == svc) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else if (has_name) {
       auto nm = rule.at("name").get<std::string>();
       sampler->addRule([=](const std::string &, const std::string &name) -> RuleResult {
         if (name == nm) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else {
       sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
-        return {true, sample_rate};
+        return RuleResult{true, sample_rate};
       });
     }
   }
@@ -251,18 +275,11 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id)
-    : opts_(options),
-      buffer_(std::move(buffer)),
-      get_time_(get_time),
-      get_id_(get_id),
-      legacy_obfuscation_(legacyObfuscationEnabled()) {}
+    : opts_(options), buffer_(std::move(buffer)), get_time_(get_time), get_id_(get_id) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
                std::shared_ptr<RulesSampler> sampler)
-    : opts_(options),
-      get_time_(getRealTime),
-      get_id_(getId),
-      legacy_obfuscation_(legacyObfuscationEnabled()) {
+    : opts_(options), get_time_(getRealTime), get_id_(getId) {
   if (isDebug()) {
     logger_ = std::make_shared<VerboseLogger>(opts_.log_func);
   } else {
@@ -300,10 +317,10 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
-  auto span = std::make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id,
-                                     trace_id, parent_id, std::move(span_context), get_time_(),
-                                     opts_.service, opts_.type, operation_name, operation_name,
-                                     opts_.operation_name_override, legacy_obfuscation_);
+  auto span =
+      makeUnique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id, trace_id,
+                       parent_id, std::move(span_context), get_time_(), opts_.service, opts_.type,
+                       operation_name, operation_name, opts_.operation_name_override);
 
   if (!opts_.environment.empty()) {
     span->SetTag(datadog::tags::environment, opts_.environment);
@@ -322,7 +339,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
     span->SetTag(tag.first, tag.second);
   }
-  return span;
+  return std::move(span);
 } catch (const std::bad_alloc &) {
   // At least don't crash.
   return nullptr;

@@ -3,7 +3,7 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
-#include <regex>
+#include <cctype>
 
 #include "bool.h"
 
@@ -74,18 +74,88 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
   return kvp;
 }
 
-// Expands a string into tokens that are separated by commas or whitespace.
-// Intended for expanding the propagation style environment variables.
-std::vector<std::string> tokenize_propagation_style(const std::string &input) {
-  const std::regex word_separator("[\\s,]+");
+// Return tokens scanned from the specified `input` using the specified
+// `in_delimiter` predicate.  `in_delimiter` returns whether a character is
+// considered part of a delimiter.  Contiguous runs of characters for which
+// `in_delimiter` returns `true` are considered part of the same delimiter.
+// Empty tokens are excluded from the result.
+template <typename Predicate>
+std::vector<std::string> tokenize(const std::string &input, Predicate &&in_delimiter) {
   std::vector<std::string> result;
-  std::copy_if(std::sregex_token_iterator(input.begin(), input.end(), word_separator, -1),
-               std::sregex_token_iterator(), std::back_inserter(result),
-               [](const std::string &s) { return !s.empty(); });
+  std::string current;
+
+  for (const char ch : input) {
+    if (in_delimiter(ch)) {
+      if (!current.empty()) {
+        result.push_back(current);
+        current.clear();
+      }
+    } else {
+      current += ch;
+    }
+  }
+
+  if (!current.empty()) {
+    result.push_back(std::move(current));
+  }
+
   return result;
 }
 
+// Expands a string into tokens that are separated by commas or whitespace.
+// Intended for expanding the propagation style environment variables.
+std::vector<std::string> tokenize_propagation_style(const std::string &input) {
+  return tokenize(
+      input, [](char ch) { return ch == ',' || std::isspace(static_cast<unsigned char>(ch)); });
+}
+
 }  // namespace
+
+TracerOptions::TracerOptions(std::string agent_host, uint32_t agent_port, std::string service,
+                             std::string type, std::string environment, double sample_rate,
+                             bool priority_sampling, std::string sampling_rules,
+                             int64_t write_period_ms, std::string operation_name_override,
+                             std::set<PropagationStyle> extract, std::set<PropagationStyle> inject,
+                             bool report_hostname, bool analytics_enabled, double analytics_rate,
+                             std::map<std::string, std::string> tags, std::string version,
+                             std::string agent_url, LogFunc log_func)
+    : agent_host(std::move(agent_host)),
+      agent_port(std::move(agent_port)),
+      service(std::move(service)),
+      type(std::move(type)),
+      environment(std::move(environment)),
+      sample_rate(std::move(sample_rate)),
+      priority_sampling(std::move(priority_sampling)),
+      sampling_rules(std::move(sampling_rules)),
+      write_period_ms(std::move(write_period_ms)),
+      operation_name_override(std::move(operation_name_override)),
+      extract(std::move(extract)),
+      inject(std::move(inject)),
+      report_hostname(std::move(report_hostname)),
+      analytics_enabled(std::move(analytics_enabled)),
+      analytics_rate(std::move(analytics_rate)),
+      tags(std::move(tags)),
+      version(std::move(version)),
+      agent_url(std::move(agent_url)),
+      log_func(std::move(log_func)) {}
+
+ot::expected<std::set<PropagationStyle>> asPropagationStyle(
+    const std::vector<std::string> &styles) {
+  std::set<PropagationStyle> propagation_styles;
+  for (const std::string &style : styles) {
+    if (style == "Datadog") {
+      propagation_styles.insert(PropagationStyle::Datadog);
+    } else if (style == "B3") {
+      propagation_styles.insert(PropagationStyle::B3);
+    } else {
+      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    }
+  }
+  if (propagation_styles.size() == 0) {
+    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+  return propagation_styles;
+}
 
 ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     const TracerOptions &input) {

@@ -26,15 +26,21 @@ namespace datadog {
 namespace opentracing {
 
 struct SampleResult {
-  double rule_rate = std::nan("");
-  double limiter_rate = std::nan("");
-  double priority_rate = std::nan("");
-  OptionalSamplingPriority sampling_priority = nullptr;
+  double rule_rate;
+  double limiter_rate;
+  double priority_rate;
+  OptionalSamplingPriority sampling_priority;
+
+  explicit SampleResult(double rule_rate = std::nan(""), double limiter_rate = std::nan(""),
+                        double priority_rate = std::nan(""),
+                        OptionalSamplingPriority sampling_priority = nullptr);
 };
 
 struct SamplingRate {
-  double rate = std::nan("");
-  uint64_t max_hash = 0;
+  double rate;
+  uint64_t max_hash;
+
+  explicit SamplingRate(double rate = std::nan(""), uint64_t max_hash = 0);
 };
 
 class PrioritySampler {
@@ -53,8 +59,10 @@ class PrioritySampler {
 };
 
 struct RuleResult {
-  bool matched = false;
-  double rate = std::nan("");
+  bool matched;
+  double rate;
+
+  explicit RuleResult(bool matched = false, double rate = std::nan(""));
 };
 
 using RuleFunc = std::function<RuleResult(const std::string&, const std::string&)>;

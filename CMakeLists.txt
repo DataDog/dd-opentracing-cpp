@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.7)
 
 project(dd-opentracing-cpp)
 
@@ -23,7 +23,7 @@ endif()
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 # Includes
 set(CMAKE_INCLUDE_PATH 3rd_party/include deps/include)
@@ -49,12 +49,28 @@ find_package(Sanitizers)
 install(DIRECTORY include/datadog DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-  add_compile_options(-Wall -Wextra -Werror -pedantic -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+  add_compile_options(-Wall -Wextra -Werror -pedantic -pedantic-errors -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++11)
+
+  # To support GCC 4.8, which supports a subset of C++11 and none of C++14, we
+  # had to add `std::move` to some return statements.  In more recent versions
+  # of the language, this can inhibit the return value optimization, and so GCC
+  # and Clang emit a warning.
+  # Suppress that warning if available.
+  if (((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "9")) OR ((CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "4")))
+    add_compile_options(-Wno-redundant-move)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/W3)
 else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+# There are various bugs in g++ before major version 5.
+# Add flags to work around them.
+if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5"))
+  add_compile_options(-Wno-missing-field-initializers)
 endif()
 
 # Outputs

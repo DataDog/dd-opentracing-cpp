@@ -2,7 +2,7 @@
 
 #include <opentracing/ext/tags.h>
 
-#include <catch2/catch.hpp>
+#include "catch.h"
 using namespace datadog::opentracing;
 
 void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const char *> &lhs,

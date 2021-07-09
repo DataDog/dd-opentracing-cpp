@@ -6,6 +6,7 @@
 #include <sstream>
 #include <utility>
 
+#include "make_unique.h"
 #include "sample.h"
 #include "span_buffer.h"
 
@@ -82,7 +83,11 @@ const std::string json_baggage_key = "baggage";
 // unicode strings, only used for comparing HTTP header names.
 // Rolled my own because I don't want to import all of libboost for a couple of functions!
 bool equals_ignore_case(const std::string &a, const std::string &b) {
-  return std::equal(a.begin(), a.end(), b.begin(), b.end(),
+  if (a.size() != b.size()) {
+    return false;
+  }
+
+  return std::equal(a.begin(), a.end(), b.begin(),
                     [](char a, char b) { return tolower(a) == tolower(b); });
 }
 
@@ -106,19 +111,19 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
 
   if (!trace_id_set && !parent_id_set) {
     // Both IDs are empty; return an empty context.
-    return std::make_unique<Result>();
+    return makeUnique<Result>();
   }
   if (!trace_id_set) {
     // There's a parent ID without a trace ID.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   if (!parent_id_set && !origin_set) {
     // Parent ID is required, except when origin is set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   if (origin_set && !sampling_priority_set) {
     // Origin should only be set if sampling priority is also set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return makeUnique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
 }
@@ -144,7 +149,7 @@ OptionalSamplingPriority asSamplingPriority(int i) {
       i > static_cast<int>(SamplingPriority::MaximumValue)) {
     return nullptr;
   }
-  return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));
+  return makeUnique<SamplingPriority>(static_cast<SamplingPriority>(i));
 }
 
 SpanContext::SpanContext(std::shared_ptr<const Logger> logger, uint64_t id, uint64_t trace_id,
@@ -437,8 +442,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     j.at(json_baggage_key).get_to(baggage);
   }
 
-  auto context =
-      std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
+  auto context = makeUnique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
@@ -468,7 +472,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       context = std::move(result.value());
     }
   }
-  return context;
+  return std::move(context);
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
@@ -524,8 +528,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
                                                       sampling_priority_set, origin_set)) {
     return std::move(*result);
   }
-  auto context =
-      std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
+  auto context = makeUnique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 }
