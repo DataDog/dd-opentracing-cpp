@@ -69,6 +69,10 @@ void finish_root_span(const PendingTrace& trace, SpanData& span) {
 
 }  // namespace
 
+WritingSpanBufferOptions::WritingSpanBufferOptions(bool enabled, std::string hostname,
+                                                   double analytics_rate)
+    : enabled(enabled), hostname(std::move(hostname)), analytics_rate(analytics_rate) {}
+
 void PendingTrace::finish() {
   // Apply changes to spans, in particular treating the root / local-root
   // span as special.

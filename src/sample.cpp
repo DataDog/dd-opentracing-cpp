@@ -26,6 +26,17 @@ uint64_t maxIdFromSampleRate(double rate) {
 }
 }  // namespace
 
+SampleResult::SampleResult(double rule_rate, double limiter_rate, double priority_rate,
+                           OptionalSamplingPriority sampling_priority)
+    : rule_rate(rule_rate),
+      limiter_rate(limiter_rate),
+      priority_rate(priority_rate),
+      sampling_priority(std::move(sampling_priority)) {}
+
+SamplingRate::SamplingRate(double rate, uint64_t max_hash) : rate(rate), max_hash(max_hash) {}
+
+RuleResult::RuleResult(bool matched, double rate) : matched(matched), rate(rate) {}
+
 SampleResult PrioritySampler::sample(const std::string& environment, const std::string& service,
                                      uint64_t trace_id) const {
   SamplingRate applied_rate = default_sample_rate_;
@@ -61,9 +72,9 @@ void PrioritySampler::configure(json config) {
     auto rate = it.value();
     auto max_hashed = maxIdFromSampleRate(rate);
     if (key == priority_sampler_default_rate_key) {
-      default_sample_rate_ = {rate, max_hashed};
+      default_sample_rate_ = SamplingRate{rate, max_hashed};
     } else {
-      agent_sampling_rates_[key] = {rate, max_hashed};
+      agent_sampling_rates_[key] = SamplingRate{rate, max_hashed};
     }
   }
 }
@@ -110,7 +121,7 @@ RuleResult RulesSampler::match(const std::string& service, const std::string& na
       return result;
     }
   }
-  return {false, nan};
+  return RuleResult{false, nan};
 }
 
 void RulesSampler::updatePrioritySampler(json config) { priority_sampler_.configure(config); }

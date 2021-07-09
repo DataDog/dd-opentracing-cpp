@@ -241,29 +241,29 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
       auto nm = rule.at("name").get<std::string>();
       sampler->addRule([=](const std::string &service, const std::string &name) -> RuleResult {
         if (service == svc && name == nm) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else if (has_service) {
       auto svc = rule.at("service").get<std::string>();
       sampler->addRule([=](const std::string &service, const std::string &) -> RuleResult {
         if (service == svc) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else if (has_name) {
       auto nm = rule.at("name").get<std::string>();
       sampler->addRule([=](const std::string &, const std::string &name) -> RuleResult {
         if (name == nm) {
-          return {true, sample_rate};
+          return RuleResult{true, sample_rate};
         }
-        return {false, nan};
+        return RuleResult{false, nan};
       });
     } else {
       sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
-        return {true, sample_rate};
+        return RuleResult{true, sample_rate};
       });
     }
   }
