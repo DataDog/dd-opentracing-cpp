@@ -196,15 +196,6 @@ TEST_CASE("deserialize fails") {
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
-
-  SECTION("when origin provided without sampling priority") {
-    carrier.Set(test_case.x_datadog_trace_id, "123");
-    carrier.Set(test_case.x_datadog_parent_id, "456");
-    carrier.Set(test_case.x_datadog_origin, "madeuporigin");
-    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
-    REQUIRE(!err);
-    REQUIRE(err.error() == ot::span_context_corrupted_error);
-  }
 }
 
 TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
@@ -337,13 +328,6 @@ TEST_CASE("Binary Span Context") {
 
     SECTION("when the sampling priority is whack") {
       carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
-      auto err = SpanContext::deserialize(logger, carrier);
-      REQUIRE(!err);
-      REQUIRE(err.error() == ot::span_context_corrupted_error);
-    }
-
-    SECTION("when sampling priority is missing but origin is set") {
-      carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"origin\": \"synthetics\" }";
       auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
       REQUIRE(err.error() == ot::span_context_corrupted_error);
@@ -659,5 +643,18 @@ TEST_CASE("origin header propagation") {
     REQUIRE(meta.find("_dd.origin") != meta.end());
     meta = spans->at(1)->meta;
     REQUIRE(meta.find("_dd.origin") != meta.end());
+  }
+
+  SECTION("only trace id and origin headers are required") {
+    MockTextMapCarrier tmc;
+    tmc.text_map["x-datadog-trace-id"] = "321";
+    tmc.text_map["x-datadog-origin"] = "madeuporigin";
+
+    auto span_context_maybe = tracer->Extract(tmc);
+    REQUIRE(span_context_maybe);
+
+    auto sc = dynamic_cast<SpanContext*>(span_context_maybe->get());
+    REQUIRE(sc->traceId() == 321);
+    REQUIRE(sc->origin() == "madeuporigin");
   }
 }
