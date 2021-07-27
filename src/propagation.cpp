@@ -101,7 +101,7 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 // whether the corresponding tag is set.  Note that `std::unique_ptr` is here
 // used as a substitute for `std::optional`.
 std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_presence_policy(
-    bool trace_id_set, bool parent_id_set, bool sampling_priority_set, bool origin_set) {
+    bool trace_id_set, bool parent_id_set, bool origin_set) {
   using Result = ot::expected<std::unique_ptr<ot::SpanContext>>;
 
   if (!trace_id_set && !parent_id_set) {
@@ -114,10 +114,6 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
   }
   if (!parent_id_set && !origin_set) {
     // Parent ID is required, except when origin is set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
-  }
-  if (origin_set && !sampling_priority_set) {
-    // Origin should only be set if sampling priority is also set.
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
@@ -412,9 +408,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
 
   reader >> j;
 
-  if (const auto result = enforce_tag_presence_policy(
-          j.count(json_trace_id_key), j.count(json_parent_id_key),
-          j.count(json_sampling_priority_key), j.count(json_origin_key))) {
+  if (const auto result = enforce_tag_presence_policy(j.contains(json_trace_id_key),
+                                                      j.contains(json_parent_id_key),
+                                                      j.contains(json_origin_key))) {
     return std::move(*result);
   }
 
@@ -481,7 +477,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   std::string origin;
   bool trace_id_set = false;
   bool parent_id_set = false;
-  bool sampling_priority_set = false;
   bool origin_set = false;
   std::unordered_map<std::string, std::string> baggage;
   auto result =
@@ -501,7 +496,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
                         << std::endl;
               return ot::make_unexpected(ot::span_context_corrupted_error);
             }
-            sampling_priority_set = true;
           } else if (headers_impl.origin_header != nullptr &&
                      equals_ignore_case(key, headers_impl.origin_header)) {
             origin = value;
@@ -520,8 +514,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (!result) {  // "if unexpected", hence "return {}" from above is fine.
     return ot::make_unexpected(result.error());
   }
-  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set,
-                                                      sampling_priority_set, origin_set)) {
+  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set, origin_set)) {
     return std::move(*result);
   }
   auto context =
