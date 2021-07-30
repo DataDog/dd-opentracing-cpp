@@ -36,7 +36,6 @@ set(CMAKE_LIBRARY_PATH deps/lib)
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
-find_package(ZLIB REQUIRED)
 find_library(MSGPACK_LIB msgpack)
 find_package(CURL)
 find_package(Threads REQUIRED)
@@ -58,7 +57,7 @@ else()
 endif()
 
 # Outputs
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads)
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads)
 
 ## Shared lib
 if(BUILD_SHARED)
