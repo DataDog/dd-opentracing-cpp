@@ -12,6 +12,7 @@ include(GNUInstallDirs)
 
 option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
+option(BUILD_OBJECT "Builds objects for use in another project" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
 
@@ -81,6 +82,13 @@ if(BUILD_STATIC)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+## Object lib
+if(BUILD_OBJECT)
+  add_library(dd_opentracing-object OBJECT ${DD_OPENTRACING_SOURCES})
+  add_sanitizers(dd_opentracing-object)
+  target_compile_definitions(dd_opentracing-object PUBLIC DD_OPENTRACING_OBJECT)
 endif()
 
 ## Plugin
