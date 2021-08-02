@@ -40,7 +40,7 @@ ENV LDFLAGS="-fPIC"
 
 
 RUN apt-get update && \
-  apt-get install -y git build-essential wget curl tar cmake libpcre3-dev zlib1g-dev
+  apt-get install -y git build-essential wget curl tar cmake libpcre3-dev
 
 WORKDIR /root
 

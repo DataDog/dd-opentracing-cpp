@@ -9,14 +9,12 @@ fi
 OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.6.0}
 CURL_VERSION=${CURL_VERSION:-7.70.0}
 MSGPACK_VERSION=${MSGPACK_VERSION:-3.2.1}
-ZLIB_VERSION=${ZLIB_VERSION:-1.2.11}
 
 # Just report versions and exit.
 if [[ "$1" == "versions" ]]; then
 	echo "opentracing:$OPENTRACING_VERSION"
 	echo "curl:$CURL_VERSION"
 	echo "msgpack:$MSGPACK_VERSION"
-	echo "zlib:$ZLIB_VERSION"
 	exit 0
 fi
 
@@ -26,7 +24,6 @@ fi
 BUILD_OPENTRACING=1
 BUILD_CURL=1
 BUILD_MSGPACK=1
-BUILD_ZLIB=1
 
 while test $# -gt 0
 do
@@ -36,8 +33,6 @@ do
     not-opentracing) BUILD_OPENTRACING=0
       ;;
     not-curl) BUILD_CURL=0
-      ;;
-    not-zlib) BUILD_ZLIB=0
       ;;
     *) echo "unknown dependency: $1" && exit 1
       ;;
@@ -63,19 +58,6 @@ if [ "$BUILD_OPENTRACING" -eq "1" ]; then
   cd ../..
   rm -r "opentracing-cpp-${OPENTRACING_VERSION}/"
   rm opentracing-cpp.tar.gz
-fi
-
-# Zlib
-if [ "$BUILD_ZLIB" -eq "1" ]; then
-  wget "https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz"
-  tar zxf "zlib-${ZLIB_VERSION}.tar.gz"
-  mkdir -p "zlib-${ZLIB_VERSION}"
-  cd "zlib-${ZLIB_VERSION}"
-  CFLAGS="$CFLAGS -fPIC" ./configure --prefix="$install_dir" --static
-  make && make install
-  cd ..
-  rm -r "zlib-${ZLIB_VERSION}"
-  rm "zlib-${ZLIB_VERSION}.tar.gz"
 fi
 
 # Msgpack
@@ -110,7 +92,7 @@ if [ "$BUILD_CURL" -eq "1" ]; then
               --without-ssl \
               --disable-crypto-auth \
               --without-axtls \
-              --with-zlib \
+              --without-zlib \
               --disable-rtsp \
               --enable-shared=no \
               --enable-static=yes \
