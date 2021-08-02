@@ -88,6 +88,8 @@ endif()
 if(BUILD_OBJECT)
   add_library(dd_opentracing-object OBJECT ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-object)
+  target_link_libraries(dd_opentracing-object ${CURL_LIBRARIES} Threads::Threads)
+  set_property(TARGET dd_opentracing-object PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_compile_definitions(dd_opentracing-object PUBLIC DD_OPENTRACING_OBJECT)
 endif()
 
