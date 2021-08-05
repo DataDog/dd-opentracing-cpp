@@ -27,7 +27,6 @@ endif()
 set(CMAKE_CXX_STANDARD 14)
 
 # Includes
-set(CMAKE_INCLUDE_PATH 3rd_party/include deps/include)
 include_directories(SYSTEM 3rd_party/include deps/include)
 include_directories(include)
 
