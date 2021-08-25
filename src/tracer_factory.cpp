@@ -135,6 +135,25 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
 template <class TracerImpl>
 ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
     const char *configuration, std::string &error_message) const noexcept try {
+  
+  // TODO
+  std::cout << "You are making a tracer!\n" << std::flush;
+
+  const auto reportEnvVar = [](const char* name) {
+    const char* const value = std::getenv(name);
+    std::cout << name << ' ';
+    if (value) {
+      std::cout << "= " << value;
+    } else {
+      std::cout << "is unset";
+    }
+    std::cout << '\n' << std::flush;
+  };
+
+  reportEnvVar("FISH_FLAVOR");
+  reportEnvVar("BEST_COLOR");
+  // end TODO
+
   auto maybe_options = optionsFromConfig(configuration, error_message);
   if (!maybe_options) {
     return ot::make_unexpected(maybe_options.error());
