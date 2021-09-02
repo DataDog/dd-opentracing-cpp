@@ -149,14 +149,12 @@ TEST_CASE("SpanContext") {
       carrier.set_fails_after = 0;
       auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
-      REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
 
     SECTION("when setting parent id fails") {
       carrier.set_fails_after = 1;
       auto err = context.serialize(carrier, buffer, propagation_styles, priority_sampling);
       REQUIRE(!err);
-      REQUIRE(err.error() == std::error_code(6, ot::propagation_error_category()));
     }
   }
 }
@@ -194,7 +192,6 @@ TEST_CASE("deserialize fails") {
     carrier.Set("but where is parent-id??", "420");
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
-    REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
   SECTION("but not if origin is nonempty") {
@@ -212,7 +209,6 @@ TEST_CASE("deserialize fails") {
     carrier.Set(test_case.x_datadog_parent_id, "420");
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
-    REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
   SECTION("when the sampling priority is whack") {
@@ -221,7 +217,6 @@ TEST_CASE("deserialize fails") {
     carrier.Set(test_case.x_datadog_sampling_priority, "420");
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
-    REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 
   SECTION("when decimal integer IDs start decimal but have hex characters") {
@@ -283,7 +278,6 @@ TEST_CASE("deserialize fails when there are conflicting b3 and datadog headers")
   auto err =
       SpanContext::deserialize(logger, carrier, {PropagationStyle::Datadog, PropagationStyle::B3});
   REQUIRE(!err);
-  REQUIRE(err.error() == ot::span_context_corrupted_error);
 }
 
 TEST_CASE("deserialize returns a null context if both trace ID and parent ID are missing") {
@@ -339,7 +333,6 @@ TEST_CASE("Binary Span Context") {
       carrier.clear(carrier.badbit);
       auto err = context.serialize(carrier, buffer, priority_sampling);
       REQUIRE(!err);
-      REQUIRE(err.error() == std::make_error_code(std::errc::io_error));
       carrier.clear(carrier.goodbit);
     }
   }
@@ -349,28 +342,24 @@ TEST_CASE("Binary Span Context") {
       carrier << "{ \"parent_id\": \"420\" }";
       auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
-      REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when parent_id is missing") {
       carrier << "{ \"trace_id\": \"123\" }";
       auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
-      REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when the sampling priority is whack") {
       carrier << "{ \"trace_id\": \"123\", \"parent_id\": \"420\", \"sampling_priority\": 42 }";
       auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
-      REQUIRE(err.error() == ot::span_context_corrupted_error);
     }
 
     SECTION("when given invalid json data") {
       carrier << "something that isn't JSON";
       auto err = SpanContext::deserialize(logger, carrier);
       REQUIRE(!err);
-      REQUIRE(err.error() == std::make_error_code(std::errc::invalid_argument));
     }
   }
 }
