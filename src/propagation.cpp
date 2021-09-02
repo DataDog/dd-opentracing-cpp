@@ -123,62 +123,64 @@ enum class PropagationError {
 // `PropagationErrorCategory` defines the diagnostic messages corresponding to
 // `ProgagationError` values.
 class PropagationErrorCategory : public std::error_category {
-  public:
-    // Return the name of this error category.
-    const char* name() const noexcept override;
+ public:
+  // Return the name of this error category.
+  const char *name() const noexcept override;
 
-    // Return the diagnostic message corresponding to the specified `code`,
-    // where `code` is one of the values of `PropagationError`.
-    std::string message(int condition) const override;
-    
-    // Return the singleton instance of this error category.
-    static const PropagationErrorCategory& instance();
+  // Return the diagnostic message corresponding to the specified `code`,
+  // where `code` is one of the values of `PropagationError`.
+  std::string message(int condition) const override;
+
+  // Return the singleton instance of this error category.
+  static const PropagationErrorCategory &instance();
 };
 
-const char* PropagationErrorCategory::name() const noexcept {
-    return "Datadog trace propagation";
-}
+const char *PropagationErrorCategory::name() const noexcept { return "Datadog trace propagation"; }
 
 std::string PropagationErrorCategory::message(int code) const {
   switch (static_cast<PropagationError>(code)) {
-  case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_PRE:
-    return "output stream in bad state, cannot begin serializing SpanContext";
-  case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_POST:
-    return "output stream in bad state after writing JSON, cannot serialize SpanContext";
-  case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_STREAM:
-    return "memory allocation failure, cannot serialize SpanContext into stream";
-  case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_MAP:
-    return "memory allocation failure, cannot serialize SpanContext into TextMapWriter";
-  case PropagationError::BAD_STREAM_DESERIALIZE_SPAN_CONTEXT:
-    return "input stream in bad state, cannot begin deserializing SpanContext";
-  case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_STREAM:
-    return "invalid sampling priority, cannot deserialize SpanContext from stream";
-  case PropagationError::INVALID_JSON_DESERIALIZE_SPAN_CONTEXT_STREAM:
-    return "invalid JSON, cannot deserialize SpanContext from stream";
-  case PropagationError::INVALID_INTEGER_DESERIALIZE_SPAN_CONTEXT_STREAM:
-    return "invalid integer literal, cannot deserialize SpanContext from stream";
-  case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_STREAM:
-    return "memory allocation failure, cannot deserialize SpanContext from stream";
-  case PropagationError::DATADOG_B3_HEADER_CONFLICT:
-    return "conflicting Datadog and B3 headers, unable to deserialize SpanContext from TextMapReader";
-  case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_TEXT_MAP:
-    return "memory allocation failure, cannot deserialize SpanContext from TextMapReader";
-  case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_TEXT_MAP:
-    return "invalid sampling priority, cannot deserialize SpanContext from TextMapReader";
-  case PropagationError::INVALID_TRACE_ID:
-    return "invalid integer literal for trace ID or parent ID, cannot deserialize SpanContext from TextMapReader";
-  case PropagationError::OUT_OF_RANGE_TRACE_ID:
-    return "trace ID or parent ID is out of range, cannot deserialize SpanContext from TextMapReader";
-  case PropagationError::PARENT_ID_WITHOUT_TRACE_ID:
-    return "span has a parent ID but does not have a trace ID, unable to deserialize SpanContext";
-  case PropagationError::MISSING_PARENT_ID:
-    return "span has neither a parent ID nor an origin, unable to deserialize SpanContext";
+    case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_PRE:
+      return "output stream in bad state, cannot begin serializing SpanContext";
+    case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_POST:
+      return "output stream in bad state after writing JSON, cannot serialize SpanContext";
+    case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_STREAM:
+      return "memory allocation failure, cannot serialize SpanContext into stream";
+    case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_MAP:
+      return "memory allocation failure, cannot serialize SpanContext into TextMapWriter";
+    case PropagationError::BAD_STREAM_DESERIALIZE_SPAN_CONTEXT:
+      return "input stream in bad state, cannot begin deserializing SpanContext";
+    case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_STREAM:
+      return "invalid sampling priority, cannot deserialize SpanContext from stream";
+    case PropagationError::INVALID_JSON_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "invalid JSON, cannot deserialize SpanContext from stream";
+    case PropagationError::INVALID_INTEGER_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "invalid integer literal, cannot deserialize SpanContext from stream";
+    case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "memory allocation failure, cannot deserialize SpanContext from stream";
+    case PropagationError::DATADOG_B3_HEADER_CONFLICT:
+      return "conflicting Datadog and B3 headers, unable to deserialize SpanContext from "
+             "TextMapReader";
+    case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_TEXT_MAP:
+      return "memory allocation failure, cannot deserialize SpanContext from TextMapReader";
+    case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_TEXT_MAP:
+      return "invalid sampling priority, cannot deserialize SpanContext from TextMapReader";
+    case PropagationError::INVALID_TRACE_ID:
+      return "invalid integer literal for trace ID or parent ID, cannot deserialize SpanContext "
+             "from TextMapReader";
+    case PropagationError::OUT_OF_RANGE_TRACE_ID:
+      return "trace ID or parent ID is out of range, cannot deserialize SpanContext from "
+             "TextMapReader";
+    case PropagationError::PARENT_ID_WITHOUT_TRACE_ID:
+      return "span has a parent ID but does not have a trace ID, unable to deserialize "
+             "SpanContext";
+    case PropagationError::MISSING_PARENT_ID:
+      return "span has neither a parent ID nor an origin, unable to deserialize SpanContext";
   }
 
   return "unrecognized Datadog propagation error code " + std::to_string(code);
 }
 
-const PropagationErrorCategory& PropagationErrorCategory::instance() {
+const PropagationErrorCategory &PropagationErrorCategory::instance() {
   static PropagationErrorCategory singleton;
   return singleton;
 }
