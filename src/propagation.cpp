@@ -129,7 +129,7 @@ class PropagationErrorCategory : public std::error_category {
 
   // Return the diagnostic message corresponding to the specified `code`,
   // where `code` is one of the values of `PropagationError`.
-  std::string message(int condition) const override;
+  std::string message(int code) const override;
 
   // Return the singleton instance of this error category.
   static const PropagationErrorCategory &instance();
