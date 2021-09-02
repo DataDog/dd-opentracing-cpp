@@ -102,7 +102,7 @@ jobs:
       - run:
           name: Tools required to build code and dependencies
           command: |
-            apt-get update
+            apt-get --allow-releaseinfo-change update
             DEBIAN_FRONTEND=noninteractive apt-get -y install git cmake g++-7
       - checkout
       - run:
