@@ -92,7 +92,7 @@ jobs:
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
     docker:
-      - image: opentracing/nginx-opentracing:0.16.0
+      - image: opentracing/nginx-opentracing:0.20.0
     environment:
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
