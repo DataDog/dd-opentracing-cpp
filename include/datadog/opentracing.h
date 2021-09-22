@@ -117,20 +117,22 @@ struct TracerOptions {
   // A logging function that is called by the tracer when noteworthy events occur.
   // The default value uses std::cerr, and applications can inject their own logging function.
   LogFunc log_func = [](LogLevel level, ot::string_view message) {
+    std::string level_str;
     switch (level) {
       case LogLevel::debug:
-        std::cerr << "debug: " << message << std::endl;
+        level_str = "debug";
         break;
       case LogLevel::info:
-        std::cerr << "info: " << message << std::endl;
+        level_str = "info";
         break;
       case LogLevel::error:
-        std::cerr << "error: " << message << std::endl;
+        level_str = "error";
         break;
       default:
-        std::cerr << "<unknown level>: " << message << std::endl;
+        level_str = "<unknown level>";
         break;
     }
+    std::cerr << level_str + ": " + message.data() + "\n";
   };
 };
 
