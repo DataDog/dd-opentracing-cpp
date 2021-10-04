@@ -104,7 +104,7 @@ TEST_CASE("SpanContext") {
         REQUIRE(sc);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
-        REQUIRE(received_context->id() == 420);
+        REQUIRE(received_context->traceId() == 123);
       }
 
       SECTION("even with trailing whitespace in integer fields") {
@@ -113,7 +113,7 @@ TEST_CASE("SpanContext") {
         REQUIRE(sc);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
-        REQUIRE(received_context->id() == 420);
+        REQUIRE(received_context->traceId() == 123);
       }
 
       SECTION("even with whitespace surrounding integer fields") {
@@ -122,7 +122,7 @@ TEST_CASE("SpanContext") {
         REQUIRE(sc);
         auto received_context = dynamic_cast<SpanContext*>(sc->get());
         REQUIRE(received_context);
-        REQUIRE(received_context->id() == 420);
+        REQUIRE(received_context->traceId() == 123);
       }
     }
     SECTION("can access ids") {
