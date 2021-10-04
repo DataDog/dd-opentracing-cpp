@@ -97,6 +97,33 @@ TEST_CASE("SpanContext") {
           REQUIRE(*received_context2 == *received_context);
         }
       }
+
+      SECTION("even with leading whitespace in integer fields") {
+        carrier.Set("x-datadog-trace-id", "    123");
+        auto sc = SpanContext::deserialize(logger, carrier, propagation_styles);
+        REQUIRE(sc);
+        auto received_context = dynamic_cast<SpanContext*>(sc->get());
+        REQUIRE(received_context);
+        REQUIRE(received_context->traceId() == 123);
+      }
+
+      SECTION("even with trailing whitespace in integer fields") {
+        carrier.Set("x-datadog-trace-id", "123    ");
+        auto sc = SpanContext::deserialize(logger, carrier, propagation_styles);
+        REQUIRE(sc);
+        auto received_context = dynamic_cast<SpanContext*>(sc->get());
+        REQUIRE(received_context);
+        REQUIRE(received_context->traceId() == 123);
+      }
+
+      SECTION("even with whitespace surrounding integer fields") {
+        carrier.Set("x-datadog-trace-id", "  123    ");
+        auto sc = SpanContext::deserialize(logger, carrier, propagation_styles);
+        REQUIRE(sc);
+        auto received_context = dynamic_cast<SpanContext*>(sc->get());
+        REQUIRE(received_context);
+        REQUIRE(received_context->traceId() == 123);
+      }
     }
     SECTION("can access ids") {
       REQUIRE(context.ToTraceID() == "123");
@@ -195,6 +222,12 @@ TEST_CASE("deserialize fails") {
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
     REQUIRE(err.error() == ot::span_context_corrupted_error);
+  }
+
+  SECTION("when decimal integer IDs start decimal but have hex characters") {
+    carrier.Set(test_case.x_datadog_trace_id, "123deadbeef");
+    auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
+    REQUIRE(!err);
   }
 }
 
