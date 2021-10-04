@@ -4,6 +4,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 #include "sample.h"
@@ -117,6 +118,23 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
+}
+
+// Interpret the specified `text` as a non-negative integer formatted in the
+// specified `base` (e.g. base 10 for decimal, base 16 for hexadecimal),
+// possibly surrounded by whitespace, and return the integer.  Throw an
+// exception derived from `std::logic_error` if an error occurs.
+uint64_t parse_uint64(const std::string& text, int base) {
+  std::size_t end_index;
+  const uint64_t result = std::stoull(text, &end_index, base);
+
+  // If any of the remaining characters are not whitespace, then `text`
+  // contains something other than a base-`base` integer.
+  if (std::any_of(text.begin() + end_index, text.end(), [](unsigned char ch) { return !std::isspace(ch);})) {
+    throw std::invalid_argument("integer text field has a trailing non-whitespace character");
+  }
+
+  return result;
 }
 
 }  // namespace
@@ -416,8 +434,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
 
   std::string trace_id_str = j[json_trace_id_key];
   std::string parent_id_str = j[json_parent_id_key];
-  trace_id = std::stoull(trace_id_str);
-  parent_id = std::stoull(parent_id_str);
+  trace_id = parse_uint64(trace_id_str, 10);
+  parent_id = parse_uint64(parent_id_str, 10);
 
   if (j.find(json_sampling_priority_key) != j.end()) {
     sampling_priority = asSamplingPriority(j[json_sampling_priority_key]);
@@ -483,10 +501,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
           if (equals_ignore_case(key, headers_impl.trace_id_header)) {
-            trace_id = std::stoull(value, nullptr, headers_impl.base);
+            trace_id = parse_uint64(value, headers_impl.base);
             trace_id_set = true;
           } else if (equals_ignore_case(key, headers_impl.span_id_header)) {
-            parent_id = std::stoull(value, nullptr, headers_impl.base);
+            parent_id = parse_uint64(value, headers_impl.base);
             parent_id_set = true;
           } else if (equals_ignore_case(key, headers_impl.sampling_priority_header)) {
             sampling_priority = asSamplingPriority(std::stoi(value));
