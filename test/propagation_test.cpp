@@ -228,7 +228,6 @@ TEST_CASE("deserialize fails") {
     carrier.Set(test_case.x_datadog_trace_id, "123deadbeef");
     auto err = SpanContext::deserialize(logger, carrier, test_case.styles);
     REQUIRE(!err);
-    REQUIRE(err.error() == ot::span_context_corrupted_error);
   }
 }
 
