@@ -69,14 +69,15 @@ TEST_CASE("rules sampler") {
   start.tm_mon = 2;
   start.tm_year = 107;
   const TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
-                 std::chrono::steady_clock::time_point{}};
+                       std::chrono::steady_clock::time_point{}};
   const TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   // A `Limiter` configured with these parameters will allow the first, but
   // none afterward. TODO: is that so?
   const long max_tokens = 1;
   const double refresh_rate = 1.0;
   const long tokens_per_refresh = 1;
-  const auto sampler = std::make_shared<RulesSampler>(get_time, max_tokens, refresh_rate, tokens_per_refresh);
+  const auto sampler =
+      std::make_shared<RulesSampler>(get_time, max_tokens, refresh_rate, tokens_per_refresh);
 
   const ot::StartSpanOptions span_options;
   const ot::FinishSpanOptions finish_options;
@@ -172,7 +173,7 @@ TEST_CASE("rules sampler") {
   SECTION("sampling based on rule yields a \"user\" sampling priority") {
     // See the comments in `RulesSampler::sample` for an explanation of this
     // section.
-    
+
     // There are three cases:
     // 1. Create a rule that matches the trace, and has rate `0.0`. Expect
     //     priority `UserDrop`.
@@ -180,7 +181,7 @@ TEST_CASE("rules sampler") {
     //     priority `UserKeep`.
     // 3. Create a rule that matches the trace, and has rate `1.0`, but the
     //     limiter drops it. Expect `UserDrop`.
-    
+
     SECTION("when the matching rule drops a trace") {
       TracerOptions tracer_options;
       tracer_options.service = "test.service";
@@ -191,10 +192,11 @@ TEST_CASE("rules sampler") {
 
       auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
-      
+
       const auto& metrics = mwriter->traces[0][0]->metrics;
       REQUIRE(metrics.count("_sampling_priority_v1"));
-      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserDrop));
+      REQUIRE(metrics.at("_sampling_priority_v1") ==
+              static_cast<double>(SamplingPriority::UserDrop));
     }
 
     SECTION("when the matching rule keeps a trace") {
@@ -207,12 +209,13 @@ TEST_CASE("rules sampler") {
 
       auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
-      
+
       const auto& metrics = mwriter->traces[0][0]->metrics;
       REQUIRE(metrics.count("_sampling_priority_v1"));
-      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserKeep));
+      REQUIRE(metrics.at("_sampling_priority_v1") ==
+              static_cast<double>(SamplingPriority::UserKeep));
     }
-      
+
     SECTION("when the limiter drops a trace") {
       TracerOptions tracer_options;
       tracer_options.service = "test.service";
@@ -223,7 +226,7 @@ TEST_CASE("rules sampler") {
 
       auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
-      
+
       const auto& metrics = mwriter->traces[0][0]->metrics;
       REQUIRE(metrics.count("_sampling_priority_v1"));
       // TODO: We fail here. The sampling priority is actually `UserKeep` (as
@@ -236,7 +239,8 @@ TEST_CASE("rules sampler") {
       // `UserDrop` even before this point. What am I missing? Either I'm not
       // understanding the `Limiter`'s role here, or some sort of reset is
       // happening that I missed.
-      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserDrop));
+      REQUIRE(metrics.at("_sampling_priority_v1") ==
+              static_cast<double>(SamplingPriority::UserDrop));
     }
   }
 }
