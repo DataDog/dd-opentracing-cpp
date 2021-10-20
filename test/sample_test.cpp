@@ -62,20 +62,27 @@ TEST_CASE("priority sampler unit test") {
 }
 
 TEST_CASE("rules sampler") {
+  // `RulesSampler`'s constructor parameters are used to configure the
+  // sampler's `Limiter`. Here we prepare those arguments.
   std::tm start{};
   start.tm_mday = 12;
   start.tm_mon = 2;
   start.tm_year = 107;
-  TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
+  const TimePoint time{std::chrono::system_clock::from_time_t(timegm(&start)),
                  std::chrono::steady_clock::time_point{}};
-  TimeProvider get_time = [&time]() { return time; };  // Mock clock.
+  const TimeProvider get_time = [&time]() { return time; };  // Mock clock.
+  // A `Limiter` configured with these parameters will allow the first, but
+  // none afterward. TODO: is that so?
+  const long max_tokens = 1;
+  const double refresh_rate = 1.0;
+  const long tokens_per_refresh = 1;
+  const auto sampler = std::make_shared<RulesSampler>(get_time, max_tokens, refresh_rate, tokens_per_refresh);
 
-  auto sampler = std::make_shared<RulesSampler>(get_time, 1, 1.0, 1);
   const ot::StartSpanOptions span_options;
   const ot::FinishSpanOptions finish_options;
 
-  auto mwriter = std::make_shared<MockWriter>(sampler);
-  auto writer = std::shared_ptr<Writer>(mwriter);
+  const auto mwriter = std::make_shared<MockWriter>(sampler);
+  const auto writer = std::shared_ptr<Writer>(mwriter);
 
   SECTION("rule matching applied") {
     TracerOptions tracer_options;
@@ -144,7 +151,7 @@ TEST_CASE("rules sampler") {
     REQUIRE(metrics["_dd.rule_psr"] == 0.4);
   }
 
-  SECTION("applies limiter to sampled spans") {
+  SECTION("applies limiter to sampled spans only") {
     TracerOptions tracer_options;
     tracer_options.service = "test.service";
     tracer_options.sampling_rules = R"([
@@ -160,5 +167,76 @@ TEST_CASE("rules sampler") {
     REQUIRE(metrics["_dd.rule_psr"] == 0.0);
     REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
     REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
+  }
+
+  SECTION("sampling based on rule yields a \"user\" sampling priority") {
+    // See the comments in `RulesSampler::sample` for an explanation of this
+    // section.
+    
+    // There are three cases:
+    // 1. Create a rule that matches the trace, and has rate `0.0`. Expect
+    //     priority `UserDrop`.
+    // 2. Create a rule that matches the trace, and has rate `1.0`. Expect
+    //     priority `UserKeep`.
+    // 3. Create a rule that matches the trace, and has rate `1.0`, but the
+    //     limiter drops it. Expect `UserDrop`.
+    
+    SECTION("when the matching rule drops a trace") {
+      TracerOptions tracer_options;
+      tracer_options.service = "test.service";
+      tracer_options.sampling_rules = R"([
+    {"sample_rate": 0.0}
+])";
+      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+      auto span = tracer->StartSpanWithOptions("operation name", span_options);
+      span->FinishWithOptions(finish_options);
+      
+      const auto& metrics = mwriter->traces[0][0]->metrics;
+      REQUIRE(metrics.count("_sampling_priority_v1"));
+      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserDrop));
+    }
+
+    SECTION("when the matching rule keeps a trace") {
+      TracerOptions tracer_options;
+      tracer_options.service = "test.service";
+      tracer_options.sampling_rules = R"([
+    {"sample_rate": 1.0}
+])";
+      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+      auto span = tracer->StartSpanWithOptions("operation name", span_options);
+      span->FinishWithOptions(finish_options);
+      
+      const auto& metrics = mwriter->traces[0][0]->metrics;
+      REQUIRE(metrics.count("_sampling_priority_v1"));
+      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserKeep));
+    }
+      
+    SECTION("when the limiter drops a trace") {
+      TracerOptions tracer_options;
+      tracer_options.service = "test.service";
+      tracer_options.sampling_rules = R"([
+    {"sample_rate": 1.0}
+])";
+      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+
+      auto span = tracer->StartSpanWithOptions("operation name", span_options);
+      span->FinishWithOptions(finish_options);
+      
+      const auto& metrics = mwriter->traces[0][0]->metrics;
+      REQUIRE(metrics.count("_sampling_priority_v1"));
+      // TODO: We fail here. The sampling priority is actually `UserKeep` (as
+      // in the test case above).  What I don't get is that, with the `Limiter`
+      // parameters (1, 1.0, 1), it should allow the first and then not any
+      // subsequent until the clock progresses, i.e. in the "limits requests"
+      // case in `limiter_test.cpp`. All of the `Tracer`s in this file use the
+      // same sampler, which uses the same limiter. If my claim about the
+      // effect of (1, 1.0, 1) were true, though, then we'd be getting
+      // `UserDrop` even before this point. What am I missing? Either I'm not
+      // understanding the `Limiter`'s role here, or some sort of reset is
+      // happening that I missed.
+      REQUIRE(metrics.at("_sampling_priority_v1") == static_cast<double>(SamplingPriority::UserDrop));
+    }
   }
 }
