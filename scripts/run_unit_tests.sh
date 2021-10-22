@@ -56,6 +56,9 @@ BUILD_DIR="${BUILD_DIR:-.build}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
+# shellcheck disable=SC2086
 cmake $cmake_flags ..
+# shellcheck disable=SC2086
 make $make_flags
+# shellcheck disable=SC2086
 ctest $ctest_flags
