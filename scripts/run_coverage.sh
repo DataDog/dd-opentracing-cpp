@@ -1,5 +1,24 @@
 #!/bin/sh
 
+usage() {
+  cat <<'END_USAGE'
+Build the library and its unit tests with coverage instrumentation, run the
+unit tests, and then generate a report of the source coverage of the tests.
+
+Options:
+
+  --serve
+  --port=<PORT>
+    After generating the coverage report, run an HTTP server on the optionally
+    specified <PORT> that serves the report as HTML.  If <PORT> is not
+    specified (i.e. using the `--serve` option), then it defaults to port 8000.
+
+  --help
+  -h
+    Print this message.
+END_USAGE
+}
+
 # Exit if any non-conditional command returns a nonzero exit status.
 set -e
 
@@ -10,9 +29,13 @@ serve_port=0
 # Parse command line options.
 while [ $# -gt 0 ]; do
   case "$1" in
+    --help|-h) usage
+      exit ;;
     --serve) serve_port=8000 ;;
     --port=*) serve_port=${1#--port=} ;;
-    *) >&2 printf "Unknown option: %s\n" "$1"
+    *) >&2 usage
+      >&2 printf "\nUnknown option: %s\n" "$1"
+      exit 1
   esac
   shift
 done
