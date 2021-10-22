@@ -1,5 +1,9 @@
 add_library(catch STATIC test_main.cpp)
 
+if(BUILD_COVERAGE)
+  SET(CMAKE_CXX_FLAGS="-g -O0 -Wall -fprofile-arcs -ftest-coverage")
+endif()
+
 macro(_datadog_test TEST_NAME)
   add_executable(${TEST_NAME} ${ARGN})
   add_sanitizers(${TEST_NAME})  

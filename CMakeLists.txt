@@ -14,6 +14,7 @@ option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
+option(BUILD_COVERAGE "Builds code with code coverage profiling instrumentation" OFF)
 
 if(BUILD_TESTING)
   set(BUILD_SHARED ON)
@@ -51,6 +52,9 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
   add_compile_options(-Wall -Wextra -Werror -pedantic -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+  if(BUILD_COVERAGE)
+      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/W3)
 else()
@@ -58,7 +62,11 @@ else()
 endif()
 
 # Outputs
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads)
+if(BUILD_COVERAGE)
+  # Sneak the non-library linker flags in here as well.
+  set(COVERAGE_LIBRARIES gcov -fprofile-arcs -ftest-coverage)
+endif()
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
 
 ## Shared lib
 if(BUILD_SHARED)
