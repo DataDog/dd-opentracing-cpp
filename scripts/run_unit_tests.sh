@@ -15,4 +15,4 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 cmake -DBUILD_TESTING=ON ..
 make --jobs=$(nproc)
-ctest --output-on-failure
+ctest --output-on-failure "$@"

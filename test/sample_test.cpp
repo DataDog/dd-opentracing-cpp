@@ -72,7 +72,7 @@ TEST_CASE("rules sampler") {
                        std::chrono::steady_clock::time_point{}};
   const TimeProvider get_time = [&time]() { return time; };  // Mock clock.
   // A `Limiter` configured with these parameters will allow the first, but
-  // none afterward. TODO: is that so?
+  // none afterward.
   const long max_tokens = 1;
   const double refresh_rate = 1.0;
   const long tokens_per_refresh = 1;
@@ -188,11 +188,13 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 0.0}
 ])";
-      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
-      auto span = tracer->StartSpanWithOptions("operation name", span_options);
+      const auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
 
+      REQUIRE(mwriter->traces.size() == 1);
+      REQUIRE(mwriter->traces[0].size() == 1);
       const auto& metrics = mwriter->traces[0][0]->metrics;
       REQUIRE(metrics.count("_sampling_priority_v1"));
       REQUIRE(metrics.at("_sampling_priority_v1") ==
@@ -205,11 +207,13 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 1.0}
 ])";
-      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
-      auto span = tracer->StartSpanWithOptions("operation name", span_options);
+      const auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
 
+      REQUIRE(mwriter->traces.size() == 1);
+      REQUIRE(mwriter->traces[0].size() == 1);
       const auto& metrics = mwriter->traces[0][0]->metrics;
       REQUIRE(metrics.count("_sampling_priority_v1"));
       REQUIRE(metrics.at("_sampling_priority_v1") ==
@@ -222,25 +226,32 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 1.0}
 ])";
-      auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
       auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
+      // The first trace will be allowed by the limiter.
+      {
+        REQUIRE(mwriter->traces.size() == 1);
+        REQUIRE(mwriter->traces[0].size() == 1);
+        const auto& metrics = mwriter->traces[0][0]->metrics;
+        REQUIRE(metrics.count("_sampling_priority_v1"));
+        REQUIRE(metrics.at("_sampling_priority_v1") ==
+                static_cast<double>(SamplingPriority::UserKeep));
+      }
 
-      const auto& metrics = mwriter->traces[0][0]->metrics;
-      REQUIRE(metrics.count("_sampling_priority_v1"));
-      // TODO: We fail here. The sampling priority is actually `UserKeep` (as
-      // in the test case above).  What I don't get is that, with the `Limiter`
-      // parameters (1, 1.0, 1), it should allow the first and then not any
-      // subsequent until the clock progresses, i.e. in the "limits requests"
-      // case in `limiter_test.cpp`. All of the `Tracer`s in this file use the
-      // same sampler, which uses the same limiter. If my claim about the
-      // effect of (1, 1.0, 1) were true, though, then we'd be getting
-      // `UserDrop` even before this point. What am I missing? Either I'm not
-      // understanding the `Limiter`'s role here, or some sort of reset is
-      // happening that I missed.
-      REQUIRE(metrics.at("_sampling_priority_v1") ==
-              static_cast<double>(SamplingPriority::UserDrop));
+      span = tracer->StartSpanWithOptions("operation name", span_options);
+      span->FinishWithOptions(finish_options);
+      // The second trace will be dropped by the limiter, and the priority will
+      // be `UserDrop`.
+      {
+        REQUIRE(mwriter->traces.size() == 2);
+        REQUIRE(mwriter->traces[1].size() == 1);
+        const auto& metrics = mwriter->traces[1][0]->metrics;
+        REQUIRE(metrics.count("_sampling_priority_v1"));
+        REQUIRE(metrics.at("_sampling_priority_v1") ==
+                static_cast<double>(SamplingPriority::UserDrop));
+      }
     }
   }
 }
