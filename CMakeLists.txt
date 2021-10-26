@@ -63,8 +63,7 @@ endif()
 
 # Outputs
 if(BUILD_COVERAGE)
-  # Sneak the non-library linker flags in here as well.
-  set(COVERAGE_LIBRARIES gcov -fprofile-arcs -ftest-coverage)
+  set(COVERAGE_LIBRARIES gcov)
 endif()
 set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
 
@@ -72,6 +71,9 @@ set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES
 if(BUILD_SHARED)
   add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing)
+  if(BUILD_COVERAGE)
+    target_link_options(dd_opentracing PRIVATE -fprofile-arcs -ftest-coverage)
+  endif()
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
   target_compile_definitions(dd_opentracing PUBLIC DD_OPENTRACING_SHARED)
@@ -101,6 +103,9 @@ if(BUILD_PLUGIN)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/export.map
       "{ global: OpenTracingMakeTracerFactory; local: *; };")
   add_library(dd_opentracing_plugin MODULE ${DD_OPENTRACING_SOURCES})
+  if(BUILD_COVERAGE)
+    target_link_options(dd_opentracing_plugin PRIVATE -fprofile-arcs -ftest-coverage)
+  endif()
   target_link_libraries(dd_opentracing_plugin PUBLIC ${DATADOG_LINK_LIBRARIES}
                         -static-libstdc++
                         -static-libgcc
