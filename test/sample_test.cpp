@@ -228,22 +228,14 @@ TEST_CASE("rules sampler") {
 ])";
       const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
 
+      // The first span will be allowed by the limiter (tested in the previous section).
       auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
-      // The first trace will be allowed by the limiter.
-      {
-        REQUIRE(mwriter->traces.size() == 1);
-        REQUIRE(mwriter->traces[0].size() == 1);
-        const auto& metrics = mwriter->traces[0][0]->metrics;
-        REQUIRE(metrics.count("_sampling_priority_v1"));
-        REQUIRE(metrics.at("_sampling_priority_v1") ==
-                static_cast<double>(SamplingPriority::UserKeep));
-      }
 
-      span = tracer->StartSpanWithOptions("operation name", span_options);
-      span->FinishWithOptions(finish_options);
       // The second trace will be dropped by the limiter, and the priority will
       // be `UserDrop`.
+      span = tracer->StartSpanWithOptions("operation name", span_options);
+      span->FinishWithOptions(finish_options);
       {
         REQUIRE(mwriter->traces.size() == 2);
         REQUIRE(mwriter->traces[1].size() == 1);
