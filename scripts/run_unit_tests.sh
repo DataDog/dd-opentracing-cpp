@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 usage() {
   cat <<'END_USAGE'
@@ -10,13 +10,9 @@ Options:
     Build the code and tests with instrumentation for tracking source code
     coverage.
 
-  --make-verbose
-    Pass the VERBOSE=1 option to `make` when building, so that it echos the
-    commands it's executing.
-
-  --ctest-<OPTION>
-    Pass --<OPTION> to `ctest` when running the tests.  For example,
-    `--ctest-verbose` will pass the `--verbose` flag to `ctest`.
+  --verbose
+    Emit verbose output.  Pass the VERBOSE=1 option to `make` when building,
+    and pass the `--verbose` flag to `ctest` when running the tests.
 
   --help
   -h
@@ -27,19 +23,23 @@ END_USAGE
 # Exit if any non-conditional command returns a nonzero exit status.
 set -e
 
-cmake_flags='-DBUILD_TESTING=ON'
-make_flags="--jobs=$(nproc)"
-ctest_flags='--output-on-failure'
+cmake_flags=('-DBUILD_TESTING=ON')
+make_flags=("--jobs=$(nproc)")
+ctest_flags=('--output-on-failure')
 
 # Parse command line options.
 while [ $# -gt 0 ]; do
   case "$1" in
-    -h|--help) usage
+    -h|--help)
+      usage
       exit ;;
-    --coverage) cmake_flags="$cmake_flags -DBUILD_COVERAGE=ON" ;;
-    --make-verbose) make_flags="$make_flags VERBOSE=1" ;;
-    --ctest-*) ctest_flags="$ctest_flags --${1#--ctest-}" ;;
-    *) >&2 usage 
+    --coverage)
+      cmake_flags+=('-DBUILD_COVERAGE=ON') ;;
+    --verbose)
+      make_flags+=('VERBOSE=1')
+      ctest_flags+=('--verbose') ;;
+    *)
+      >&2 usage 
       >&2 printf "\nUnknown option: %s\n" "$1"
       exit 1
   esac
@@ -56,9 +56,6 @@ BUILD_DIR="${BUILD_DIR:-.build}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
-# shellcheck disable=SC2086
-cmake $cmake_flags ..
-# shellcheck disable=SC2086
-make $make_flags
-# shellcheck disable=SC2086
-ctest $ctest_flags
+cmake "${cmake_flags[@]}" ..
+make "${make_flags[@]}"
+ctest "${ctest_flags[@]}"
