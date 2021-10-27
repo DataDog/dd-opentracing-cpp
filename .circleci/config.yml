@@ -169,3 +169,13 @@ workflows:
           <<: *run_on_release_tag
           requires:
             - build
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build
