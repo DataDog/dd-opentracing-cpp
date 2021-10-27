@@ -62,6 +62,8 @@ Additional libraries are installed via a script.
 
 If you want [sanitizers](https://github.com/google/sanitizers) to be enabled, then add either the `-DSANITIZE_THREAD=ON -DSANITIZE_UNDEFINED=ON` or `-DSANITIZE_ADDRESS=ON` flags to cmake, running the tests will now also check with the sanitizers.
 
+You can enable code coverage instrumentation in the builds of the library and its unit tests by adding the `-DBUILD_COVERAGE=ON` flag to cmake. See [scripts/run_coverage.sh](scripts/run_coverage.sh).
+
 ### Build (Windows)
 
 **NOTE**: This is currently Early Access, and issues should be reported only via GitHub Issues. Installation steps are likely to change based on user feedback and becoming available via Vcpkg.
