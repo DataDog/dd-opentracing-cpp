@@ -3,7 +3,7 @@ version: 2
 defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_6
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_7
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
             mkdir -p /tmp/build/
             cd .build
             cmake $CMAKE_ARGS ..
-            make
+            make --jobs=$(nproc)
             make install
             cp libdd_opentracing_plugin.so /tmp/build/libdd_opentracing_plugin.so
             cp libdd_opentracing.so /tmp/build/libdd_opentracing.so
@@ -74,7 +74,7 @@ jobs:
             mkdir -p .build
             cd .build
             cmake $CMAKE_ARGS ..
-            make
+            make --jobs=$(nproc)
             env $RUN_ARGS ctest --output-on-failure
 
   test_tsan:
@@ -117,7 +117,7 @@ jobs:
             mkdir -p /tmp/build/
             cd .build
             cmake $CMAKE_ARGS ..
-            make
+            make --jobs=$(nproc)
             make install
             cp libdd_opentracing_plugin.so /usr/local/lib/libdd_opentracing_plugin.so
       - run:
@@ -143,6 +143,29 @@ jobs:
             # Run the tests.
             bash -x ./nginx_integration_test.sh
 
+  test_coverage:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Build source dependencies
+          command: |
+            ./scripts/install_dependencies.sh
+      - run:
+          name: Build (with cmake) and test with coverage
+          command: |
+            rm -rf .build
+            scripts/run_coverage.sh
+            rm -rf /tmp/coverage
+            mkdir /tmp/coverage
+            tar czf /tmp/coverage/report.tar.gz coverage/report
+      - persist_to_workspace:
+          root: /tmp/
+          paths:
+            - coverage
+      - store_artifacts:
+          path: /tmp/coverage
+
 _workflow_filters:
   _version_tag: &version_tag
     # Allows semver or "test" tags, with any suffix.
@@ -166,6 +189,10 @@ workflows:
       - test_asan:
           <<: *run_on_release_tag
       - integration_test_nginx:
+          <<: *run_on_release_tag
+          requires:
+            - build
+      - test_coverage:
           <<: *run_on_release_tag
           requires:
             - build
