@@ -12,7 +12,6 @@ namespace opentracing {
 
 namespace {
 const std::string agent_protocol = "http://";
-const size_t max_queued_traces = 7000;
 // Retry sending traces to agent a couple of times. Any more than that and the agent won't accept
 // them.
 // write_period 1s + timeout 2s + (retry & timeout) 2.5s + (retry and timeout) 4.5s = 10s.
@@ -25,8 +24,8 @@ const long default_timeout_ms = 2000L;
 AgentWriter::AgentWriter(std::string host, uint32_t port, std::string url,
                          std::chrono::milliseconds write_period,
                          std::shared_ptr<RulesSampler> sampler)
-    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
-                  default_retry_periods, host, port, url, sampler) {}
+    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period,
+                  default_max_queued_traces, default_retry_periods, host, port, url, sampler) {}
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,

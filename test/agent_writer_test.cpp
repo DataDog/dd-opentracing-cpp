@@ -5,7 +5,6 @@
 #include <catch2/catch.hpp>
 #include <ctime>
 
-#include "../src/agent_writer.cpp"  // Otherwise the compiler won't generate AgentWriter for us.
 #include "mocks.h"
 using namespace datadog::opentracing;
 
@@ -390,6 +389,7 @@ TEST_CASE("flush") {
   std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
   MockHandle* handle = handle_ptr.get();
   std::vector<std::chrono::milliseconds> retry_periods{std::chrono::seconds(60)};
+  const size_t max_queued_traces = AgentWriter::default_max_queued_traces;
   AgentWriter writer{std::move(handle_ptr),
                      std::chrono::seconds(3600),
                      max_queued_traces,

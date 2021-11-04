@@ -11,6 +11,8 @@ CURL_VERSION=${CURL_VERSION:-7.70.0}
 MSGPACK_VERSION=${MSGPACK_VERSION:-3.2.1}
 ZLIB_VERSION=${ZLIB_VERSION:-1.2.11}
 
+MAKE_JOB_COUNT=${MAKE_JOB_COUNT:-$(nproc)}
+
 # Just report versions and exit.
 if [[ "$1" == "versions" ]]; then
 	echo "opentracing:$OPENTRACING_VERSION"
@@ -58,7 +60,7 @@ if [ "$BUILD_OPENTRACING" -eq "1" ]; then
         -DBUILD_TESTING=OFF \
         -DBUILD_MOCKTRACER=OFF \
         ..
-  make
+  make --jobs="$MAKE_JOB_COUNT"
   make install
   cd ../..
   rm -r "opentracing-cpp-${OPENTRACING_VERSION}/"
@@ -72,7 +74,7 @@ if [ "$BUILD_ZLIB" -eq "1" ]; then
   mkdir -p "zlib-${ZLIB_VERSION}"
   cd "zlib-${ZLIB_VERSION}"
   CFLAGS="$CFLAGS -fPIC" ./configure --prefix="$install_dir" --static
-  make && make install
+  make --jobs="$MAKE_JOB_COUNT" && make install
   cd ..
   rm -r "zlib-${ZLIB_VERSION}"
   rm "zlib-${ZLIB_VERSION}.tar.gz"
@@ -85,7 +87,7 @@ if [ "$BUILD_MSGPACK" -eq "1" ]; then
   mkdir -p "msgpack-${MSGPACK_VERSION}/.build"
   cd "msgpack-${MSGPACK_VERSION}/.build"
   cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF ..
-  make
+  make --jobs="$MAKE_JOB_COUNT"
   make install
   cd ../..
   rm -r "msgpack-${MSGPACK_VERSION}/"
@@ -115,7 +117,7 @@ if [ "$BUILD_CURL" -eq "1" ]; then
               --enable-shared=no \
               --enable-static=yes \
               --with-pic
-  make && make install
+  make --jobs="$MAKE_JOB_COUNT" && make install
   cd ..
   rm -r "curl-${CURL_VERSION}/"
   rm "curl-${CURL_VERSION}.tar.gz"

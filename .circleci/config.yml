@@ -1,6 +1,6 @@
 version: 2
 
-default-environment: &default-environment
+default_environment: &default_environment
     # The `resource_class` specified in the `defaults` implies a memory limit
     # and supposedly a CPU count limit.  However, either there is no actual CPU
     # count limit, or the limit cannot be determined from within the running
@@ -20,13 +20,13 @@ defaults: &defaults
   docker:
     - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_7
   resource_class: medium
-  environment: *default-environment
+  environment: *default_environment
 
 jobs:
   build:
     <<: *defaults
     environment:
-      <<: *default-environment
+      <<: *default_environment
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
@@ -88,33 +88,58 @@ jobs:
       - run:
           name: Build and test
           command: |
+            set -x
             rm -rf .build
             mkdir -p .build
             cd .build
-            cmake $CMAKE_ARGS ..
+            # Build sanitized tests using clang instead of GCC.  There is an
+            # bug in a recent version of libstdc++ that causes thread sanitizer
+            # to interpret waits on a condition variable as a "double lock" of
+            # the involved mutex.  Until that is resolved, it's easiest to just
+            # build with clang, which uses libc++ instead of libstdc++. See
+            # <https://github.com/google/sanitizers/issues/1259>
+            # and
+            # <https://gcc.gnu.org/bugzilla//show_bug.cgi?id=101978>.
+            CC=/usr/bin/clang-9 CXX=/usr/bin/clang++-9 cmake $CMAKE_ARGS ..
             make --jobs="$MAKE_JOB_COUNT"
+            printf 'Here is the value of RUN_ARGS: %s\n' "$RUN_ARGS"
             env $RUN_ARGS ctest --output-on-failure
+
+  # Recent versions of the sanitizers have a bug where the combination of ubsan
+  # (the undefined behavior sanitizer) and tsan (the thread sanitizer) causes
+  # one to emit a false positive for the other.  See
+  # <https://github.com/google/sanitizers/issues/1106>.
+  # As a workaround, here we use ubsan by itself.  Previously it was run as
+  # part of `test_tsan`.
+  test_ubsan:
+    <<: *test_sanitizer_base
+    environment:
+      <<: *default_environment
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_UNDEFINED=On
+      # Give it a blank value, or else it will default to "<nil>"
+      RUN_ARGS: ""
 
   test_tsan:
     <<: *test_sanitizer_base
     environment:
-      <<: *default-environment
-      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
+      <<: *default_environment
+      CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On
       RUN_ARGS: TSAN_OPTIONS=detect_deadlocks=1:second_deadlock_stack=1
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
-      <<: *default-environment
+      <<: *default_environment
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
-      RUN ARGS:
+      # Give it a blank value, or else it will default to "<nil>"
+      RUN_ARGS: ""
 
   integration_test_nginx:
     working_directory: ~/dd-opentracing-cpp
     docker:
       - image: opentracing/nginx-opentracing:0.20.0
     environment:
-      <<: *default-environment
+      <<: *default_environment
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
@@ -231,6 +256,10 @@ workflows:
           requires:
             - stat
       - test_asan:
+          <<: *run_on_release_tag
+          requires:
+            - stat
+      - test_ubsan:
           <<: *run_on_release_tag
           requires:
             - stat

@@ -45,6 +45,11 @@ class AgentWriter : public Writer {
   // Permanently stops writing Traces. Calls to write() and flush() will do nothing.
   void stop();
 
+  // Default value of `max_queued_traces` in the constructor overload without
+  // that parameter. This implementation detail is exposed for use in the unit
+  // test.
+  static const size_t default_max_queued_traces = 7000;
+
  private:
   // Initialises the curl handle. May throw a runtime_exception.
   void setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port,
