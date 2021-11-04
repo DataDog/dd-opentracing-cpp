@@ -1,11 +1,11 @@
 #include "../src/tracer_factory.h"
 
-#include "../src/tracer.h"
-#include "mocks.h"
-
 #include <datadog/tags.h>
 
 #include <catch2/catch.hpp>
+
+#include "../src/tracer.h"
+#include "mocks.h"
 
 using namespace datadog::opentracing;
 
