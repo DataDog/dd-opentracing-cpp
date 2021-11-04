@@ -102,7 +102,6 @@ jobs:
             # <https://gcc.gnu.org/bugzilla//show_bug.cgi?id=101978>.
             CC=/usr/bin/clang-9 CXX=/usr/bin/clang++-9 cmake $CMAKE_ARGS ..
             make --jobs="$MAKE_JOB_COUNT"
-            printf 'Here is the value of RUN_ARGS: %s\n' "$RUN_ARGS"
             env $RUN_ARGS ctest --output-on-failure
 
   # Recent versions of the sanitizers have a bug where the combination of ubsan
