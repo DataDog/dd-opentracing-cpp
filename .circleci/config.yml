@@ -179,7 +179,7 @@ jobs:
               cat /sys/fs/cgroup/cpuset/cpuset.cpus
               cat /proc/self/cgroup
               cat /proc/cgroups
-              find /sys/fs/cgroup/cpuset
+              find /sys/fs/cgroup
               uname -a
               cat /proc/meminfo
 
