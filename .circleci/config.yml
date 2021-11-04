@@ -1,29 +1,32 @@
 version: 2
 
-defaults: &defaults
-  working_directory: ~/dd-opentracing-cpp
-  docker:
-    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_7
-  resource_class: medium
-  environment:
-    # The `resource_class`, above, implies a memory limit and supposedly a CPU
-    # count limit.  However, either there is no actual CPU count limit, or the
-    # limit cannot be determined from within the running job.  Instead, the
-    # number of CPUs on the host machine is all we can see.  This means that a
-    # command like `make --jobs=$(nproc)` is likely to run out of memory,
-    # because while the `resource_class` says it has 2 CPUs, `nproc` will
-    # report something like 36.  `make` will then spawn a bunch of processes,
-    # and the job will run out of memory.
+default-environment: &default-environment
+    # The `resource_class` specified in the `defaults` implies a memory limit
+    # and supposedly a CPU count limit.  However, either there is no actual CPU
+    # count limit, or the limit cannot be determined from within the running
+    # job.  Instead, the number of CPUs on the host machine is all we can see.
+    # This means that a command like `make --jobs=$(nproc)` is likely to run
+    # out of memory, because while the `resource_class` says it has 2 CPUs,
+    # `nproc` will report something like 36.  `make` will then spawn a bunch of
+    # processes, and the job will run out of memory.
     # So, here we hard-code the number of CPUs supposedly offered by the
     # `resource_class`.  For information about the `resource_class` values,
     # see:
     # https://circleci.com/docs/2.0/configuration-reference/
     MAKE_JOB_COUNT: 2
 
+defaults: &defaults
+  working_directory: ~/dd-opentracing-cpp
+  docker:
+    - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_7
+  resource_class: medium
+  environment: *default-environment
+
 jobs:
   build:
     <<: *defaults
     environment:
+      <<: *default-environment
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
@@ -95,12 +98,14 @@ jobs:
   test_tsan:
     <<: *test_sanitizer_base
     environment:
+      <<: *default-environment
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_THREAD=On -DSANITIZE_UNDEFINED=On
       RUN_ARGS: TSAN_OPTIONS=detect_deadlocks=1:second_deadlock_stack=1
 
   test_asan:
     <<: *test_sanitizer_base
     environment:
+      <<: *default-environment
       CMAKE_ARGS: -DBUILD_TESTING=ON -DSANITIZE_ADDRESS=On
       RUN ARGS:
 
@@ -109,6 +114,7 @@ jobs:
     docker:
       - image: opentracing/nginx-opentracing:0.20.0
     environment:
+      <<: *default-environment
       CMAKE_ARGS: -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
       CFLAGS: -march=x86-64 -fPIC
       CXXFLAGS: -march=x86-64 -fPIC
