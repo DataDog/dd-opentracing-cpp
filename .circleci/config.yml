@@ -178,7 +178,7 @@ jobs:
               getconf _NPROCESSORS_ONLN
               cat /sys/fs/cgroup/cpuset/cpuset.cpus
               cat /proc/self/cgroup
-              find /sys/fs/cgroup/cpuset/docker/
+              find /sys/fs/cgroup/cpuset
               uname -a
               cat /proc/meminfo
 
