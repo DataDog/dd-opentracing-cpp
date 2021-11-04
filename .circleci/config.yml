@@ -166,6 +166,17 @@ jobs:
             - coverage
       - store_artifacts:
           path: /tmp/coverage
+            
+  stat:
+      <<: *defaults
+      steps:
+        - run:
+            name: Print information about the execution environment
+            command: |
+              set -x
+              nproc
+              uname -a
+              cat /proc/meminfo
 
 _workflow_filters:
   _version_tag: &version_tag
@@ -183,12 +194,20 @@ workflows:
   version: 2
   build_test_deploy:
     jobs:
+      - stat:
+          <<: *run_on_release_tag
       - build:
           <<: *run_on_release_tag
+          requires:
+            - stat
       - test_tsan:
           <<: *run_on_release_tag
+          requires:
+            - stat
       - test_asan:
           <<: *run_on_release_tag
+          requires:
+            - stat
       - integration_test_nginx:
           <<: *run_on_release_tag
           requires:
