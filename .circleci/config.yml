@@ -175,6 +175,7 @@ jobs:
             command: |
               set -x
               nproc
+              getconf _NPROCESSORS_ONLN
               uname -a
               cat /proc/meminfo
 
