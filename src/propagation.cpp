@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
 #include "sample.h"
@@ -96,6 +97,104 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
   return result.first == prefix.end();
 }
 
+// `PropagationError` enumerates the errors that can be produced by this
+// translation unit.
+enum class PropagationError {
+  // Each value must be nonzero, because zero means "not an error" by some
+  // conventions.
+  BAD_STREAM_SERIALIZE_SPAN_CONTEXT_PRE = 1,
+  BAD_STREAM_SERIALIZE_SPAN_CONTEXT_POST = 2,
+  BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_STREAM = 3,
+  BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_MAP = 4,
+  BAD_STREAM_DESERIALIZE_SPAN_CONTEXT = 5,
+  INVALID_SAMPLING_PRIORITY_FROM_STREAM = 6,
+  INVALID_JSON_DESERIALIZE_SPAN_CONTEXT_STREAM = 7,
+  INVALID_INTEGER_DESERIALIZE_SPAN_CONTEXT_STREAM = 8,
+  BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_STREAM = 9,
+  DATADOG_B3_HEADER_CONFLICT = 10,
+  BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_TEXT_MAP = 11,
+  INVALID_SAMPLING_PRIORITY_FROM_TEXT_MAP = 12,
+  INVALID_TRACE_ID = 13,
+  OUT_OF_RANGE_TRACE_ID = 14,
+  PARENT_ID_WITHOUT_TRACE_ID = 15,
+  MISSING_PARENT_ID = 16
+};
+
+// `PropagationErrorCategory` defines the diagnostic messages corresponding to
+// `ProgagationError` values.
+class PropagationErrorCategory : public std::error_category {
+ public:
+  // Return the name of this error category.
+  const char *name() const noexcept override;
+
+  // Return the diagnostic message corresponding to the specified `code`,
+  // where `code` is one of the values of `PropagationError`.
+  std::string message(int code) const override;
+
+  // Return the singleton instance of this error category.
+  static const PropagationErrorCategory &instance();
+};
+
+const char *PropagationErrorCategory::name() const noexcept { return "Datadog trace propagation"; }
+
+std::string PropagationErrorCategory::message(int code) const {
+  switch (static_cast<PropagationError>(code)) {
+    case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_PRE:
+      return "output stream in bad state, cannot begin serializing SpanContext";
+    case PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_POST:
+      return "output stream in bad state after writing JSON, cannot serialize SpanContext";
+    case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_STREAM:
+      return "memory allocation failure, cannot serialize SpanContext into stream";
+    case PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_MAP:
+      return "memory allocation failure, cannot serialize SpanContext into TextMapWriter";
+    case PropagationError::BAD_STREAM_DESERIALIZE_SPAN_CONTEXT:
+      return "input stream in bad state, cannot begin deserializing SpanContext";
+    case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_STREAM:
+      return "invalid sampling priority, cannot deserialize SpanContext from stream";
+    case PropagationError::INVALID_JSON_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "invalid JSON, cannot deserialize SpanContext from stream";
+    case PropagationError::INVALID_INTEGER_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "invalid integer literal, cannot deserialize SpanContext from stream";
+    case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_STREAM:
+      return "memory allocation failure, cannot deserialize SpanContext from stream";
+    case PropagationError::DATADOG_B3_HEADER_CONFLICT:
+      return "conflicting Datadog and B3 headers, unable to deserialize SpanContext from "
+             "TextMapReader";
+    case PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_TEXT_MAP:
+      return "memory allocation failure, cannot deserialize SpanContext from TextMapReader";
+    case PropagationError::INVALID_SAMPLING_PRIORITY_FROM_TEXT_MAP:
+      return "invalid sampling priority, cannot deserialize SpanContext from TextMapReader";
+    case PropagationError::INVALID_TRACE_ID:
+      return "invalid integer literal for trace ID or parent ID, cannot deserialize SpanContext "
+             "from TextMapReader";
+    case PropagationError::OUT_OF_RANGE_TRACE_ID:
+      return "trace ID or parent ID is out of range, cannot deserialize SpanContext from "
+             "TextMapReader";
+    case PropagationError::PARENT_ID_WITHOUT_TRACE_ID:
+      return "span has a parent ID but does not have a trace ID, unable to deserialize "
+             "SpanContext";
+    case PropagationError::MISSING_PARENT_ID:
+      return "span has neither a parent ID nor an origin, unable to deserialize SpanContext";
+  }
+
+  return "unrecognized Datadog propagation error code " + std::to_string(code);
+}
+
+const PropagationErrorCategory &PropagationErrorCategory::instance() {
+  static PropagationErrorCategory singleton;
+  return singleton;
+}
+
+// Return an error code corresponding to the specified error `value`.
+std::error_code make_error_code(PropagationError value) {
+  return std::error_code(static_cast<int>(value), PropagationErrorCategory::instance());
+}
+
+// Return an "unexpected result" corresponding to the specified error `value`.
+ot::unexpected_type<> make_unexpected(PropagationError value) {
+  return ot::make_unexpected(make_error_code(value));
+}
+
 // If the result of `SpanContext::deserialize` can be determined solely from
 // the presence of certain tags, return the appropriate result.  If the result
 // cannot be determined, return `nullptr`.  Each specified boolean indicates
@@ -111,11 +210,11 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
   }
   if (!trace_id_set) {
     // There's a parent ID without a trace ID.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return std::make_unique<Result>(make_unexpected(PropagationError::PARENT_ID_WITHOUT_TRACE_ID));
   }
   if (!parent_id_set && !origin_set) {
     // Parent ID is required, except when origin is set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
+    return std::make_unique<Result>(make_unexpected(PropagationError::MISSING_PARENT_ID));
   }
   return nullptr;
 }
@@ -316,7 +415,7 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
                                           bool prioritySamplingEnabled) const try {
   // check ostream state
   if (!writer.good()) {
-    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+    return make_unexpected(PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_PRE);
   }
 
   json j;
@@ -335,12 +434,12 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
   writer << j.dump();
   // check ostream state
   if (!writer.good()) {
-    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+    return make_unexpected(PropagationError::BAD_STREAM_SERIALIZE_SPAN_CONTEXT_POST);
   }
 
   return {};
 } catch (const std::bad_alloc &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+  return make_unexpected(PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_STREAM);
 }
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
@@ -357,7 +456,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
   }
   return result;
 } catch (const std::bad_alloc &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+  return make_unexpected(PropagationError::BAD_ALLOC_SERIALIZE_SPAN_CONTEXT_MAP);
 }
 
 ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
@@ -411,7 +510,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     std::shared_ptr<const Logger> logger, std::istream &reader) try {
   // check istream state
   if (!reader.good()) {
-    return ot::make_unexpected(std::make_error_code(std::errc::io_error));
+    return make_unexpected(PropagationError::BAD_STREAM_DESERIALIZE_SPAN_CONTEXT);
   }
 
   // Check for the case when no span is encoded.
@@ -441,8 +540,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (j.find(json_sampling_priority_key) != j.end()) {
     sampling_priority = asSamplingPriority(j[json_sampling_priority_key]);
     if (sampling_priority == nullptr) {
-      // sampling priority value not valid, return unexpected error
-      return ot::make_unexpected(ot::span_context_corrupted_error);
+      return make_unexpected(PropagationError::INVALID_SAMPLING_PRIORITY_FROM_STREAM);
     }
   }
   if (j.find(json_origin_key) != j.end()) {
@@ -457,11 +555,11 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  return make_unexpected(PropagationError::INVALID_JSON_DESERIALIZE_SPAN_CONTEXT_STREAM);
 } catch (const std::invalid_argument &ia) {
-  return ot::make_unexpected(ot::span_context_corrupted_error);
+  return make_unexpected(PropagationError::INVALID_INTEGER_DESERIALIZE_SPAN_CONTEXT_STREAM);
 } catch (const std::bad_alloc &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+  return make_unexpected(PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_STREAM);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
@@ -477,15 +575,15 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
                                     *dynamic_cast<SpanContext *>(context.get())) {
         std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
-                  << std::endl;
-        return ot::make_unexpected(ot::span_context_corrupted_error);
+                  << std::endl;  // TODO: can we remove this error logging?
+        return make_unexpected(PropagationError::DATADOG_B3_HEADER_CONFLICT);
       }
       context = std::move(result.value());
     }
   }
   return context;
 } catch (const std::bad_alloc &) {
-  return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+  return make_unexpected(PropagationError::BAD_ALLOC_DESERIALIZE_SPAN_CONTEXT_TEXT_MAP);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
@@ -512,8 +610,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
               std::cerr << "Invalid sampling_priority value in serialized SpanContext"
-                        << std::endl;
-              return ot::make_unexpected(ot::span_context_corrupted_error);
+                        << std::endl;  // TODO: can we remove this error logging?
+              return make_unexpected(PropagationError::INVALID_SAMPLING_PRIORITY_FROM_TEXT_MAP);
             }
           } else if (headers_impl.origin_header != nullptr &&
                      equals_ignore_case(key, headers_impl.origin_header)) {
@@ -524,9 +622,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
                             value);
           }
         } catch (const std::invalid_argument &ia) {
-          return ot::make_unexpected(ot::span_context_corrupted_error);
+          return make_unexpected(PropagationError::INVALID_TRACE_ID);
         } catch (const std::out_of_range &oor) {
-          return ot::make_unexpected(ot::span_context_corrupted_error);
+          return make_unexpected(PropagationError::OUT_OF_RANGE_TRACE_ID);
         }
         return {};
       });
