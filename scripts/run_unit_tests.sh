@@ -24,7 +24,7 @@ END_USAGE
 set -e
 
 cmake_flags=('-DBUILD_TESTING=ON')
-make_flags=("--jobs=$(nproc)")
+make_flags=("--jobs=${MAKE_JOB_COUNT:-$(nproc)}")
 ctest_flags=('--output-on-failure')
 
 # Parse command line options.
