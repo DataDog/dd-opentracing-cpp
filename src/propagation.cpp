@@ -1,7 +1,6 @@
 #include "propagation.h"
 
 #include <algorithm>
-#include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -207,7 +206,7 @@ SpanContext &SpanContext::operator=(const SpanContext &other) {
 
 SpanContext::SpanContext(SpanContext &&other)
     : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
-      logger_(other.logger_),
+      logger_(std::move(other.logger_)),
       id_(other.id_),
       trace_id_(other.trace_id_),
       propagated_sampling_priority_(std::move(other.propagated_sampling_priority_)),
@@ -216,7 +215,7 @@ SpanContext::SpanContext(SpanContext &&other)
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
-  logger_ = other.logger_;
+  logger_ = std::move(other.logger_);
   id_ = other.id_;
   trace_id_ = other.trace_id_;
   origin_ = other.origin_;
@@ -476,8 +475,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     if (result.value() != nullptr) {
       if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
                                     *dynamic_cast<SpanContext *>(context.get())) {
-        std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
-                  << std::endl;
+        logger->Log(LogLevel::error, "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers");
         return ot::make_unexpected(ot::span_context_corrupted_error);
       }
       context = std::move(result.value());
@@ -511,8 +509,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             sampling_priority = asSamplingPriority(std::stoi(value));
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
-              std::cerr << "Invalid sampling_priority value in serialized SpanContext"
-                        << std::endl;
+              logger->Log(LogLevel::error, "Invalid sampling_priority value in serialized SpanContext");
               return ot::make_unexpected(ot::span_context_corrupted_error);
             }
           } else if (headers_impl.origin_header != nullptr &&

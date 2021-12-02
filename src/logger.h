@@ -3,6 +3,8 @@
 
 #include "datadog/opentracing.h"
 
+#include <memory>
+
 namespace datadog {
 namespace opentracing {
 
@@ -48,6 +50,10 @@ class VerboseLogger final : public Logger {
   void Trace(uint64_t trace_id, ot::string_view message) const noexcept override;
   void Trace(uint64_t trace_id, uint64_t span_id, ot::string_view message) const noexcept override;
 };
+
+// Return a `Logger` instance configured using the specified `options`.  The
+// returned value will not be null.
+std::shared_ptr<const Logger> makeLogger(const TracerOptions& options);
 
 }  // namespace opentracing
 }  // namespace datadog

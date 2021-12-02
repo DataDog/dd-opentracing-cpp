@@ -1,7 +1,5 @@
 #include "span_buffer.h"
 
-#include <iostream>
-
 #include "sample.h"
 #include "span.h"
 #include "writer.h"
@@ -109,12 +107,12 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   auto trace_iter = traces_.find(span->traceId());
   if (trace_iter == traces_.end()) {
-    std::cerr << "Missing trace for finished span" << std::endl;
+    logger_->Log(LogLevel::error, "Missing trace for finished span");
     return;
   }
   auto& trace = trace_iter->second;
   if (trace.all_spans.find(span->spanId()) == trace.all_spans.end()) {
-    std::cerr << "A Span that was not registered was submitted to WritingSpanBuffer" << std::endl;
+    logger_->Log(LogLevel::error, "A Span that was not registered was submitted to WritingSpanBuffer");
     return;
   }
   uint64_t trace_id = span->traceId();

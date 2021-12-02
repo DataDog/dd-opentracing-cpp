@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "encoder.h"
+#include "logger.h"
 
 namespace datadog {
 namespace opentracing {
@@ -21,7 +22,7 @@ using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 // A Writer is used to submit completed traces to the Datadog agent.
 class Writer {
  public:
-  Writer(std::shared_ptr<RulesSampler> sampler);
+  Writer(std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger);
 
   virtual ~Writer() {}
 
@@ -40,7 +41,7 @@ class Writer {
 // to the Datadog Agent.
 class ExternalWriter : public Writer {
  public:
-  ExternalWriter(std::shared_ptr<RulesSampler> sampler) : Writer(sampler) {}
+  ExternalWriter(std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger) : Writer(sampler, logger) {}
   ~ExternalWriter() override {}
 
   // Implements Writer methods.

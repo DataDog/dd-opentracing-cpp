@@ -49,7 +49,7 @@ TEST_CASE("writer") {
     test_case.expected_opts[CURLOPT_TIMEOUT_MS] = "2000";
 
     AgentWriter writer{std::move(handle_ptr), std::chrono::seconds(1), 100,           {},
-                       test_case.host,        test_case.port,          test_case.url, sampler};
+                       test_case.host,        test_case.port,          test_case.url, sampler, std::make_shared<MockLogger>()};
 
     REQUIRE(handle->options == test_case.expected_opts);
   }
@@ -65,7 +65,8 @@ TEST_CASE("writer") {
                              "localhost",
                              1234,
                              "gopher://hostname:1234/v0.4/traces",
-                             sampler});
+                             sampler,
+                             std::make_shared<MockLogger>()});
   }
 
   std::atomic<bool> handle_destructed{false};
@@ -78,6 +79,8 @@ TEST_CASE("writer") {
   size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
 
+  auto logger = std::make_shared<const Journal>();
+
   AgentWriter writer{std::move(handle_ptr),
                      only_send_traces_when_we_flush,
                      max_queued_traces,
@@ -85,7 +88,8 @@ TEST_CASE("writer") {
                      "hostname",
                      6319,
                      "",
-                     sampler};
+                     sampler,
+                     logger};
 
   SECTION("traces can be sent") {
     writer.write(make_trace(
@@ -142,36 +146,34 @@ TEST_CASE("writer") {
           "Unable to parse response from agent.\n"
           "Error was: [json.exception.parse_error.101] parse error at line 1, column 1: "
           "syntax error while parsing value - invalid literal; last read: '/'\n"
-          "Error near: // Error at start, short body\n"},
+          "Error near: // Error at start, short body"},
          {"{\"lol\" // Error near start, error message should have truncated "
           "body. 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9",
           "Unable to parse response from agent.\n"
           "Error was: [json.exception.parse_error.101] parse error at line 1, column 8: syntax "
           "error while parsing object separator - invalid literal; last read: '\"lol\" /'; "
           "expected ':'\n"
-          "Error near: {\"lol\" // Error near start, error message should h...\n"},
+          "Error near: {\"lol\" // Error near start, error message should h..."},
          {"{\"Error near the end, should be truncated. 0 1 2 3 4 5 6 7 8 9 \", oh noes",
           "Unable to parse response from agent.\n"
           "Error was: [json.exception.parse_error.101] parse error at line 1, column 65: syntax "
           "error while parsing object separator - unexpected ','; expected ':'\n"
-          "Error near: ...d. 0 1 2 3 4 5 6 7 8 9 \", oh noes\n"},
+          "Error near: ...d. 0 1 2 3 4 5 6 7 8 9 \", oh noes"},
          {"{\"Error in the middle, truncated from both ends\" lol 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 "
           "6 7 8 9",
           "Unable to parse response from agent.\n"
           "Error was: [json.exception.parse_error.101] parse error at line 1, column 50: syntax "
           "error while parsing object separator - invalid literal; last read: '\"Error in the "
           "middle, truncated from both ends\" l'; expected ':'\n"
-          "Error near: ...uncated from both ends\" lol 0 1 2 3 4 5 6 7 8 9 0 ...\n"}}));
+          "Error near: ...uncated from both ends\" lol 0 1 2 3 4 5 6 7 8 9 0 ..."}}));
 
     handle->response = bad_response_test_case.response;
     writer.write(make_trace(
         {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
 
-    std::stringstream error_message;
-    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush(std::chrono::seconds(10));
-    std::cerr.rdbuf(stderr);  // Restore stderr.
-    REQUIRE(error_message.str() == bad_response_test_case.error);
+    REQUIRE(!logger->records.empty());
+    REQUIRE(logger->records.back().message == bad_response_test_case.error);
     REQUIRE(sampler->config == "");
   }
 
@@ -190,7 +192,7 @@ TEST_CASE("writer") {
     handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
                                max_queued_traces, disable_retry, "hostname", 6319, "",
-                               std::make_shared<RulesSampler>()});
+                               std::make_shared<RulesSampler>(), std::make_shared<MockLogger>()});
   }
 
   SECTION("handle failure during post") {
@@ -198,11 +200,8 @@ TEST_CASE("writer") {
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
     // Redirect stderr so the test logs don't look like a failure.
-    std::stringstream error_message;
-    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush(std::chrono::seconds(10));  // Doesn't throw an error. That's the test!
-    REQUIRE(error_message.str() == "Error setting agent request size: Timeout was reached\n");
-    std::cerr.rdbuf(stderr);  // Restore stderr.
+    REQUIRE(logger->records.back().message == "Error setting agent request size: Timeout was reached");
     // Dropped all spans.
     handle->rcode = CURLE_OK;
     REQUIRE(handle->getTraces()->size() == 0);
@@ -213,12 +212,8 @@ TEST_CASE("writer") {
     handle->error = "error from libcurl";
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
-    std::stringstream error_message;
-    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
     writer.flush(std::chrono::seconds(10));
-    REQUIRE(error_message.str() ==
-            "Error sending traces to agent: Timeout was reached\nerror from libcurl\n");
-    std::cerr.rdbuf(stderr);  // Restore stderr.
+    REQUIRE(logger->records.back().message == "Error sending traces to agent: Timeout was reached\nerror from libcurl");
   }
 
   SECTION("responses are not sent to sampler if the conenction fails") {
@@ -301,7 +296,8 @@ TEST_CASE("writer") {
                        "hostname",
                        6319,
                        "",
-                       std::make_shared<RulesSampler>()};
+                       std::make_shared<RulesSampler>(),
+                       std::make_shared<MockLogger>()};
     // Send 7 traces at 1 trace per second. Since the write period is 2s, there should be 4
     // different writes. We don't count the number of writes because that could flake, but we do
     // check that all 7 traces are written, implicitly testing that multiple writes happen.
@@ -340,11 +336,8 @@ TEST_CASE("writer") {
                        "hostname",
                        6319,
                        "",
-                       std::make_shared<RulesSampler>()};
-    // Redirect cerr, so the the terminal output doesn't imply failure.
-    std::stringstream error_message;
-    std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
-
+                       std::make_shared<RulesSampler>(),
+                       std::make_shared<MockLogger>()};
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
 
@@ -359,8 +352,6 @@ TEST_CASE("writer") {
       writer.flush(std::chrono::seconds(10));
       REQUIRE(handle->perform_call_count == 3);  // Once originally, and two retries.
     }
-
-    std::cerr.rdbuf(stderr);  // Restore stderr.
   }
 
   SECTION("multiple requests don't append headers") {
@@ -397,11 +388,8 @@ TEST_CASE("flush") {
                      "hostname",
                      6319,
                      "",
-                     std::make_shared<RulesSampler>()};
-  // Redirect cerr, so the the terminal output doesn't imply failure.
-  std::stringstream error_message;
-  std::streambuf* stderr = std::cerr.rdbuf(error_message.rdbuf());
-
+                     std::make_shared<RulesSampler>(),
+                     std::make_shared<MockLogger>()};
   writer.write(make_trace(
       {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
 
@@ -417,6 +405,4 @@ TEST_CASE("flush") {
     // unlikely since 30s >>> 0.25s
     REQUIRE(wait_time < (retry_periods[0] / 2));
   }
-
-  std::cerr.rdbuf(stderr);  // Restore stderr.
 }

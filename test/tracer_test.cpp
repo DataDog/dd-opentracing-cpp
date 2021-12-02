@@ -205,7 +205,7 @@ TEST_CASE("env overrides") {
     REQUIRE(maybe_options);
     TracerOptions opts = maybe_options.value();
     opts.log_func = [](LogLevel, ot::string_view) {};  // noise suppression
-    std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
+    std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler, std::make_shared<MockLogger>()}};
 
     // Create span
     auto span = tracer->StartSpanWithOptions("/env-override", span_options);
@@ -269,7 +269,7 @@ TEST_CASE("startup log") {
 
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler}};
+  std::shared_ptr<Tracer> tracer{new Tracer{opts, writer, sampler, std::make_shared<MockLogger>()}};
 
   if (enabled) {
     REQUIRE(!ss.str().empty());

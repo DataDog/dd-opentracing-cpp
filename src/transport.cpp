@@ -1,7 +1,6 @@
 #include "transport.h"
 
 #include <cstring>
-#include <iostream>
 #include <stdexcept>
 
 namespace datadog {
@@ -12,13 +11,14 @@ size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
   handle->response_buffer_.write(ptr, size * nmemb);
 
   if (!handle->response_buffer_) {
-    std::cerr << "Unable to write to response buffer" << std::endl;
+    handle->logger_->Log(LogLevel::error, "Unable to write to response buffer");
     return -1;
   }
   return size * nmemb;
 }
 
-CurlHandle::CurlHandle() {
+CurlHandle::CurlHandle(std::shared_ptr<const Logger> logger)
+: logger_(logger) {
   curl_global_init(CURL_GLOBAL_ALL);
   handle_ = curl_easy_init();
   // Set the error buffer.
