@@ -9,6 +9,8 @@
 
 using json = nlohmann::json;
 
+extern "C" char** environ;
+
 namespace datadog {
 namespace opentracing {
 
@@ -138,20 +140,9 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
   
   // TODO
   std::cout << "You are making a tracer!\n" << std::flush;
-
-  const auto reportEnvVar = [](const char* name) {
-    const char* const value = std::getenv(name);
-    std::cout << name << ' ';
-    if (value) {
-      std::cout << "= " << value;
-    } else {
-      std::cout << "is unset";
-    }
-    std::cout << '\n' << std::flush;
-  };
-
-  reportEnvVar("FISH_FLAVOR");
-  reportEnvVar("BEST_COLOR");
+  for (const char* const* var = environ; *var; ++var) {
+    std::cout << "tracer environment: " << *var << "\n";
+  }
   // end TODO
 
   auto maybe_options = optionsFromConfig(configuration, error_message);
