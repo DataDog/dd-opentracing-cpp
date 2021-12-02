@@ -13,6 +13,7 @@
 
 #include <fstream>
 #include <random>
+#include <sstream>
 
 #include "bool.h"
 #include "tracer.h"
@@ -66,15 +67,6 @@ bool isEnabled() {
     return false;
   }
   return true;
-}
-
-bool isDebug() {
-  auto debug = std::getenv("DD_TRACE_DEBUG");
-  // defaults to false unless env var is set to "true"
-  if (debug != nullptr && stob(debug, false)) {
-    return true;
-  }
-  return false;
 }
 
 std::string reportingHostname(TracerOptions options) {
@@ -146,38 +138,6 @@ void startupLog(TracerOptions &options) {
   message += "DATADOG TRACER CONFIGURATION - ";
   message += j.dump();
   options.log_func(LogLevel::info, message);
-  /*
-  // C++17's filesystem api would be really nice to have right now..
-  std::string startup_log_path = "/var/tmp/dd-opentracing-cpp";
-  struct stat s;
-  if (stat(startup_log_path.c_str(), &s) == 0) {
-    if (!S_ISDIR(s.st_mode)) {
-      // Path exists but isn't a directory.
-      return;
-    }
-  } else {
-    if (errno != ENOENT) {
-      // Failed to stat directory, but reason was something other than
-      // not existing.
-      return;
-    }
-    if (mkdir(startup_log_path.c_str(), 01777) != 0) {
-      // Unable to create the log path.
-      return;
-    }
-  }
-
-  auto now = std::chrono::system_clock::now();
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-  std::ofstream log_file(startup_log_path + "/startup_options-" + std::to_string(timestamp) +
-                         ".json");
-  if (!log_file.good()) {
-    return;
-  }
-  logTracerOptions(now, options, log_file);
-  log_file.close();
-  */
 }
 
 }  // namespace
@@ -244,30 +204,27 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
     }
   }
 } catch (const json::parse_error &error) {
-  logger_->Log(
-      LogLevel::error,
-      std::string("rules sampler: unable to parse JSON config for rules sampler: ", error.what()));
+  std::ostringstream message;
+  message << "rules sampler: unable to parse JSON config for rules sampler: " << error.what();
+  logger_->Log(LogLevel::error, message.str());
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
                IdProvider get_id)
-    : opts_(options),
+    : logger_(std::make_shared<StandardLogger>(options.log_func)),
+      opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
       legacy_obfuscation_(legacyObfuscationEnabled()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
-               std::shared_ptr<RulesSampler> sampler)
-    : opts_(options),
+               std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+    : logger_(logger),
+      opts_(options),
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
-  if (isDebug()) {
-    logger_ = std::make_shared<VerboseLogger>(opts_.log_func);
-  } else {
-    logger_ = std::make_shared<StandardLogger>(opts_.log_func);
-  }
   configureRulesSampler(sampler);
   startupLog(options);
   buffer_ = std::make_shared<WritingSpanBuffer>(

@@ -3,6 +3,9 @@ add_library(catch STATIC test_main.cpp)
 macro(_datadog_test TEST_NAME)
   add_executable(${TEST_NAME} ${ARGN})
   add_sanitizers(${TEST_NAME})  
+  if(BUILD_COVERAGE)
+    target_link_options(${TEST_NAME} PRIVATE -fprofile-arcs -ftest-coverage)
+  endif()
   target_link_libraries(${TEST_NAME} dd_opentracing
                                      ${DATADOG_LINK_LIBRARIES}
                                      catch)

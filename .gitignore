@@ -42,3 +42,6 @@ bazel-*
 
 # IDE settings
 .vscode/
+
+# Code coverage report
+/coverage/

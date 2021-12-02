@@ -1,6 +1,6 @@
 #include "agent_writer.h"
 
-#include <iostream>
+#include <sstream>
 
 #include "encoder.h"
 #include "sample.h"
@@ -12,7 +12,6 @@ namespace opentracing {
 
 namespace {
 const std::string agent_protocol = "http://";
-const size_t max_queued_traces = 7000;
 // Retry sending traces to agent a couple of times. Any more than that and the agent won't accept
 // them.
 // write_period 1s + timeout 2s + (retry & timeout) 2.5s + (retry and timeout) 4.5s = 10s.
@@ -24,18 +23,23 @@ const long default_timeout_ms = 2000L;
 
 AgentWriter::AgentWriter(std::string host, uint32_t port, std::string url,
                          std::chrono::milliseconds write_period,
-                         std::shared_ptr<RulesSampler> sampler)
-    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{}}, write_period, max_queued_traces,
-                  default_retry_periods, host, port, url, sampler) {}
+                         std::shared_ptr<RulesSampler> sampler,
+                         std::shared_ptr<const Logger> logger)
+    // `CurlHandle` is defined in `transport.h`.
+    : AgentWriter(std::unique_ptr<Handle>{new CurlHandle{logger}}, write_period,
+                  default_max_queued_traces, default_retry_periods, host, port, url, sampler,
+                  logger) {}
 
 AgentWriter::AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
                          size_t max_queued_traces,
                          std::vector<std::chrono::milliseconds> retry_periods, std::string host,
-                         uint32_t port, std::string url, std::shared_ptr<RulesSampler> sampler)
-    : Writer(sampler),
+                         uint32_t port, std::string url, std::shared_ptr<RulesSampler> sampler,
+                         std::shared_ptr<const Logger> logger)
+    : Writer(sampler, logger),
       write_period_(write_period),
       max_queued_traces_(max_queued_traces),
-      retry_periods_(retry_periods) {
+      retry_periods_(retry_periods),
+      logger_(logger) {
   setUpHandle(handle, host, port, url);
   startWriting(std::move(handle));
 }
@@ -154,7 +158,7 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
           }  // lock on mutex_ ends.
           // Send spans, not in critical period.
           bool success = retryFiniteOnFail(
-              [&]() { return AgentWriter::postTraces(handle, headers, payload); });
+              [&]() { return AgentWriter::postTraces(handle, headers, payload, logger_); });
           if (success) {
             trace_encoder_->handleResponse(handle->getResponse());
           }
@@ -195,26 +199,33 @@ bool AgentWriter::retryFiniteOnFail(std::function<bool()> f) const {
 }
 
 bool AgentWriter::postTraces(std::unique_ptr<Handle> &handle,
-                             std::map<std::string, std::string> headers, std::string payload) try {
+                             std::map<std::string, std::string> headers, std::string payload,
+                             std::shared_ptr<const Logger> logger) try {
   handle->setHeaders(headers);
 
   // We have to set the size manually, because msgpack uses null characters.
   CURLcode rcode = handle->setopt(CURLOPT_POSTFIELDSIZE, payload.size());
   if (rcode != CURLE_OK) {
-    std::cerr << "Error setting agent request size: " << curl_easy_strerror(rcode) << std::endl;
+    std::ostringstream error;
+    error << "Error setting agent request size: " << curl_easy_strerror(rcode);
+    logger->Log(LogLevel::error, error.str());
     return false;
   }
 
   rcode = handle->setopt(CURLOPT_POSTFIELDS, payload.data());
   if (rcode != CURLE_OK) {
-    std::cerr << "Error setting agent request body: " << curl_easy_strerror(rcode) << std::endl;
+    std::ostringstream error;
+    error << "Error setting agent request body: " << curl_easy_strerror(rcode);
+    logger->Log(LogLevel::error, error.str());
     return false;
   }
 
   rcode = handle->perform();
   if (rcode != CURLE_OK) {
-    std::cerr << "Error sending traces to agent: " << curl_easy_strerror(rcode) << std::endl
-              << handle->getError() << std::endl;
+    std::ostringstream error;
+    error << "Error sending traces to agent: " << curl_easy_strerror(rcode) << "\n"
+          << handle->getError();
+    logger->Log(LogLevel::error, error.str());
     return false;
   }
   return true;

@@ -5,6 +5,7 @@
 #include <datadog/version.h>
 
 #include <functional>
+#include <memory>
 #include <random>
 
 #include "clock.h"
@@ -31,6 +32,7 @@ uint64_t getId();
 class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
  public:
   // Creates a Tracer by copying the given options and injecting the given dependencies.
+  // This overload is for use in unit tests.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
          IdProvider get_id);
 
@@ -39,7 +41,7 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   // an ExternalWriter that requires an external HTTP client to encode and submit to the Datadog
   // Agent.
   Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
-         std::shared_ptr<RulesSampler> sampler);
+         std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger);
 
   Tracer() = delete;
 

@@ -14,7 +14,7 @@
       "metrics": {
         "_dd.limit_psr": 1,
         "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 1
+        "_sampling_priority_v1": 2
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -37,7 +37,7 @@
       "metrics": {
         "_dd.limit_psr": 1,
         "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 1
+        "_sampling_priority_v1": 2
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -60,7 +60,7 @@
       "metrics": {
         "_dd.limit_psr": 1,
         "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 1
+        "_sampling_priority_v1": 2
       },
       "name": "nginx.handle",
       "resource": "/",

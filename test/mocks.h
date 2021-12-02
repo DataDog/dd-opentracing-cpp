@@ -8,6 +8,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 
 #include "../src/sample.h"
@@ -31,13 +32,48 @@ struct MockLogger : public Logger {
   void Trace(uint64_t, uint64_t, ot::string_view) const noexcept override {}
 };
 
+// `Journal` is an implementation of `Logger` that appends logged records to an
+// internal `vector`, `records`.
+struct Journal : public Logger {
+  struct Record {
+    LogLevel level;
+    uint64_t trace_id;  // zero if absent
+    uint64_t span_id;   // zero if absent
+    std::string message;
+  };
+
+  mutable std::vector<Record> records;
+
+  Journal() : Logger([](LogLevel, ot::string_view) {}) {}
+  void Log(LogLevel level, ot::string_view message) const noexcept override {
+    records.push_back(Record{level, 0, 0, message});
+  }
+  void Log(LogLevel level, uint64_t trace_id, ot::string_view message) const noexcept override {
+    records.push_back(Record{level, trace_id, 0, message});
+  }
+  void Log(LogLevel level, uint64_t trace_id, uint64_t span_id, ot::string_view message) const
+      noexcept override {
+    records.push_back(Record{level, trace_id, span_id, message});
+  }
+  void Trace(ot::string_view message) const noexcept override {
+    records.push_back(Record{LogLevel::debug, 0, 0, message});
+  }
+  void Trace(uint64_t trace_id, ot::string_view message) const noexcept override {
+    records.push_back(Record{LogLevel::debug, trace_id, 0, message});
+  }
+  void Trace(uint64_t trace_id, uint64_t span_id, ot::string_view message) const
+      noexcept override {
+    records.push_back(Record{LogLevel::debug, trace_id, span_id, message});
+  }
+};
+
 // Exists just so we can see that opts was set correctly.
 struct MockTracer : public Tracer {
   TracerOptions opts;
 
   MockTracer(TracerOptions opts, std::shared_ptr<Writer> writer,
-             std::shared_ptr<RulesSampler> sampler)
-      : Tracer(opts, writer, sampler), opts(opts) {}
+             std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+      : Tracer(opts, writer, sampler, logger), opts(opts) {}
 
   std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
                                                  const ot::StartSpanOptions& /* options */) const
@@ -140,7 +176,8 @@ struct MockRulesSampler : public RulesSampler {
 
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter(std::shared_ptr<RulesSampler> sampler) : Writer(sampler) {}
+  MockWriter(std::shared_ptr<RulesSampler> sampler)
+      : Writer(sampler, std::make_shared<MockLogger>()) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {

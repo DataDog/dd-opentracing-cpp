@@ -20,18 +20,20 @@ namespace opentracing {
 
 class Handle;
 
-// A Writer that sends Traces (collections of Spans) to a Datadog agent.
+// A Writer that manages a thread that sends Traces (collections of Spans) to a
+// Datadog agent.
 class AgentWriter : public Writer {
  public:
   // Creates an AgentWriter that uses curl to send Traces to a Datadog agent. May throw a
   // runtime_exception.
   AgentWriter(std::string host, uint32_t port, std::string unix_socket,
-              std::chrono::milliseconds write_period, std::shared_ptr<RulesSampler> sampler);
+              std::chrono::milliseconds write_period, std::shared_ptr<RulesSampler> sampler,
+              std::shared_ptr<const Logger> logger);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
               size_t max_queued_traces, std::vector<std::chrono::milliseconds> retry_periods,
               std::string host, uint32_t port, std::string unix_socket,
-              std::shared_ptr<RulesSampler> sampler);
+              std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger);
 
   // Does not flush on destruction, buffered traces may be lost. Stops all threads.
   ~AgentWriter() override;
@@ -45,6 +47,11 @@ class AgentWriter : public Writer {
   // Permanently stops writing Traces. Calls to write() and flush() will do nothing.
   void stop();
 
+  // Default value of `max_queued_traces` in the constructor overload without
+  // that parameter. This implementation detail is exposed for use in the unit
+  // test.
+  static const size_t default_max_queued_traces = 7000;
+
  private:
   // Initialises the curl handle. May throw a runtime_exception.
   void setUpHandle(std::unique_ptr<Handle> &handle, std::string host, uint32_t port,
@@ -55,7 +62,8 @@ class AgentWriter : public Writer {
   void startWriting(std::unique_ptr<Handle> handle);
   // Posts the given Traces to the Agent. Returns true if it succeeds, otherwise false.
   static bool postTraces(std::unique_ptr<Handle> &handle,
-                         std::map<std::string, std::string> headers, std::string payload);
+                         std::map<std::string, std::string> headers, std::string payload,
+                         std::shared_ptr<const Logger> logger);
   // Retries the given function a finite number of times according to retry_periods_. Retries when
   // f() returns false.
   bool retryFiniteOnFail(std::function<bool()> f) const;
@@ -80,6 +88,9 @@ class AgentWriter : public Writer {
   bool stop_writing_ = false;
   // If set to true, flushes worker (which sets it false again). Locked by mutex_;
   bool flush_worker_ = false;
+  // The logger is used to print diagnostic messages.  The actual mechanism is
+  // determined by the `log_func` field of `TracerOptions`.
+  std::shared_ptr<const Logger> logger_;
 };
 
 }  // namespace opentracing

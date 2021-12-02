@@ -1,9 +1,9 @@
 #include "propagation.h"
 
 #include <algorithm>
-#include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 #include "sample.h"
@@ -101,7 +101,7 @@ bool has_prefix(const std::string &str, const std::string &prefix) {
 // whether the corresponding tag is set.  Note that `std::unique_ptr` is here
 // used as a substitute for `std::optional`.
 std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_presence_policy(
-    bool trace_id_set, bool parent_id_set, bool sampling_priority_set, bool origin_set) {
+    bool trace_id_set, bool parent_id_set, bool origin_set) {
   using Result = ot::expected<std::unique_ptr<ot::SpanContext>>;
 
   if (!trace_id_set && !parent_id_set) {
@@ -116,11 +116,25 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
     // Parent ID is required, except when origin is set.
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
-  if (origin_set && !sampling_priority_set) {
-    // Origin should only be set if sampling priority is also set.
-    return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
-  }
   return nullptr;
+}
+
+// Interpret the specified `text` as a non-negative integer formatted in the
+// specified `base` (e.g. base 10 for decimal, base 16 for hexadecimal),
+// possibly surrounded by whitespace, and return the integer.  Throw an
+// exception derived from `std::logic_error` if an error occurs.
+uint64_t parse_uint64(const std::string &text, int base) {
+  std::size_t end_index;
+  const uint64_t result = std::stoull(text, &end_index, base);
+
+  // If any of the remaining characters are not whitespace, then `text`
+  // contains something other than a base-`base` integer.
+  if (std::any_of(text.begin() + end_index, text.end(),
+                  [](unsigned char ch) { return !std::isspace(ch); })) {
+    throw std::invalid_argument("integer text field has a trailing non-whitespace character");
+  }
+
+  return result;
 }
 
 }  // namespace
@@ -192,7 +206,7 @@ SpanContext &SpanContext::operator=(const SpanContext &other) {
 
 SpanContext::SpanContext(SpanContext &&other)
     : nginx_opentracing_compatibility_hack_(other.nginx_opentracing_compatibility_hack_),
-      logger_(other.logger_),
+      logger_(std::move(other.logger_)),
       id_(other.id_),
       trace_id_(other.trace_id_),
       propagated_sampling_priority_(std::move(other.propagated_sampling_priority_)),
@@ -201,7 +215,7 @@ SpanContext::SpanContext(SpanContext &&other)
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
-  logger_ = other.logger_;
+  logger_ = std::move(other.logger_);
   id_ = other.id_;
   trace_id_ = other.trace_id_;
   origin_ = other.origin_;
@@ -412,16 +426,16 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
 
   reader >> j;
 
-  if (const auto result = enforce_tag_presence_policy(
-          j.count(json_trace_id_key), j.count(json_parent_id_key),
-          j.count(json_sampling_priority_key), j.count(json_origin_key))) {
+  if (const auto result = enforce_tag_presence_policy(j.contains(json_trace_id_key),
+                                                      j.contains(json_parent_id_key),
+                                                      j.contains(json_origin_key))) {
     return std::move(*result);
   }
 
   std::string trace_id_str = j[json_trace_id_key];
   std::string parent_id_str = j[json_parent_id_key];
-  trace_id = std::stoull(trace_id_str);
-  parent_id = std::stoull(parent_id_str);
+  trace_id = parse_uint64(trace_id_str, 10);
+  parent_id = parse_uint64(parent_id_str, 10);
 
   if (j.find(json_sampling_priority_key) != j.end()) {
     sampling_priority = asSamplingPriority(j[json_sampling_priority_key]);
@@ -461,8 +475,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     if (result.value() != nullptr) {
       if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
                                     *dynamic_cast<SpanContext *>(context.get())) {
-        std::cerr << "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers"
-                  << std::endl;
+        logger->Log(LogLevel::error,
+                    "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers");
         return ot::make_unexpected(ot::span_context_corrupted_error);
       }
       context = std::move(result.value());
@@ -481,27 +495,25 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   std::string origin;
   bool trace_id_set = false;
   bool parent_id_set = false;
-  bool sampling_priority_set = false;
   bool origin_set = false;
   std::unordered_map<std::string, std::string> baggage;
   auto result =
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
           if (equals_ignore_case(key, headers_impl.trace_id_header)) {
-            trace_id = std::stoull(value, nullptr, headers_impl.base);
+            trace_id = parse_uint64(value, headers_impl.base);
             trace_id_set = true;
           } else if (equals_ignore_case(key, headers_impl.span_id_header)) {
-            parent_id = std::stoull(value, nullptr, headers_impl.base);
+            parent_id = parse_uint64(value, headers_impl.base);
             parent_id_set = true;
           } else if (equals_ignore_case(key, headers_impl.sampling_priority_header)) {
             sampling_priority = asSamplingPriority(std::stoi(value));
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
-              std::cerr << "Invalid sampling_priority value in serialized SpanContext"
-                        << std::endl;
+              logger->Log(LogLevel::error,
+                          "Invalid sampling_priority value in serialized SpanContext");
               return ot::make_unexpected(ot::span_context_corrupted_error);
             }
-            sampling_priority_set = true;
           } else if (headers_impl.origin_header != nullptr &&
                      equals_ignore_case(key, headers_impl.origin_header)) {
             origin = value;
@@ -520,8 +532,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (!result) {  // "if unexpected", hence "return {}" from above is fine.
     return ot::make_unexpected(result.error());
   }
-  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set,
-                                                      sampling_priority_set, origin_set)) {
+  if (const auto result = enforce_tag_presence_policy(trace_id_set, parent_id_set, origin_set)) {
     return std::move(*result);
   }
   auto context =

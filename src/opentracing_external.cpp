@@ -7,6 +7,9 @@
 
 #include <datadog/opentracing.h>
 
+#include <sstream>
+
+#include "logger.h"
 #include "sample.h"
 #include "tracer.h"
 #include "tracer_options.h"
@@ -21,18 +24,20 @@ std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTrace
     const TracerOptions &options) {
   auto maybe_options = applyTracerOptionsFromEnvironment(options);
   if (!maybe_options) {
-    std::cerr << "Error applying TracerOptions from environment variables: "
-              << maybe_options.error() << std::endl
-              << "Tracer will be started without options from the environment" << std::endl;
+    std::ostringstream message;
+    message << "Error applying TracerOptions from environment variables: " << maybe_options.error()
+            << "\nTracer will be started without options from the environment\n";
+    StandardLogger(options.log_func).Log(LogLevel::error, message.str());
     maybe_options = options;
   }
   TracerOptions opts = maybe_options.value();
 
+  auto logger = makeLogger(opts);
   auto sampler = std::make_shared<RulesSampler>();
-  auto writer = std::make_shared<ExternalWriter>(sampler);
+  auto writer = std::make_shared<ExternalWriter>(sampler, logger);
   auto encoder = writer->encoder();
   return std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>>{
-      std::shared_ptr<ot::Tracer>{new Tracer{opts, writer, sampler}}, encoder};
+      std::shared_ptr<ot::Tracer>{new Tracer{opts, writer, sampler, logger}}, encoder};
 }
 
 }  // namespace opentracing
