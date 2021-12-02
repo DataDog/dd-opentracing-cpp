@@ -1,9 +1,9 @@
 #ifndef DD_OPENTRACING_LOGGER_H
 #define DD_OPENTRACING_LOGGER_H
 
-#include "datadog/opentracing.h"
-
 #include <memory>
+
+#include "datadog/opentracing.h"
 
 namespace datadog {
 namespace opentracing {

@@ -37,8 +37,8 @@ struct MockLogger : public Logger {
 struct Journal : public Logger {
   struct Record {
     LogLevel level;
-    uint64_t trace_id; // zero if absent
-    uint64_t span_id; // zero if absent
+    uint64_t trace_id;  // zero if absent
+    uint64_t span_id;   // zero if absent
     std::string message;
   };
 
@@ -51,7 +51,8 @@ struct Journal : public Logger {
   void Log(LogLevel level, uint64_t trace_id, ot::string_view message) const noexcept override {
     records.push_back(Record{level, trace_id, 0, message});
   }
-  void Log(LogLevel level, uint64_t trace_id, uint64_t span_id, ot::string_view message) const noexcept override {
+  void Log(LogLevel level, uint64_t trace_id, uint64_t span_id, ot::string_view message) const
+      noexcept override {
     records.push_back(Record{level, trace_id, span_id, message});
   }
   void Trace(ot::string_view message) const noexcept override {
@@ -60,7 +61,8 @@ struct Journal : public Logger {
   void Trace(uint64_t trace_id, ot::string_view message) const noexcept override {
     records.push_back(Record{LogLevel::debug, trace_id, 0, message});
   }
-  void Trace(uint64_t trace_id, uint64_t span_id, ot::string_view message) const noexcept override {
+  void Trace(uint64_t trace_id, uint64_t span_id, ot::string_view message) const
+      noexcept override {
     records.push_back(Record{LogLevel::debug, trace_id, span_id, message});
   }
 };
@@ -70,8 +72,7 @@ struct MockTracer : public Tracer {
   TracerOptions opts;
 
   MockTracer(TracerOptions opts, std::shared_ptr<Writer> writer,
-             std::shared_ptr<RulesSampler> sampler,
-             std::shared_ptr<const Logger> logger)
+             std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
       : Tracer(opts, writer, sampler, logger), opts(opts) {}
 
   std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view /* operation_name */,
@@ -175,7 +176,8 @@ struct MockRulesSampler : public RulesSampler {
 
 // A Writer implementation that allows access to the Spans recorded.
 struct MockWriter : public Writer {
-  MockWriter(std::shared_ptr<RulesSampler> sampler) : Writer(sampler, std::make_shared<MockLogger>()) {}
+  MockWriter(std::shared_ptr<RulesSampler> sampler)
+      : Writer(sampler, std::make_shared<MockLogger>()) {}
   ~MockWriter() override {}
 
   void write(Trace trace) override {

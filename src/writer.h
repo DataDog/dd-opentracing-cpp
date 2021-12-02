@@ -41,7 +41,8 @@ class Writer {
 // to the Datadog Agent.
 class ExternalWriter : public Writer {
  public:
-  ExternalWriter(std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger) : Writer(sampler, logger) {}
+  ExternalWriter(std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+      : Writer(sampler, logger) {}
   ~ExternalWriter() override {}
 
   // Implements Writer methods.

@@ -475,7 +475,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     if (result.value() != nullptr) {
       if (context != nullptr && *dynamic_cast<SpanContext *>(result.value().get()) !=
                                     *dynamic_cast<SpanContext *>(context.get())) {
-        logger->Log(LogLevel::error, "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers");
+        logger->Log(LogLevel::error,
+                    "Attempt to deserialize SpanContext with conflicting Datadog and B3 headers");
         return ot::make_unexpected(ot::span_context_corrupted_error);
       }
       context = std::move(result.value());
@@ -509,7 +510,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             sampling_priority = asSamplingPriority(std::stoi(value));
             if (sampling_priority == nullptr) {
               // The sampling_priority key was present, but the value makes no sense.
-              logger->Log(LogLevel::error, "Invalid sampling_priority value in serialized SpanContext");
+              logger->Log(LogLevel::error,
+                          "Invalid sampling_priority value in serialized SpanContext");
               return ot::make_unexpected(ot::span_context_corrupted_error);
             }
           } else if (headers_impl.origin_header != nullptr &&

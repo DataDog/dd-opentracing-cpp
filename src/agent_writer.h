@@ -27,7 +27,8 @@ class AgentWriter : public Writer {
   // Creates an AgentWriter that uses curl to send Traces to a Datadog agent. May throw a
   // runtime_exception.
   AgentWriter(std::string host, uint32_t port, std::string unix_socket,
-              std::chrono::milliseconds write_period, std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger);
+              std::chrono::milliseconds write_period, std::shared_ptr<RulesSampler> sampler,
+              std::shared_ptr<const Logger> logger);
 
   AgentWriter(std::unique_ptr<Handle> handle, std::chrono::milliseconds write_period,
               size_t max_queued_traces, std::vector<std::chrono::milliseconds> retry_periods,
@@ -61,7 +62,8 @@ class AgentWriter : public Writer {
   void startWriting(std::unique_ptr<Handle> handle);
   // Posts the given Traces to the Agent. Returns true if it succeeds, otherwise false.
   static bool postTraces(std::unique_ptr<Handle> &handle,
-                         std::map<std::string, std::string> headers, std::string payload, std::shared_ptr<const Logger> logger);
+                         std::map<std::string, std::string> headers, std::string payload,
+                         std::shared_ptr<const Logger> logger);
   // Retries the given function a finite number of times according to retry_periods_. Retries when
   // f() returns false.
   bool retryFiniteOnFail(std::function<bool()> f) const;

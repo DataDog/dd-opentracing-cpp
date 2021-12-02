@@ -48,8 +48,15 @@ TEST_CASE("writer") {
     }));
     test_case.expected_opts[CURLOPT_TIMEOUT_MS] = "2000";
 
-    AgentWriter writer{std::move(handle_ptr), std::chrono::seconds(1), 100,           {},
-                       test_case.host,        test_case.port,          test_case.url, sampler, std::make_shared<MockLogger>()};
+    AgentWriter writer{std::move(handle_ptr),
+                       std::chrono::seconds(1),
+                       100,
+                       {},
+                       test_case.host,
+                       test_case.port,
+                       test_case.url,
+                       sampler,
+                       std::make_shared<MockLogger>()};
 
     REQUIRE(handle->options == test_case.expected_opts);
   }
@@ -201,7 +208,8 @@ TEST_CASE("writer") {
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
     // Redirect stderr so the test logs don't look like a failure.
     writer.flush(std::chrono::seconds(10));  // Doesn't throw an error. That's the test!
-    REQUIRE(logger->records.back().message == "Error setting agent request size: Timeout was reached");
+    REQUIRE(logger->records.back().message ==
+            "Error setting agent request size: Timeout was reached");
     // Dropped all spans.
     handle->rcode = CURLE_OK;
     REQUIRE(handle->getTraces()->size() == 0);
@@ -213,7 +221,8 @@ TEST_CASE("writer") {
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
     writer.flush(std::chrono::seconds(10));
-    REQUIRE(logger->records.back().message == "Error sending traces to agent: Timeout was reached\nerror from libcurl");
+    REQUIRE(logger->records.back().message ==
+            "Error sending traces to agent: Timeout was reached\nerror from libcurl");
   }
 
   SECTION("responses are not sent to sampler if the conenction fails") {

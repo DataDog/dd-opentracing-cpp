@@ -17,8 +17,7 @@ size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
   return size * nmemb;
 }
 
-CurlHandle::CurlHandle(std::shared_ptr<const Logger> logger)
-: logger_(logger) {
+CurlHandle::CurlHandle(std::shared_ptr<const Logger> logger) : logger_(logger) {
   curl_global_init(CURL_GLOBAL_ALL);
   handle_ = curl_easy_init();
   // Set the error buffer.

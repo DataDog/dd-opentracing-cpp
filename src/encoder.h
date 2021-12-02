@@ -3,11 +3,11 @@
 
 #include <datadog/opentracing.h>
 
-#include "logger.h"
-
 #include <deque>
 #include <memory>
 #include <sstream>
+
+#include "logger.h"
 
 namespace datadog {
 namespace opentracing {

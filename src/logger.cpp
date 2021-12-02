@@ -1,7 +1,8 @@
 #include "logger.h"
-#include "bool.h"
 
 #include <cstdlib>
+
+#include "bool.h"
 
 namespace datadog {
 namespace opentracing {

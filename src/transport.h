@@ -1,13 +1,13 @@
 #ifndef DD_OPENTRACING_TRANSPORT_H
 #define DD_OPENTRACING_TRANSPORT_H
 
-#include "logger.h"
-
 #include <curl/curl.h>
 
 #include <map>
 #include <sstream>
 #include <string>
+
+#include "logger.h"
 
 namespace datadog {
 namespace opentracing {

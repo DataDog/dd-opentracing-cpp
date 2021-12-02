@@ -112,7 +112,8 @@ void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   }
   auto& trace = trace_iter->second;
   if (trace.all_spans.find(span->spanId()) == trace.all_spans.end()) {
-    logger_->Log(LogLevel::error, "A Span that was not registered was submitted to WritingSpanBuffer");
+    logger_->Log(LogLevel::error,
+                 "A Span that was not registered was submitted to WritingSpanBuffer");
     return;
   }
   uint64_t trace_id = span->traceId();

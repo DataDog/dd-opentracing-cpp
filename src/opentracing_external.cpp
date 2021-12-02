@@ -7,13 +7,13 @@
 
 #include <datadog/opentracing.h>
 
+#include <sstream>
+
 #include "logger.h"
 #include "sample.h"
 #include "tracer.h"
 #include "tracer_options.h"
 #include "writer.h"
-
-#include <sstream>
 
 namespace ot = opentracing;
 
@@ -25,9 +25,8 @@ std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTrace
   auto maybe_options = applyTracerOptionsFromEnvironment(options);
   if (!maybe_options) {
     std::ostringstream message;
-    message << "Error applying TracerOptions from environment variables: "
-              << maybe_options.error()
-              << "\nTracer will be started without options from the environment\n";
+    message << "Error applying TracerOptions from environment variables: " << maybe_options.error()
+            << "\nTracer will be started without options from the environment\n";
     StandardLogger(options.log_func).Log(LogLevel::error, message.str());
     maybe_options = options;
   }
