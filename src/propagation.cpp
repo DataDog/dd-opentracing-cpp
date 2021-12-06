@@ -21,7 +21,7 @@ struct HeadersImpl {
   const char *sampling_priority_header;
   const char *origin_header;
   // Certain tags that are associated with the entire trace are propagated.
-  // See `tag_propagation.h`.  
+  // See `tag_propagation.h`.
   const char *tags_header;
   const int base;
   std::string (*encode_id)(uint64_t);

@@ -30,7 +30,7 @@ std::unordered_map<std::string, std::string> deserializeTags(ot::string_view hea
 // `tag_value` and append the result to the specified `serialized_tags`.
 void appendTag(std::string& serialized_tags, ot::string_view tag_key, ot::string_view tag_value);
 
-} // namespace opentracing
-} // namespace datadog
+}  // namespace opentracing
+}  // namespace datadog
 
 #endif
