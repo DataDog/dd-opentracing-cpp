@@ -20,6 +20,9 @@ struct HeadersImpl {
   const char *span_id_header;
   const char *sampling_priority_header;
   const char *origin_header;
+  // Certain tags that are associated with the entire trace are propagated.
+  // See `tag_propagation.h`.  
+  const char *tags_header;
   const int base;
   std::string (*encode_id)(uint64_t);
   std::string (*encode_sampling_priority)(SamplingPriority);
@@ -50,6 +53,7 @@ constexpr struct {
                       "x-datadog-parent-id",
                       "x-datadog-sampling-priority",
                       "x-datadog-origin",
+                      "x-datadog-tags",
                       10,
                       std::to_string,
                       to_string};
@@ -58,6 +62,7 @@ constexpr struct {
                  "X-B3-SpanId",
                  "X-B3-Sampled",
                  "x-datadog-origin",
+                 "x-datadog-tags",
                  16,
                  asHex,
                  clampB3SamplingPriorityValue};
@@ -149,6 +154,7 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
       headers.push_back(propagation_headers[style].sampling_priority_header);
       headers.push_back(propagation_headers[style].origin_header);
     }
+    // TODO headers.push_back(propagation_headers[style].tags_header);
   }
   return headers;
 }
@@ -301,8 +307,7 @@ std::string SpanContext::baggageItem(ot::string_view key) const {
 
 SpanContext SpanContext::withId(uint64_t id) const {
   std::lock_guard<std::mutex> lock{mutex_};
-  auto baggage = baggage_;  // (Shallow) copy baggage.
-  SpanContext context{logger_, id, trace_id_, origin_, std::move(baggage)};
+  SpanContext context{logger_, id, trace_id_, origin_, decltype(baggage_)(baggage_)};
   if (propagated_sampling_priority_ != nullptr) {
     context.propagated_sampling_priority_.reset(
         new SamplingPriority(*propagated_sampling_priority_));
