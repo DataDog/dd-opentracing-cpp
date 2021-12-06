@@ -25,7 +25,7 @@ namespace opentracing {
 //
 // [1]: https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 // [2]:
-// https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.2s6f0izi97s1
+// https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.yp07yuixga36
 
 namespace {
 
