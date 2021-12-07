@@ -87,7 +87,7 @@ class WritingSpanBuffer : public SpanBuffer {
   OptionalSamplingPriority setSamplingPriorityImpl(uint64_t trace_id,
                                                    OptionalSamplingPriority priority);
   OptionalSamplingPriority assignSamplingPriorityImpl(const SpanData* span);
-  void setSamplerResult(uint64_t trace_id, SampleResult& sample_result);
+  void setSamplerResult(uint64_t trace_id, const SampleResult& sample_result);
 
   std::shared_ptr<const Logger> logger_;
   std::shared_ptr<Writer> writer_;

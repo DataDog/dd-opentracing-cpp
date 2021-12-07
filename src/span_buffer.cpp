@@ -205,7 +205,7 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const Spa
   return getSamplingPriorityImpl(span->trace_id);
 }
 
-void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, SampleResult& sample_result) {
+void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& sample_result) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
     logger_->Trace(trace_id, "cannot assign rules sampler result, trace not found");
