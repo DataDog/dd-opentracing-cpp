@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <catch2/catch.hpp>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -67,5 +68,16 @@ TEST_CASE("tag propagation codec expected values") {
   SECTION("decodes to expected value") {
     const auto decoded = deserializeTags(test_case.encoded);
     REQUIRE(decoded == test_case.decoded);
+  }
+}
+
+TEST_CASE("tag propagation decoding duplicate tags") {
+  SECTION("fails when the values are different") {
+    REQUIRE_THROWS_AS(deserializeTags("dupe=foo,dupe=bar"), std::runtime_error);
+  }
+
+  SECTION("succeeds when the values are the same") {
+    const std::unordered_map<std::string, std::string> expected{{"dupe", "same"}};
+    REQUIRE(deserializeTags("dupe=same,dupe=same") == expected);
   }
 }
