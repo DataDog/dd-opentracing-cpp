@@ -154,7 +154,7 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
       headers.push_back(propagation_headers[style].sampling_priority_header);
       headers.push_back(propagation_headers[style].origin_header);
     }
-    // TODO headers.push_back(propagation_headers[style].tags_header);
+    headers.push_back(propagation_headers[style].tags_header);
   }
   return headers;
 }
