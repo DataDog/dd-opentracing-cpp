@@ -81,6 +81,7 @@ const std::string json_trace_id_key = "trace_id";
 const std::string json_parent_id_key = "parent_id";
 const std::string json_sampling_priority_key = "sampling_priority";
 const std::string json_origin_key = "origin";
+const std::string json_tags_key = "tags";
 const std::string json_baggage_key = "baggage";
 
 // Does what it says on the tin. Just looks at each char, so don't try and use this on
@@ -334,6 +335,8 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
       j[json_origin_key] = origin_;
     }
   }
+  // TODO: no
+  j[json_tags_key] = "";
   j[json_baggage_key] = baggage_;
 
   writer << j.dump();
@@ -401,6 +404,12 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
     }
   }
 
+  // TODO: no
+  result = writer.Set(headers_impl.tags_header, "");
+  if (!result) {
+    return result;
+  }
+
   for (auto baggage_item : baggage_) {
     std::string key = std::string(baggage_prefix) + baggage_item.first;
     result = writer.Set(key, baggage_item.second);
@@ -462,7 +471,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-} catch (const std::invalid_argument &ia) {
+} catch (const std::invalid_argument &) {
   return ot::make_unexpected(ot::span_context_corrupted_error);
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));

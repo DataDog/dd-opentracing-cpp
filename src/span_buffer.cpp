@@ -89,7 +89,7 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   uint64_t trace_id = context.traceId();
   auto trace = traces_.find(trace_id);
   if (trace == traces_.end() || trace->second.all_spans.empty()) {
-    traces_.emplace(std::make_pair(trace_id, PendingTrace{logger_}));
+    traces_.emplace(trace_id, PendingTrace{logger_});
     trace = traces_.find(trace_id);
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
     trace->second.sampling_priority_locked = p != nullptr;
