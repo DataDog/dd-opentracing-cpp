@@ -160,14 +160,6 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
   return headers;
 }
 
-OptionalSamplingPriority asSamplingPriority(int i) {
-  if (i < static_cast<int>(SamplingPriority::MinimumValue) ||
-      i > static_cast<int>(SamplingPriority::MaximumValue)) {
-    return nullptr;
-  }
-  return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));
-}
-
 SpanContext::SpanContext(std::shared_ptr<const Logger> logger, uint64_t id, uint64_t trace_id,
                          std::string origin,
                          std::unordered_map<std::string, std::string> &&baggage)

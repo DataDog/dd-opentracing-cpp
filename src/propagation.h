@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "logger.h"
+#include "sampling_priority.h"
 
 namespace ot = opentracing;
 
@@ -27,27 +28,6 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
 class Tracer;
 class SpanBuffer;
 struct HeadersImpl;
-
-enum class SamplingPriority : int {
-  UserDrop = -1,
-  SamplerDrop = 0,
-  SamplerKeep = 1,
-  UserKeep = 2,
-
-  MinimumValue = UserDrop,
-  MaximumValue = UserKeep,
-};
-
-// A SamplingPriority that encompasses only values that may be directly set by users.
-enum class UserSamplingPriority : int {
-  UserDrop = static_cast<int>(SamplingPriority::UserDrop),
-  UserKeep = static_cast<int>(SamplingPriority::UserKeep),
-};
-
-// Move to std::optional in C++17 when it has better compiler support.
-using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
-
-OptionalSamplingPriority asSamplingPriority(int i);
 
 class SpanContext : public ot::SpanContext {
  public:
