@@ -21,20 +21,9 @@
 namespace datadog {
 namespace opentracing {
 
+// `MockLogger` is an implementation of `Logger` that appends logged records to
+// an internal `vector`, `records`.
 struct MockLogger : public Logger {
- public:
-  MockLogger() : Logger([](LogLevel, ot::string_view) {}) {}
-  void Log(LogLevel, ot::string_view) const noexcept override {}
-  void Log(LogLevel, uint64_t, ot::string_view) const noexcept override {}
-  void Log(LogLevel, uint64_t, uint64_t, ot::string_view) const noexcept override {}
-  void Trace(ot::string_view) const noexcept override {}
-  void Trace(uint64_t, ot::string_view) const noexcept override {}
-  void Trace(uint64_t, uint64_t, ot::string_view) const noexcept override {}
-};
-
-// `Journal` is an implementation of `Logger` that appends logged records to an
-// internal `vector`, `records`.
-struct Journal : public Logger {
   struct Record {
     LogLevel level;
     uint64_t trace_id;  // zero if absent
@@ -44,7 +33,7 @@ struct Journal : public Logger {
 
   mutable std::vector<Record> records;
 
-  Journal() : Logger([](LogLevel, ot::string_view) {}) {}
+  MockLogger() : Logger([](LogLevel, ot::string_view) {}) {}
   void Log(LogLevel level, ot::string_view message) const noexcept override {
     records.push_back(Record{level, 0, 0, message});
   }

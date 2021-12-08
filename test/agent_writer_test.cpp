@@ -86,7 +86,7 @@ TEST_CASE("writer") {
   size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
 
-  auto logger = std::make_shared<const Journal>();
+  auto logger = std::make_shared<const MockLogger>();
 
   AgentWriter writer{std::move(handle_ptr),
                      only_send_traces_when_we_flush,
