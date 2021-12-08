@@ -1,5 +1,4 @@
 #include "upstream_service.h"
-#include "base64_rfc4648_unpadded.h"
 
 #include <algorithm>
 #include <cassert>
@@ -9,6 +8,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+#include "base64_rfc4648_unpadded.h"
 
 namespace datadog {
 namespace opentracing {
@@ -68,15 +69,18 @@ SamplingPriority deserializeSamplingPriority(ot::string_view text) {
   std::size_t bytes_parsed = 0;
   const int sampling_priority_int = std::stoi(sampling_priority_string, &bytes_parsed);
   if (bytes_parsed != sampling_priority_string.size()) {
-      std::ostringstream error;
-      error << "Unable to parse a sampling priority integer from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_priority_string.size() << "): " << sampling_priority_string;
-      throw std::runtime_error(error.str());
+    std::ostringstream error;
+    error << "Unable to parse a sampling priority integer from the following text (consumed "
+          << bytes_parsed << " bytes out of " << sampling_priority_string.size()
+          << "): " << sampling_priority_string;
+    throw std::runtime_error(error.str());
   }
-  const OptionalSamplingPriority sampling_priority_maybe = asSamplingPriority(sampling_priority_int);
+  const OptionalSamplingPriority sampling_priority_maybe =
+      asSamplingPriority(sampling_priority_int);
   if (sampling_priority_maybe == nullptr) {
-      std::ostringstream error;
-      error << "Unrecognized integer value for sampling priority: " << sampling_priority_int;
-      throw std::runtime_error(error.str());
+    std::ostringstream error;
+    error << "Unrecognized integer value for sampling priority: " << sampling_priority_int;
+    throw std::runtime_error(error.str());
   }
   return *sampling_priority_maybe;
 }
@@ -86,28 +90,32 @@ SamplingMechanism deserializeSamplingMechanism(ot::string_view text) {
   std::size_t bytes_parsed = 0;
   const int sampling_mechanism_int = std::stoi(sampling_mechanism_string, &bytes_parsed);
   if (bytes_parsed != sampling_mechanism_string.size()) {
-      std::ostringstream error;
-      error << "Unable to parse a sampling mechanism integer from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_mechanism_string.size() << "): " << sampling_mechanism_string;
-      throw std::runtime_error(error.str());
+    std::ostringstream error;
+    error << "Unable to parse a sampling mechanism integer from the following text (consumed "
+          << bytes_parsed << " bytes out of " << sampling_mechanism_string.size()
+          << "): " << sampling_mechanism_string;
+    throw std::runtime_error(error.str());
   }
   return asSamplingMechanism(sampling_mechanism_int);
 }
 
 double deserializeSamplingRate(ot::string_view text) {
-    if (text.empty()) {
-        return std::nan("");
-    }
+  if (text.empty()) {
+    return std::nan("");
+  }
 
-    const std::string sampling_rate_string = text;
-    std::size_t bytes_parsed = 0;
-    const double sampling_rate = std::stod(sampling_rate_string, &bytes_parsed);
-    if (bytes_parsed != sampling_rate_string.size()) {
-      std::ostringstream error;
-      error << "Unable to parse a sampling rate float from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_rate_string.size() << "): " << sampling_rate_string;
-      throw std::runtime_error(error.str());
-    }
+  const std::string sampling_rate_string = text;
+  std::size_t bytes_parsed = 0;
+  const double sampling_rate = std::stod(sampling_rate_string, &bytes_parsed);
+  if (bytes_parsed != sampling_rate_string.size()) {
+    std::ostringstream error;
+    error << "Unable to parse a sampling rate float from the following text (consumed "
+          << bytes_parsed << " bytes out of " << sampling_rate_string.size()
+          << "): " << sampling_rate_string;
+    throw std::runtime_error(error.str());
+  }
 
-    return sampling_rate;
+  return sampling_rate;
 }
 
 // Return an `UpstreamService` parsed from the specified `text`, or throw a
@@ -115,7 +123,7 @@ double deserializeSamplingRate(ot::string_view text) {
 UpstreamService deserialize(ot::string_view text) {
   UpstreamService result;
   const auto end = text.end();
-  
+
   // .service_name
   auto iter = text.begin();
   auto next = std::find(iter, end, '|');
@@ -126,12 +134,12 @@ UpstreamService deserialize(ot::string_view text) {
   // there aren't enough fields).
   const auto advanceTo = [&](const char* field_name_for_diagnostic) {
     if (next == end) {
-        std::string error;
-        error += "Missing fields in UpstreamService; no ";
-        error += field_name_for_diagnostic;
-        error += " to decode. Offending text: ";
-        error += text;
-        throw std::runtime_error(error);
+      std::string error;
+      error += "Missing fields in UpstreamService; no ";
+      error += field_name_for_diagnostic;
+      error += " to decode. Offending text: ";
+      error += text;
+      throw std::runtime_error(error);
     }
     iter = next + 1;
     next = std::find(iter, end, '|');
@@ -142,15 +150,15 @@ UpstreamService deserialize(ot::string_view text) {
 
   advanceTo("sampling_mechanism");
   result.sampling_mechanism = deserializeSamplingMechanism(range(iter, next));
-  
+
   advanceTo("sampling_rate");
   result.sampling_rate = deserializeSamplingRate(range(iter, next));
-  
+
   // Put any remaining fields into `result.unknown_fields`.
   while (next != end) {
-      iter = next + 1;
-      next = std::find(iter, end, '|');
-      result.unknown_fields.push_back(range(iter, next));
+    iter = next + 1;
+    next = std::find(iter, end, '|');
+    result.unknown_fields.push_back(range(iter, next));
   }
 
   return result;

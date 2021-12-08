@@ -13,15 +13,15 @@ using namespace datadog::opentracing;
 namespace datadog {
 namespace opentracing {
 
-// catch2 will print values in failed assertions, but only if those values have a corresponding `operator<<`.
+// catch2 will print values in failed assertions, but only if those values have a corresponding
+// `operator<<`.
 std::ostream& operator<<(std::ostream& stream, const UpstreamService& value) {
-    const std::vector<UpstreamService> wrapper = {value};
-    return stream << serializeUpstreamServices(wrapper);
+  const std::vector<UpstreamService> wrapper = {value};
+  return stream << serializeUpstreamServices(wrapper);
 }
 
 }  // namespace opentracing
 }  // namespace datadog
-
 
 TEST_CASE("sampling rate formatting") {
   struct TestCase {
