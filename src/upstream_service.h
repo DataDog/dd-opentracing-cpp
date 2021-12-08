@@ -3,11 +3,11 @@
 
 // This component provides a type, `UpstreamService`, that contains the
 // sampling decision made by a service that preceded us in the current trace.
-// A subset of the increasing prefix of all upstream services for the current
-// trace are propagated from service to service along the trace.  The upstream
-// services are encoded to and decoded from their propagation format by the
-// provided functions `serializeUpstreamServices` and
-// `deserializeUpstreamServices`, respectively
+// A subset of the prefix of all upstream services for the current trace are
+// propagated from service to service along the trace.  The upstream services
+// are encoded to and decoded from their propagation format by the provided
+// functions `serializeUpstreamServices` and `deserializeUpstreamServices`,
+// respectively.
 //
 // In addition to being propagated along the trace, upstream services are also
 // sent to the agent TODO.
@@ -38,10 +38,16 @@ struct UpstreamService {
   std::vector<std::string> unknown_fields;
 };
 
-// Return upstream service objects parsed from the specified `text`.  TODO errors.
+// Return whether the specified `left` and the specified `right` have the same
+// value.  Two `UpstreamService` objects have the same value when their
+// serialized values are the same.
+bool operator==(const UpstreamService& left, const UpstreamService& right);
+
+// Return upstream service objects parsed from the specified `text`, or throw a
+// `std::runtime_error` if an error occurs.
 std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text);
 
-// Return the result of encoding the specified `upstream_services`.  TODO errors.
+// Return the result of encoding the specified `upstream_services`.
 std::string serializeUpstreamServices(const std::vector<UpstreamService>& upstream_services);
 
 // The following functions, `appendAsBase64Unpadded` and `appendSamplingRate`,

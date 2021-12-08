@@ -5,9 +5,23 @@
 
 #include <catch2/catch.hpp>
 #include <cmath>
+#include <ostream>
 #include <string>
 
 using namespace datadog::opentracing;
+
+namespace datadog {
+namespace opentracing {
+
+// catch2 will print values in failed assertions, but only if those values have a corresponding `operator<<`.
+std::ostream& operator<<(std::ostream& stream, const UpstreamService& value) {
+    const std::vector<UpstreamService> wrapper = {value};
+    return stream << serializeUpstreamServices(wrapper);
+}
+
+}  // namespace opentracing
+}  // namespace datadog
+
 
 TEST_CASE("sampling rate formatting") {
   struct TestCase {
@@ -51,10 +65,10 @@ TEST_CASE("unpadded base64 encoding") {
   REQUIRE(result == test_case.output);
 }
 
-TEST_CASE("serializeUpstreamServices") {
+TEST_CASE("serializeUpstreamServices/deserializeUpstreamServices") {
   struct TestCase {
-    std::vector<UpstreamService> input;
-    std::string output;
+    std::vector<UpstreamService> decoded;
+    std::string encoded;
   };
 
   // clang-format off
@@ -80,5 +94,6 @@ TEST_CASE("serializeUpstreamServices") {
   }));
   // clang-format on
 
-  REQUIRE(serializeUpstreamServices(test_case.input) == test_case.output);
+  REQUIRE(serializeUpstreamServices(test_case.decoded) == test_case.encoded);
+  REQUIRE(deserializeUpstreamServices(test_case.encoded) == test_case.decoded);
 }

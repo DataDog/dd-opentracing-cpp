@@ -1,8 +1,13 @@
 #include "upstream_service.h"
+#include "base64_rfc4648_unpadded.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cppcodec/base64_rfc4648.hpp>
+#include <cstddef>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 
 namespace datadog {
@@ -44,11 +49,111 @@ namespace {
 // [2]:
 // https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.2s6f0izi97s1
 
-// TODO: document
+// Return a `string_view` over the specified range of characters `[begin, end)`.
+ot::string_view range(const char* begin, const char* end) {
+  assert(begin <= end);
+  return ot::string_view{begin, std::size_t(end - begin)};
+}
+
+void deserializeServiceName(std::string& destination, ot::string_view text) {
+  try {
+    base64_rfc4648_unpadded::decode(destination, text);
+  } catch (const cppcodec::parse_error& error) {
+    throw std::runtime_error(error.what());
+  }
+}
+
+SamplingPriority deserializeSamplingPriority(ot::string_view text) {
+  const std::string sampling_priority_string = text;
+  std::size_t bytes_parsed = 0;
+  const int sampling_priority_int = std::stoi(sampling_priority_string, &bytes_parsed);
+  if (bytes_parsed != sampling_priority_string.size()) {
+      std::ostringstream error;
+      error << "Unable to parse a sampling priority integer from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_priority_string.size() << "): " << sampling_priority_string;
+      throw std::runtime_error(error.str());
+  }
+  const OptionalSamplingPriority sampling_priority_maybe = asSamplingPriority(sampling_priority_int);
+  if (sampling_priority_maybe == nullptr) {
+      std::ostringstream error;
+      error << "Unrecognized integer value for sampling priority: " << sampling_priority_int;
+      throw std::runtime_error(error.str());
+  }
+  return *sampling_priority_maybe;
+}
+
+SamplingMechanism deserializeSamplingMechanism(ot::string_view text) {
+  const std::string sampling_mechanism_string = text;
+  std::size_t bytes_parsed = 0;
+  const int sampling_mechanism_int = std::stoi(sampling_mechanism_string, &bytes_parsed);
+  if (bytes_parsed != sampling_mechanism_string.size()) {
+      std::ostringstream error;
+      error << "Unable to parse a sampling mechanism integer from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_mechanism_string.size() << "): " << sampling_mechanism_string;
+      throw std::runtime_error(error.str());
+  }
+  return asSamplingMechanism(sampling_mechanism_int);
+}
+
+double deserializeSamplingRate(ot::string_view text) {
+    if (text.empty()) {
+        return std::nan("");
+    }
+
+    const std::string sampling_rate_string = text;
+    std::size_t bytes_parsed = 0;
+    const double sampling_rate = std::stod(sampling_rate_string, &bytes_parsed);
+    if (bytes_parsed != sampling_rate_string.size()) {
+      std::ostringstream error;
+      error << "Unable to parse a sampling rate float from the following text (consumed " << bytes_parsed << " bytes out of " << sampling_rate_string.size() << "): " << sampling_rate_string;
+      throw std::runtime_error(error.str());
+    }
+
+    return sampling_rate;
+}
+
+// Return an `UpstreamService` parsed from the specified `text`, or throw a
+// `std::runtime_error` if an error occurs.
 UpstreamService deserialize(ot::string_view text) {
-  // TODO
-  (void)text;
-  return {};
+  UpstreamService result;
+  const auto end = text.end();
+  
+  // .service_name
+  auto iter = text.begin();
+  auto next = std::find(iter, end, '|');
+  deserializeServiceName(result.service_name, range(iter, next));
+
+  // `UpstreamService` fields are "|" separated.  Every time we go to the next
+  // field, we have to make sure that there was a "|" before it (otherwise
+  // there aren't enough fields).
+  const auto advanceTo = [&](const char* field_name_for_diagnostic) {
+    if (next == end) {
+        std::string error;
+        error += "Missing fields in UpstreamService; no ";
+        error += field_name_for_diagnostic;
+        error += " to decode. Offending text: ";
+        error += text;
+        throw std::runtime_error(error);
+    }
+    iter = next + 1;
+    next = std::find(iter, end, '|');
+  };
+
+  advanceTo("sampling_priority");
+  result.sampling_priority = deserializeSamplingPriority(range(iter, next));
+
+  advanceTo("sampling_mechanism");
+  result.sampling_mechanism = deserializeSamplingMechanism(range(iter, next));
+  
+  advanceTo("sampling_rate");
+  result.sampling_rate = deserializeSamplingRate(range(iter, next));
+  
+  // Put any remaining fields into `result.unknown_fields`.
+  while (next != end) {
+      iter = next + 1;
+      next = std::find(iter, end, '|');
+      result.unknown_fields.push_back(range(iter, next));
+  }
+
+  return result;
 }
 
 // Append to the specified `output` the serialization of the specified
@@ -71,16 +176,17 @@ void serialize(std::string& output, const UpstreamService& upstream_service) {
   }
 }
 
+// This function is used in `operator==`, below.
+std::string serializeSamplingRate(double value) {
+  std::string result;
+  appendSamplingRate(result, value);
+  return result;
+}
+
 }  // namespace
 
 void appendAsBase64Unpadded(std::string& destination, const std::string& source) {
-  destination += cppcodec::base64_rfc4648::encode(source);
-
-  // Remove any padding (at the end).
-  const char padding_char = '=';
-  const std::size_t begin_padding = destination.find_last_not_of(padding_char);
-  // Even if `begin_padding` is `std::string::npos`, this still works.
-  destination.erase(begin_padding + 1);
+  destination += base64_rfc4648_unpadded::encode(source);
 }
 
 void appendSamplingRate(std::string& destination, double value) {
@@ -113,11 +219,37 @@ void appendSamplingRate(std::string& destination, double value) {
   destination.pop_back();
 }
 
+bool operator==(const UpstreamService& left, const UpstreamService& right) {
+  // clang-format off
+  return left.service_name == right.service_name
+      && left.sampling_priority == right.sampling_priority
+      && left.sampling_mechanism == right.sampling_mechanism
+      // Two things to watch out for with `.sampling_rate`:
+      //
+      // 1. NaN is used as the N/A value, so we have to work around how NaN !=
+      //    NaN.
+      // 2. I want `original == deserialize(serialize(original))`.  This
+      //    property is handy in the unit test.  It's complicated by the
+      //    limited precision used in the formatting of `.sampling_rate`.  
+      //
+      // We handle both cases by comparing serialized versions of `.sampling_rate`.
+      && serializeSamplingRate(left.sampling_rate) == serializeSamplingRate(right.sampling_rate)
+      && left.unknown_fields == right.unknown_fields;
+  // clang-format on
+}
+
 std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text) {
-  // TODO
-  (void)text;
-  (void)deserialize(text);
-  return {};
+  std::vector<UpstreamService> result;
+
+  auto iter = text.begin();
+  const auto end = text.end();
+  while (iter < end) {
+    const auto next = std::find(iter, end, ';');
+    result.push_back(deserialize(range(iter, next)));
+    iter = next + 1;
+  }
+
+  return result;
 }
 
 std::string serializeUpstreamServices(const std::vector<UpstreamService>& upstream_services) {
