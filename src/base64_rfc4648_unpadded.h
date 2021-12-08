@@ -2,7 +2,7 @@
 #define DD_OPENTRACING_BASE64_RFC4648_UNPADDED_H
 
 // This component extends the `cppcodec` library by defining a base64 codec
-// that does not use padding, but is otherwise compatible with RFC 4648.
+// that does not use padding, but that is otherwise compatible with RFC 4648.
 //
 // Example usage:
 //
@@ -24,7 +24,7 @@ class base64_rfc4648_unpadded_policy : public cppcodec::detail::base64_rfc4648 {
 
   static CPPCODEC_ALWAYS_INLINE constexpr bool generates_padding() { return false; }
   static CPPCODEC_ALWAYS_INLINE constexpr bool requires_padding() { return false; }
-  // Other `static` member functions are inherited from the base class.
+  // Other static member functions are inherited from the base class.
 };
 
 using base64_rfc4648_unpadded =

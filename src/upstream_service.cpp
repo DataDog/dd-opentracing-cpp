@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <cppcodec/base64_rfc4648.hpp>
 #include <cstddef>
 #include <sstream>
 #include <stdexcept>
