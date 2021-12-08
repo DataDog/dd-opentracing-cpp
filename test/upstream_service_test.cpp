@@ -4,7 +4,6 @@
 #include "../src/upstream_service.h"
 
 #include <catch2/catch.hpp>
-
 #include <cmath>
 #include <string>
 
@@ -19,16 +18,14 @@ TEST_CASE("sampling rate formatting") {
   // Always four digits after the decimal, and at least one before.
   // The number is rounded _up_ to the fourth decimal place.
   // If the input is NaN, then the output is an empty string.
-  auto test_case = GENERATE(values<TestCase>({
-      {0.0123456789, "0.0124"},
-      {0, "0.0000"},
-      {0.123, "0.1230"},
-      {0.12340, "0.1234"},
-      {0.123409, "0.1235"},
-      {-1, "-1.0000"},
-      {1337, "1337.0000"},
-      {std::nan(""), ""}
-  }));
+  auto test_case = GENERATE(values<TestCase>({{0.0123456789, "0.0124"},
+                                              {0, "0.0000"},
+                                              {0.123, "0.1230"},
+                                              {0.12340, "0.1234"},
+                                              {0.123409, "0.1235"},
+                                              {-1, "-1.0000"},
+                                              {1337, "1337.0000"},
+                                              {std::nan(""), ""}}));
 
   std::string result;
   appendSamplingRate(result, test_case.input);
@@ -42,14 +39,12 @@ TEST_CASE("unpadded base64 encoding") {
   };
 
   // RFC 4648 base64 encoding, but without any trailing padding.
-  auto test_case = GENERATE(values<TestCase>({
-    {"hello, world!", "aGVsbG8sIHdvcmxkIQ"},
-    {"h", "aA"},
-    {"he", "aGU"},
-    {"hel", "aGVs"},
-    {"hell", "aGVsbA"},
-    {"hello", "aGVsbG8"}
-  }));
+  auto test_case = GENERATE(values<TestCase>({{"hello, world!", "aGVsbG8sIHdvcmxkIQ"},
+                                              {"h", "aA"},
+                                              {"he", "aGU"},
+                                              {"hel", "aGVs"},
+                                              {"hell", "aGVsbA"},
+                                              {"hello", "aGVsbG8"}}));
 
   std::string result;
   appendAsBase64Unpadded(result, test_case.input);
@@ -58,8 +53,8 @@ TEST_CASE("unpadded base64 encoding") {
 
 TEST_CASE("serializeUpstreamServices") {
   struct TestCase {
-      std::vector<UpstreamService> input;
-      std::string output;
+    std::vector<UpstreamService> input;
+    std::string output;
   };
 
   // clang-format off
@@ -85,5 +80,5 @@ TEST_CASE("serializeUpstreamServices") {
   }));
   // clang-format on
 
-  REQUIRE(serializeUpstreamServices(test_case.input) == test_case.output); 
+  REQUIRE(serializeUpstreamServices(test_case.input) == test_case.output);
 }

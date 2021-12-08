@@ -12,13 +12,13 @@
 // In addition to being propagated along the trace, upstream services are also
 // sent to the agent TODO.
 
-#include "sampling_mechanism.h"
-#include "sampling_priority.h"
-
 #include <opentracing/string_view.h>
 
 #include <string>
 #include <vector>
+
+#include "sampling_mechanism.h"
+#include "sampling_priority.h"
 
 namespace ot = opentracing;
 
@@ -28,14 +28,14 @@ namespace opentracing {
 // `UpstreamService` contains the sampling decision made by a service that
 // preceded us in the current trace.
 struct UpstreamService {
-    std::string service_name;
-    SamplingPriority sampling_priority;
-    SamplingMechanism sampling_mechanism;
-    double sampling_rate; // `std::nan("")` means "no sampling rate"
-    // The serialization format for `UpstreamService` allows for the future
-    // addition of fields.  When parsing, additional fields that don't
-    // correspond to any above are included verbatim in `unknown_fields`.
-    std::vector<std::string> unknown_fields;
+  std::string service_name;
+  SamplingPriority sampling_priority;
+  SamplingMechanism sampling_mechanism;
+  double sampling_rate;  // `std::nan("")` means "no sampling rate"
+  // The serialization format for `UpstreamService` allows for the future
+  // addition of fields.  When parsing, additional fields that don't
+  // correspond to any above are included verbatim in `unknown_fields`.
+  std::vector<std::string> unknown_fields;
 };
 
 // Return upstream service objects parsed from the specified `text`.  TODO errors.
