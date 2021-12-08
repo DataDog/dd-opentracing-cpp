@@ -18,7 +18,7 @@ namespace opentracing {
 
 // Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
 // interop.
-const ot::string_view baggage_prefix = "ot-baggage-";
+extern const ot::string_view baggage_prefix;
 
 // Returns a list of strings, where each string is a header that will be used for propagating
 // traces.

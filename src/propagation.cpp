@@ -15,6 +15,8 @@ using json = nlohmann::json;
 namespace datadog {
 namespace opentracing {
 
+const ot::string_view baggage_prefix = "ot-baggage-";
+
 struct HeadersImpl {
   const char *trace_id_header;
   const char *span_id_header;
