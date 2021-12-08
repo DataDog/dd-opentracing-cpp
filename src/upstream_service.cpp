@@ -9,6 +9,41 @@ namespace datadog {
 namespace opentracing {
 namespace {
 
+// The following [eBNF][1] grammar describes the upstream services encoding.
+// The grammar was copied from [an internal design document][2].
+//
+//     upstream services  =  group, { ";", group };
+//
+//     group  =  service name, "|",
+//               sampling priority, "|",
+//               sampling mechanism, "|",
+//               sampling rate, { "|", future field };
+//
+//     service name  =  ? unpadded base64 encoded UTF-8 bytes ?;
+//
+//     (* no plus signs, no exponential notation, etc. *)
+//     sampling priority  =  ? decimal integer ? ;
+//
+//     sampling mechanism  =  ? positive decimal integer ?;
+//
+//     sampling rate  =  "" | normalized float;
+//
+//     normalized float  =  ? decimal between 0.0 and 1.0 inclusive with at most four significant
+//         digits (rounded up) and with the leading "0." e.g. "0.9877" ?;
+//
+//     (* somewhat arbitrarily based on the other grammar *)
+//     future field  =  ( ? ASCII characters 32-126 ? - delimiter );
+//
+//     delimiter  =  "|" | ","
+//
+// That is, semicolon-separated groups of "|"-separated fields.
+//
+// See `upstream_service_test.cpp` for examples.
+//
+// [1]: https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
+// [2]:
+// https://docs.google.com/document/d/1zeO6LGnvxk5XweObHAwJbK3SfK23z7jQzp7ozWJTa2A/edit#heading=h.2s6f0izi97s1
+
 // TODO: document
 UpstreamService deserialize(ot::string_view text) {
   // TODO
@@ -64,7 +99,7 @@ void appendSamplingRate(std::string& destination, double value) {
   const char* const format = "%1.4f";
 
   const int formatted_strlen = std::snprintf(nullptr, 0, format, rounded);
-  // The +1" is for the null terminator that we will later remove.
+  // The +1 is for the null terminator that we will later remove.
   const int buffer_size = formatted_strlen + 1;
   assert(formatted_strlen > 0);
   destination.resize(destination.size() + buffer_size);
