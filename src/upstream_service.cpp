@@ -77,7 +77,8 @@ void appendAsBase64Unpadded(std::string& destination, const std::string& source)
   destination += cppcodec::base64_rfc4648::encode(source);
 
   // Remove any padding (at the end).
-  const std::size_t begin_padding = destination.find_last_not_of('=');
+  const char padding_char = '=';
+  const std::size_t begin_padding = destination.find_last_not_of(padding_char);
   // Even if `begin_padding` is `std::string::npos`, this still works.
   destination.erase(begin_padding + 1);
 }
