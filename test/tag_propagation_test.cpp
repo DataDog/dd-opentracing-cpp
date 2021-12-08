@@ -81,3 +81,7 @@ TEST_CASE("tag propagation decoding duplicate tags") {
     REQUIRE(deserializeTags("dupe=same,dupe=same") == expected);
   }
 }
+
+TEST_CASE("key/value items must contain an equal sign") {
+  REQUIRE_THROWS_AS(deserializeTags("valid=version,invalid_version"), std::runtime_error);
+}
