@@ -22,17 +22,20 @@ namespace opentracing {
 
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTracerAndEncoder(
     const TracerOptions &options) {
+  // Creating the logger here assumes that there are no environment variable
+  // dependent settings for the logger, which is true.
+  auto logger = makeLogger(options);
+
   auto maybe_options = applyTracerOptionsFromEnvironment(options);
   if (!maybe_options) {
     std::ostringstream message;
     message << "Error applying TracerOptions from environment variables: " << maybe_options.error()
             << "\nTracer will be started without options from the environment\n";
-    StandardLogger(options.log_func).Log(LogLevel::error, message.str());
+    logger->Log(LogLevel::error, message.str());
     maybe_options = options;
   }
   TracerOptions opts = maybe_options.value();
 
-  auto logger = makeLogger(opts);
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::make_shared<ExternalWriter>(sampler, logger);
   auto encoder = writer->encoder();
