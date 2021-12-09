@@ -101,10 +101,9 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
     return result;
   }
 
-  // Even though both the priority sampler and the matching sampling rule,
-  // above, did not drop this span, we still might drop the span in order to
-  // satify the configured maximum sampling rate for spans selected by rule
-  // based sampling overall.
+  // Even though the matching sampling rule, above, did not drop this span, we
+  // still might drop the span in order to satify the configured maximum
+  // sampling rate for spans selected by rule based sampling overall.
   auto limit_result = sampling_limiter_.allow();
   result.limiter_rate = limit_result.effective_rate;
   if (limit_result.allowed) {

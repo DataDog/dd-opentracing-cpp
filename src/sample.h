@@ -63,6 +63,8 @@ class RulesSampler {
  public:
   RulesSampler();
   RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
+  // Some of the member functions of this class are declared `virtual` so that
+  // they can be overridden by `MockRulesSampler` for use in unit tests.
   virtual ~RulesSampler() {}
   void addRule(RuleFunc f);
   virtual SampleResult sample(const std::string& environment, const std::string& service,

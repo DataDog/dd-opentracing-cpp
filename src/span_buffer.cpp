@@ -172,8 +172,10 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
   if (trace.sampling_priority_locked) {
     if (priority == nullptr || *priority == SamplingPriority::UserKeep ||
         *priority == SamplingPriority::UserDrop) {
-      // Only print an error if a user is taking this action. This case is legitimate (albeit with
-      // the same outcome) if the Sampler itself is trying to assignSamplingPriority.
+      // Only print a diagnostic if the sampling decision is due to a setting
+      // that the user set in the tracer. This case is legitimate (albeit with
+      // the same outcome) if the Sampler itself is trying to
+      // assignSamplingPriority.
       logger_->Trace(trace_id, "sampling priority already set and cannot be reassigned");
     }
     return getSamplingPriorityImpl(trace_id);
