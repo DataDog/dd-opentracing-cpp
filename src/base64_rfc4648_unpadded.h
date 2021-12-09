@@ -7,7 +7,8 @@
 // Example usage:
 //
 //     std::string base64_greeting = base64_rfc4648_unpadded::encode("hello");
-//     std::string greeting = base64_rfc4648_unpadded::decode(base64_greeting);
+//     std::string greeting;
+//     base64_rfc4648_unpadded::decode(greeting, base64_greeting);
 //     assert(greeting == "hello");
 
 #include <cppcodec/base64_rfc4648.hpp>
