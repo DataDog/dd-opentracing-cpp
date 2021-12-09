@@ -225,6 +225,7 @@ void appendSamplingRate(std::string& destination, double value) {
 
   const int rcode =
       std::snprintf(&*(destination.end() - buffer_size), buffer_size, format, rounded);
+  (void)rcode;  // Some `assert` macros do this, some don't.
   assert(rcode == formatted_strlen);
 
   // Remove the null terminator added by `snprintf`.
