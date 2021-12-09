@@ -23,5 +23,5 @@ TEST_CASE("unpadded base64 codec") {
   REQUIRE(base64_rfc4648_unpadded::encode(test_case.decoded) == test_case.encoded);
   std::string actual;
   base64_rfc4648_unpadded::decode(actual, test_case.encoded);
-  REQUIRE(actual  == test_case.decoded);
+  REQUIRE(actual == test_case.decoded);
 }
