@@ -474,7 +474,28 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     std::shared_ptr<const Logger> logger, const ot::TextMapReader &reader,
     std::set<PropagationStyle> styles) try {
+  // `context` is the value that we are preparing to return.
   std::unique_ptr<ot::SpanContext> context = nullptr;
+
+  // `PropagationStyle` determines from which headers context will be
+  // extracted.
+  //
+  // If more than one `PropagationStyle` is active, then we try each.  The
+  // call to `SpanContext::deserialize`, below, will return one of three kinds
+  // of values:
+  //
+  // 1. An error means that an error occurred while attempting to deserialize
+  //    context in that style, and so we fail without trying any further styles.
+  // 2. A `nullptr` means that no context could be extracted in that style.
+  //    It's still possible that one of the other styles (if active) will
+  //    succeed.
+  // 3. A `SpanContext` object means that context was extracted successfully in
+  //    that style.
+  //
+  // It's also possible that a context is successfully extracted in two or more
+  // different styles.  In that case, the resulting `SpanContext` objects must
+  // all be equivalent (otherwise, which would we return?), where equivalence
+  // is defined by `SpanContext::operator==`.
   for (PropagationStyle style : styles) {
     auto result = SpanContext::deserialize(logger, reader, propagation_headers[style]);
     if (!result) {
