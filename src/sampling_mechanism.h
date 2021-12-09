@@ -23,6 +23,8 @@ enum class KnownSamplingMechanism {
   // Update `asSamplingMechanism` when a new value is added.
 };
 
+// `UnknownSamplingMechanism` is a sampling mechanism value that does not have
+// a corresponding `KnownSamplingMechanism` value.
 struct UnknownSamplingMechanism {
   int value;
   operator int() const { return value; }
