@@ -166,7 +166,7 @@ UpstreamService deserialize(ot::string_view text) {
 // Append to the specified `output` the serialization of the specified
 // `upstream_service`.
 void serialize(std::string& output, const UpstreamService& upstream_service) {
-  appendAsBase64Unpadded(output, upstream_service.service_name);
+  output += base64_rfc4648_unpadded::encode(upstream_service.service_name);
 
   output += '|';
   output += std::to_string(int(upstream_service.sampling_priority));
@@ -191,10 +191,6 @@ std::string serializeSamplingRate(double value) {
 }
 
 }  // namespace
-
-void appendAsBase64Unpadded(std::string& destination, const std::string& source) {
-  destination += base64_rfc4648_unpadded::encode(source);
-}
 
 void appendSamplingRate(std::string& destination, double value) {
   // NaNs serialize as an empty string.

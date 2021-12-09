@@ -46,25 +46,6 @@ TEST_CASE("sampling rate formatting") {
   REQUIRE(result == test_case.output);
 }
 
-TEST_CASE("unpadded base64 encoding") {
-  struct TestCase {
-    std::string input;
-    std::string output;
-  };
-
-  // RFC 4648 base64 encoding, but without any trailing padding.
-  auto test_case = GENERATE(values<TestCase>({{"hello, world!", "aGVsbG8sIHdvcmxkIQ"},
-                                              {"h", "aA"},
-                                              {"he", "aGU"},
-                                              {"hel", "aGVs"},
-                                              {"hell", "aGVsbA"},
-                                              {"hello", "aGVsbG8"}}));
-
-  std::string result;
-  appendAsBase64Unpadded(result, test_case.input);
-  REQUIRE(result == test_case.output);
-}
-
 TEST_CASE("serializeUpstreamServices/deserializeUpstreamServices") {
   struct TestCase {
     std::vector<UpstreamService> decoded;

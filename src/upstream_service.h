@@ -50,16 +50,10 @@ std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text);
 // Return the result of encoding the specified `upstream_services`.
 std::string serializeUpstreamServices(const std::vector<UpstreamService>& upstream_services);
 
-// The following functions, `appendAsBase64Unpadded` and `appendSamplingRate`,
-// are exposed for use in unit tests.
-
-// Encode the specified `source` to base64 without adding padding bytes, and
-// append the result to the specified `destination`.
-void appendAsBase64Unpadded(std::string& destination, const std::string& source);
-
 // Round the specified sampling rate `value` up to the fourth decimal place,
 // format it as a decimal with at most four significant digits, and append the
 // result to the specified `destination`.
+// This function is exposed for use in unit tests.
 void appendSamplingRate(std::string& destination, double value);
 
 }  // namespace opentracing
