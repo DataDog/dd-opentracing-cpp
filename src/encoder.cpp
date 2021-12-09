@@ -3,6 +3,7 @@
 #include <datadog/version.h>
 
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 #include "sample.h"
 #include "span.h"
@@ -23,7 +24,9 @@ const std::string header_dd_trace_count = "X-Datadog-Trace-Count";
 const size_t RESPONSE_ERROR_REGION_SIZE = 50;
 }  // namespace
 
-AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<RulesSampler> sampler) : sampler_(sampler) {
+AgentHttpEncoder::AgentHttpEncoder(std::shared_ptr<RulesSampler> sampler,
+                                   std::shared_ptr<const Logger> logger)
+    : sampler_(sampler), logger_(logger) {
   // Set up common headers and default encoder
   common_headers_ = {{header_content_type, "application/msgpack"},
                      {header_dd_meta_lang, "cpp"},
@@ -70,9 +73,11 @@ void AgentHttpEncoder::handleResponse(const std::string& response) {
       std::string prefix = (start > 0) ? "..." : "";
       std::string suffix = ((start + size) < response.length()) ? "..." : "";
       std::string response_region = response.substr(start, size);
-      std::cerr << "Unable to parse response from agent." << std::endl
-                << "Error was: " << error.what() << std::endl
-                << "Error near: " << prefix << response_region << suffix << std::endl;
+      std::ostringstream diagnostic;
+      diagnostic << "Unable to parse response from agent."
+                 << "\nError was: " << error.what() << "\nError near: " << prefix
+                 << response_region << suffix;
+      logger_->Log(LogLevel::error, diagnostic.str());
       return;
     }
   }
