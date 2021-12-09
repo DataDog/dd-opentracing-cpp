@@ -28,6 +28,9 @@ std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTrace
 
   auto maybe_options = applyTracerOptionsFromEnvironment(options);
   if (!maybe_options) {
+    // TODO(dgoffredo): Figure out a logging interface that allows for this
+    // formatting to be done within the (possibly no-op) logger rather than out
+    // here.
     std::ostringstream message;
     message << "Error applying TracerOptions from environment variables: " << maybe_options.error()
             << "\nTracer will be started without options from the environment\n";
