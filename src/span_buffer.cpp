@@ -196,12 +196,15 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriority(const SpanDat
 }
 
 OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const SpanData* span) {
-  bool sampling_priority_unset = getSamplingPriorityImpl(span->trace_id) == nullptr;
-  if (sampling_priority_unset) {
-    auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
-    setSamplingPriorityImpl(span->trace_id, std::move(sampler_result.sampling_priority));
-    setSamplerResult(span->trace_id, sampler_result);
+  if (auto sampling_priority = getSamplingPriorityImpl(span->trace_id)) {
+    return sampling_priority;
   }
+
+  // Consult the sampler for a decision, save the decision, and then return the
+  // saved decision.
+  auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
+  setSamplingPriorityImpl(span->trace_id, std::move(sampler_result.sampling_priority));
+  setSamplerResult(span->trace_id, sampler_result);
   return getSamplingPriorityImpl(span->trace_id);
 }
 
