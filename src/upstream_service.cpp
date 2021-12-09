@@ -207,7 +207,7 @@ void appendSamplingRate(std::string& destination, double value) {
   // and then format the number.  `double` has enough precision that I don't
   // think this is any different than formatting the number as decimal and
   // then rounding up based on that.
-  const double decimal_shift = 10 * 10 * 10 * 10;
+  const double decimal_shift = 1e4;
   const double rounded = std::ceil(value * decimal_shift) / decimal_shift;
 
   const char* const format = "%1.4f";

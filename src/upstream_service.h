@@ -3,7 +3,7 @@
 
 // This component provides a type, `UpstreamService`, that contains the
 // sampling decision made by a service that preceded us in the current trace.
-// A subset of the prefix of all upstream services for the current trace are
+// A subset of the prefix of all upstream services for the current trace is
 // propagated from service to service along the trace.  The upstream services
 // are encoded to and decoded from their propagation format by the provided
 // functions `serializeUpstreamServices` and `deserializeUpstreamServices`,
