@@ -67,11 +67,17 @@ std::unordered_map<std::string, std::string> deserializeTags(ot::string_view hea
 
   auto iter = header_value.begin();
   const auto end = header_value.end();
-  while (iter < end) {
-    const auto next = std::find(iter, end, ',');
+  if (iter == end) {
+    // An empty string means no tags.
+    return tags;
+  }
+
+  decltype(iter) next;
+  do {
+    next = std::find(iter, end, ',');
     deserializeTag(tags, range(iter, next));
     iter = next + 1;
-  }
+  } while (next != end);
 
   return tags;
 }

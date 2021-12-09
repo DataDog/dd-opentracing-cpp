@@ -6,6 +6,7 @@
 #include <catch2/catch.hpp>
 #include <cmath>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 
 using namespace datadog::opentracing;
@@ -77,4 +78,35 @@ TEST_CASE("serializeUpstreamServices/deserializeUpstreamServices") {
 
   REQUIRE(serializeUpstreamServices(test_case.decoded) == test_case.encoded);
   REQUIRE(deserializeUpstreamServices(test_case.encoded) == test_case.decoded);
+}
+
+// This test case aims to cover every explicit `throw` under `deserializeUpstreamServices`.
+TEST_CASE("parsing fails") {
+  // I don't use `GENERATE` here, becuase the diagnostic printed when
+  // `REQUIRE_THROWS_AS` fails does not expand the test case value
+
+  // invalid base64 in service name
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("{curlies are invalid base64}"),
+                    std::runtime_error);
+  // missing sampling priority field
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1|0.1;"), std::runtime_error);
+  // bogus sampling priority
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|totally not an integer"),
+                    std::runtime_error);
+  // sampling priority doesn't fit into an integer
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|9999999999"), std::runtime_error);
+  // unknown sampling priority integer value
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|1337"), std::runtime_error);
+  // missing sampling mechanism field
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0"), std::runtime_error);
+  // bogus sampling mechanism
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|also not an integer"),
+                    std::runtime_error);
+  // sampling mechanism doesn't fit into an integer
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|9999999999"), std::runtime_error);
+  // missing sampling rate field
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1"), std::runtime_error);
+  // bogus sampling rate
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1|not a decimal number"),
+                    std::runtime_error);
 }

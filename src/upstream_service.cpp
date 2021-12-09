@@ -63,7 +63,7 @@ void deserializeServiceName(std::string& destination, ot::string_view text) {
   }
 }
 
-SamplingPriority deserializeSamplingPriority(ot::string_view text) {
+SamplingPriority deserializeSamplingPriority(ot::string_view text) try {
   const std::string sampling_priority_string = text;
   std::size_t bytes_parsed = 0;
   const int sampling_priority_int = std::stoi(sampling_priority_string, &bytes_parsed);
@@ -82,9 +82,12 @@ SamplingPriority deserializeSamplingPriority(ot::string_view text) {
     throw std::runtime_error(error.str());
   }
   return *sampling_priority_maybe;
+} catch (const std::logic_error& error) {
+  throw std::runtime_error(std::string("Unable to parse sampling priority (") + error.what() +
+                           ") from the following text: " + std::string(text));
 }
 
-SamplingMechanism deserializeSamplingMechanism(ot::string_view text) {
+SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
   const std::string sampling_mechanism_string = text;
   std::size_t bytes_parsed = 0;
   const int sampling_mechanism_int = std::stoi(sampling_mechanism_string, &bytes_parsed);
@@ -96,9 +99,12 @@ SamplingMechanism deserializeSamplingMechanism(ot::string_view text) {
     throw std::runtime_error(error.str());
   }
   return asSamplingMechanism(sampling_mechanism_int);
+} catch (const std::logic_error& error) {
+  throw std::runtime_error(std::string("Unable to parse sampling mechanism (") + error.what() +
+                           ") from the following text: " + std::string(text));
 }
 
-double deserializeSamplingRate(ot::string_view text) {
+double deserializeSamplingRate(ot::string_view text) try {
   if (text.empty()) {
     return std::nan("");
   }
@@ -115,6 +121,9 @@ double deserializeSamplingRate(ot::string_view text) {
   }
 
   return sampling_rate;
+} catch (const std::logic_error& error) {
+  throw std::runtime_error(std::string("Unable to parse sampling rate (") + error.what() +
+                           ") from the following text: " + std::string(text));
 }
 
 // Return an `UpstreamService` parsed from the specified `text`, or throw a
@@ -246,11 +255,17 @@ std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text) {
 
   auto iter = text.begin();
   const auto end = text.end();
-  while (iter < end) {
-    const auto next = std::find(iter, end, ';');
+  if (iter == end) {
+    // An empty string means no upstream services.
+    return result;
+  }
+
+  decltype(iter) next;
+  do {
+    next = std::find(iter, end, ';');
     result.push_back(deserialize(range(iter, next)));
     iter = next + 1;
-  }
+  } while (next != end);
 
   return result;
 }
