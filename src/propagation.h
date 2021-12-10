@@ -10,6 +10,7 @@
 
 #include "logger.h"
 #include "sampling_priority.h"
+#include "upstream_service.h"
 
 namespace ot = opentracing;
 
@@ -83,6 +84,8 @@ class SpanContext : public ot::SpanContext {
   OptionalSamplingPriority getPropagatedSamplingPriority() const;
   // Returns the propagated "origin". It returns an empty string if no origin was provided.
   const std::string origin() const;
+  std::unordered_map<std::string, std::string> getExtractedTraceTags() const;
+  std::vector<UpstreamService> getExtractedUpstreamServices() const;
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -116,6 +119,17 @@ class SpanContext : public ot::SpanContext {
   uint64_t trace_id_;
   OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
   std::string origin_;
+  // Trace tags are key/value pairs that are propagated along a trace.  If this
+  // `SpanContext` was extracted, then `extracted_trace_tags_` contains any
+  // trace tags parsed from the "x-datadog-trace-tags" header.  If this
+  // `SpanContext` is later injected, these trace tags will be included as the
+  // "x-datadog-trace-tags" header, possibly modified.
+  std::unordered_map<std::string, std::string> extracted_trace_tags_;
+  // `extracted_upstream_services_` contains the parsed value of the
+  // "_dd.p.upstream_services" tag from the trace tags.  If this `SpanContext`
+  // is later injected, then the upstream services will be included as a trace
+  // tag, possibly with this service's information appended to it.
+  std::vector<UpstreamService> extracted_upstream_services_;
 
   mutable std::mutex mutex_;
   std::unordered_map<std::string, std::string> baggage_;

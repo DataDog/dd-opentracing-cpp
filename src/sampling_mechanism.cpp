@@ -1,5 +1,7 @@
 #include "sampling_mechanism.h"
 
+#include "overload.h"
+
 namespace datadog {
 namespace opentracing {
 
@@ -12,7 +14,9 @@ SamplingMechanism asSamplingMechanism(int value) {
 }
 
 int asInt(SamplingMechanism value) {
-  return apply_visitor([](auto value) { return int(value); }, value);
+  return apply_visitor(overload([](UnknownSamplingMechanism reason) { return reason.value; },
+                                [](KnownSamplingMechanism reason) { return int(reason); }),
+                       value);
 }
 
 }  // namespace opentracing

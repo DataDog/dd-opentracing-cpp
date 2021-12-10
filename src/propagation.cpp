@@ -8,6 +8,7 @@
 
 #include "sample.h"
 #include "span_buffer.h"
+#include "tag_propagation.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -285,6 +286,18 @@ const std::string SpanContext::origin() const {
   return origin_;
 }
 
+std::unordered_map<std::string, std::string> SpanContext::getExtractedTraceTags() const {
+  // No need to lock `mutex_`, because `extracted_trace_tags_` isn't modified
+  // after being initially set by `deserialize`.
+  return extracted_trace_tags_;
+}
+
+std::vector<UpstreamService> SpanContext::getExtractedUpstreamServices() const {
+  // No need to lock `mutex_`, because `extracted_upstream_services_` isn't
+  // modified after being initially set by `deserialize`.
+  return extracted_upstream_services_;
+}
+
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
   std::lock_guard<std::mutex> lock{mutex_};
   baggage_.emplace(key, value);
@@ -329,8 +342,10 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
       j[json_origin_key] = origin_;
     }
   }
-  // TODO: no
-  j[json_tags_key] = "";
+  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
+  if (!tags.empty()) {
+    j[json_tags_key] = tags;
+  }
   j[json_baggage_key] = baggage_;
 
   writer << j.dump();
@@ -398,8 +413,10 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
     }
   }
 
-  // TODO: no
-  result = writer.Set(headers_impl.tags_header, "");
+  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
+  if (!tags.empty()) {
+    result = writer.Set(headers_impl.tags_header, tags);
+  }
   if (!result) {
     return result;
   }
@@ -430,6 +447,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   OptionalSamplingPriority sampling_priority = nullptr;
   std::string origin;
   std::unordered_map<std::string, std::string> baggage;
+  std::unordered_map<std::string, std::string> trace_tags;
+  std::vector<UpstreamService> upstream_services;
   json j;
 
   reader >> j;
@@ -458,10 +477,22 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   if (j.find(json_baggage_key) != j.end()) {
     j.at(json_baggage_key).get_to(baggage);
   }
+  if (j.find(json_tags_key) != j.end()) {
+    std::string tags;
+    j.at(json_tags_key).get_to(tags);
+    trace_tags = deserializeTags(tags);
+    auto tag_found = trace_tags.find(upstream_services_tag);
+    if (tag_found != trace_tags.end()) {
+      upstream_services = deserializeUpstreamServices(tag_found->second);
+      trace_tags.erase(tag_found);
+    }
+  }
 
   auto context =
       std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
+  context->extracted_trace_tags_ = std::move(trace_tags);
+  context->extracted_upstream_services_ = std::move(upstream_services);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
@@ -469,6 +500,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   return ot::make_unexpected(ot::span_context_corrupted_error);
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
+} catch (const std::runtime_error &) {
+  // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
+  return ot::make_unexpected(ot::span_context_corrupted_error);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
@@ -480,9 +514,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   // `PropagationStyle` determines from which headers context will be
   // extracted.
   //
-  // If more than one `PropagationStyle` is active, then we try each.  The
-  // call to `SpanContext::deserialize`, below, will return one of three kinds
-  // of values:
+  // We try to extract context in each configured `PropagationStyle`.  The call
+  // to `SpanContext::deserialize`, below, will return one of three kinds of
+  // values:
   //
   // 1. An error means that an error occurred while attempting to deserialize
   //    context in that style, and so we fail without trying any further styles.
@@ -526,6 +560,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   bool parent_id_set = false;
   bool origin_set = false;
   std::unordered_map<std::string, std::string> baggage;
+  std::unordered_map<std::string, std::string> trace_tags;
+  std::vector<UpstreamService> upstream_services;
   auto result =
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
@@ -550,10 +586,20 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
           } else if (has_prefix(key, baggage_prefix)) {
             baggage.emplace(std::string{std::begin(key) + baggage_prefix.size(), std::end(key)},
                             value);
+          } else if (equals_ignore_case(key, headers_impl.tags_header)) {
+            trace_tags = deserializeTags(value);
+            const auto found_tag = trace_tags.find(upstream_services_tag);
+            if (found_tag != trace_tags.end()) {
+              upstream_services = deserializeUpstreamServices(found_tag->second);
+              trace_tags.erase(found_tag);
+            }
           }
-        } catch (const std::invalid_argument &ia) {
+        } catch (const std::invalid_argument &) {
           return ot::make_unexpected(ot::span_context_corrupted_error);
-        } catch (const std::out_of_range &oor) {
+        } catch (const std::out_of_range &) {
+          return ot::make_unexpected(ot::span_context_corrupted_error);
+        } catch (const std::runtime_error &) {
+          // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
           return ot::make_unexpected(ot::span_context_corrupted_error);
         }
         return {};
@@ -567,6 +613,8 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   auto context =
       std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
+  context->extracted_trace_tags_ = std::move(trace_tags);
+  context->extracted_upstream_services_ = std::move(upstream_services);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 }
 

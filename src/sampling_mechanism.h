@@ -13,13 +13,23 @@ namespace opentracing {
 // `KnownSamplingMechanism` is a sampling mechanism value with a known
 // interpretation.
 enum class KnownSamplingMechanism {
+  // There are no sampling rules configured, and the tracer has not yet
+  // received any rates from the agent.
   Default = 0,
+  // The sampling decision was due to a sampling rate conveyed by the agent.
   AgentRate = 1,
+  // Reserved for future use.
   RemoteRateAuto = 2,
+  // The sampling decision was due to a matching user-specified sampling rule.
   Rule = 3,
+  // The sampling decision was made explicitly by the user, who set a sampling
+  // priority.
   Manual = 4,
+  // Reserved for future use.
   AppSec = 5,
+  // Reserved for future use.
   RemoteRateUserDefined = 6
+
   // Update `asSamplingMechanism` when a new value is added.
 };
 
@@ -27,8 +37,11 @@ enum class KnownSamplingMechanism {
 // a corresponding `KnownSamplingMechanism` value.
 struct UnknownSamplingMechanism {
   int value;
-  operator int() const { return value; }
 };
+
+inline bool operator==(UnknownSamplingMechanism left, UnknownSamplingMechanism right) {
+  return left.value == right.value;
+}
 
 // `SamplingMechanism` is either one of the known values, above, or some
 // unknown value.  This allows us to propagate future sampling mechanism values

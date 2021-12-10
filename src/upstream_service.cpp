@@ -12,6 +12,9 @@
 
 namespace datadog {
 namespace opentracing {
+
+const ot::string_view upstream_services_tag = "_dd.p.upstream_services";
+
 namespace {
 
 // The following [eBNF][1] grammar describes the upstream services encoding.

@@ -1,7 +1,9 @@
 #include "span_buffer.h"
 
+#include "overload.h"
 #include "sample.h"
 #include "span.h"
+#include "tag_propagation.h"
 #include "writer.h"
 
 namespace datadog {
@@ -64,6 +66,33 @@ void finish_root_span(const PendingTrace& trace, SpanData& span) {
   finish_span(trace, span);
 }
 
+// Return the rate from within the specified `sample_result` that applied in
+// the sampling decision, or return `std::nan("")` if no rate applied.
+double pickSamplingRate(const SampleResult& sample_result) {
+  return apply_visitor(overload([](UnknownSamplingMechanism) { return std::nan(""); },
+                                [&](KnownSamplingMechanism reason) {
+                                  switch (reason) {
+                                    case KnownSamplingMechanism::Default:
+                                      return sample_result.priority_rate;
+                                    case KnownSamplingMechanism::AgentRate:
+                                      return sample_result.priority_rate;
+                                    case KnownSamplingMechanism::RemoteRateAuto:
+                                      return std::nan("");
+                                    case KnownSamplingMechanism::Rule:
+                                      return sample_result.rule_rate;
+                                    case KnownSamplingMechanism::Manual:
+                                      return std::nan("");
+                                    case KnownSamplingMechanism::AppSec:
+                                      return std::nan("");
+                                    case KnownSamplingMechanism::RemoteRateUserDefined:
+                                      return std::nan("");
+                                  }
+                                  // unreachable
+                                  return std::nan("");
+                                }),
+                       sample_result.sampling_mechanism);
+}
+
 }  // namespace
 
 void PendingTrace::finish() {
@@ -78,6 +107,41 @@ void PendingTrace::finish() {
   }
 }
 
+void PendingTrace::applySamplingDecisionToUpstreamServices() {
+  // This is a precondition.
+  assert(sampling_priority);
+  // This is true until this trace is finished and written by the span buffer.
+  assert(finished_spans);
+
+  if (!upstream_services.empty() &&
+      upstream_services.back().sampling_priority == *sampling_priority) {
+    // Our sampling decision is the same as the previous guy's, so we have
+    // nothing to add.
+    return;
+  }
+
+  // Either we're the first to make a sampling decision, or our decision
+  // differs from the previous service's.  Append a record for this service.
+
+  // First we have to find the service name of our local root span.
+  auto found_root_span =
+      std::find_if(finished_spans->begin(), finished_spans->end(),
+                   [this](const auto& span) { return is_root(*span, all_spans); });
+  if (found_root_span == finished_spans->end()) {
+    logger->Log(LogLevel::error, trace_id, "Pending trace has no local root span");
+    return;
+  }
+  const std::string& root_service_name = (*found_root_span)->service;
+
+  UpstreamService this_service;
+  this_service.service_name = root_service_name;
+  this_service.sampling_priority = *sampling_priority;
+  this_service.sampling_mechanism = sample_result.sampling_mechanism;
+  this_service.sampling_rate = pickSamplingRate(sample_result);
+
+  upstream_services.push_back(std::move(this_service));
+}
+
 WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<const Logger> logger,
                                      std::shared_ptr<Writer> writer,
                                      std::shared_ptr<RulesSampler> sampler,
@@ -87,20 +151,32 @@ WritingSpanBuffer::WritingSpanBuffer(std::shared_ptr<const Logger> logger,
 void WritingSpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   uint64_t trace_id = context.traceId();
-  auto trace = traces_.find(trace_id);
-  if (trace == traces_.end() || trace->second.all_spans.empty()) {
-    traces_.emplace(trace_id, PendingTrace{logger_});
-    trace = traces_.find(trace_id);
+  auto trace_iter = traces_.find(trace_id);
+  if (trace_iter == traces_.end() || trace_iter->second.all_spans.empty()) {
+    trace_iter = traces_.emplace(trace_id, PendingTrace{logger_, trace_id}).first;
+    auto& trace = trace_iter->second;
+    // If a sampling priority was extracted, apply it to the pending trace.
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
-    trace->second.sampling_priority_locked = p != nullptr;
-    trace->second.sampling_priority = std::move(p);
+    trace.sampling_priority_locked = p != nullptr;
+    trace.sampling_priority = std::move(p);
+    // If an origin was extracted, apply it to the pending trace.
     if (!context.origin().empty()) {
-      trace->second.origin = context.origin();
+      trace.origin = context.origin();
     }
-    trace->second.hostname = options_.hostname;
-    trace->second.analytics_rate = options_.analytics_rate;
+    trace.trace_tags = context.getExtractedTraceTags();
+    trace.upstream_services = context.getExtractedUpstreamServices();
+
+    if (trace.sampling_priority_locked) {
+      // A sampling decision has been made. Let `trace.upstream_services`
+      // reflect our decision, if it is the first decision or is different from
+      // the one before.
+      trace.applySamplingDecisionToUpstreamServices();
+    }
+
+    trace.hostname = options_.hostname;
+    trace.analytics_rate = options_.analytics_rate;
   }
-  trace->second.all_spans.insert(context.id());
+  trace_iter->second.all_spans.insert(context.id());
 }
 
 void WritingSpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
@@ -184,9 +260,13 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
     trace.sampling_priority.reset(nullptr);
   } else {
     trace.sampling_priority.reset(new SamplingPriority(*priority));
+    trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
     if (*priority == SamplingPriority::SamplerDrop || *priority == SamplingPriority::SamplerKeep) {
       // This is an automatically-assigned sampling priority.
       trace.sampling_priority_locked = true;
+      // We made a sampling decision.  Might need to indicate that in
+      // `trace.upstream_services`.
+      trace.applySamplingDecisionToUpstreamServices();
     }
   }
   return getSamplingPriorityImpl(trace_id);
@@ -205,9 +285,30 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const Spa
   // Consult the sampler for a decision, save the decision, and then return the
   // saved decision.
   auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
-  setSamplingPriorityImpl(span->trace_id, std::move(sampler_result.sampling_priority));
   setSamplerResult(span->trace_id, sampler_result);
+  setSamplingPriorityImpl(span->trace_id, std::move(sampler_result.sampling_priority));
   return getSamplingPriorityImpl(span->trace_id);
+}
+
+std::string WritingSpanBuffer::serializeTraceTags(uint64_t trace_id) {
+  std::string result;
+  std::lock_guard<std::mutex> lock{mutex_};
+
+  const auto trace_found = traces_.find(trace_id);
+  if (trace_found == traces_.end()) {
+    // TODO: unlock and log
+    return result;
+  }
+
+  auto& trace = trace_found->second;
+
+  // TODO: Is is possible that `applySamplingDecisionToUpstreamServices` hasn't been called yet?
+  appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
+  for (const auto& entry : trace.trace_tags) {
+    appendTag(result, entry.first, entry.second);
+  }
+
+  return result;
 }
 
 void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& sample_result) {

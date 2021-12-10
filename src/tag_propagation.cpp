@@ -9,6 +9,8 @@
 namespace datadog {
 namespace opentracing {
 
+const ot::string_view trace_tag_prefix = "_dd.p.";
+
 // The following [eBNF][1] grammar describes the tag propagation encoding.
 // The grammar was copied from [an internal design document][2].
 //

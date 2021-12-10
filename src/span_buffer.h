@@ -18,22 +18,36 @@ class Writer;
 class SpanContext;
 using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
+// `PendingTrace` is an implementation detail of `WritingSpanBuffer`.  A
+// `PendingTrace` contains all of the information associated with a trace as it
+// is happening.  When all of the spans in a `PendingTrace` have finished,
+// `WritingSpanBuffer` finalizes the spans and writes them (e.g. to the agent)
+// together as a trace.
 struct PendingTrace {
-  PendingTrace(std::shared_ptr<const Logger> logger)
+  PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id)
       : logger(logger),
+        trace_id(trace_id),
         finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
         all_spans() {}
   // This constructor is only used in propagation tests.
-  PendingTrace(std::shared_ptr<const Logger> logger,
+  PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id,
                std::unique_ptr<SamplingPriority> sampling_priority)
       : logger(logger),
+        trace_id(trace_id),
         finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
         all_spans(),
         sampling_priority(std::move(sampling_priority)) {}
 
   void finish();
+  // If this service's sampling decision is the first in the trace, or if it
+  // differs from the previous service's sampling decision, append an
+  // `UpstreamService` value to `upstream_services` indicating this service's
+  // sampling decision.  The behavior is undefined unless
+  // `sampling_priority != nullptr`.
+  void applySamplingDecisionToUpstreamServices();
 
   std::shared_ptr<const Logger> logger;
+  uint64_t trace_id;
   Trace finished_spans;
   std::unordered_set<uint64_t> all_spans;
   OptionalSamplingPriority sampling_priority;
@@ -42,6 +56,23 @@ struct PendingTrace {
   std::string hostname;
   double analytics_rate;
   SampleResult sample_result;
+  // `trace_tags` are tags that are associated with the entire local trace,
+  // rather than with a single span.  Some other tags are added to the local
+  // root span when the trace chunk is sent to the agent (see
+  // `finish_root_span` in `span_buffer.cpp`).  In addition to those tags,
+  // `trace_tags` are similarly added.  `trace_tags` names all begin with the
+  // same prefix, `trace_tag_prefix`, defined in `tag_propagation.h`.
+  // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
+  // trace tags require special handling, e.g. `upstream_services`, below.
+  std::unordered_map<std::string, std::string> trace_tags;
+  // `upstream_services` contains the parsed value of the
+  // "_dd.p.upstream_services" tag from the trace tags.  Additionally, if this
+  // service is the first to make a sampling decision, or if it changes the
+  // sampling decision (currently not possible), `upstream_services` ends with
+  // an `UpstreamService` object describing this service's sampling decision.
+  // `upstream_services` is attached to the local root span as the
+  // "_dd.p.upstream_services" tag.
+  std::vector<UpstreamService> upstream_services;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -52,9 +83,20 @@ class SpanBuffer {
   virtual void registerSpan(const SpanContext& context) = 0;
   virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
   virtual OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const = 0;
+  // Set the sampling decision for the trace having specified `trace_id` to the
+  // specified `priority` if a sampling decision has not already been made.
+  // Return the sampling decision. TODO look closer, mention "locking"
   virtual OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
                                                        OptionalSamplingPriority priority) = 0;
+  // Make a sampling decision for the trace corresponding to the specified
+  // `span` if a sampling decision has not already been made. Return the
+  // sampling decision. TODO look closer, mention "locking"
   virtual OptionalSamplingPriority assignSamplingPriority(const SpanData* span) = 0;
+  // Return the serialization of the trace tags associated with the trace
+  // having the specified `trace_id`, or return an empty string if an error
+  // occurs.  Note that an empty string could mean either that there no tags or
+  // that an error occurred.
+  virtual std::string serializeTraceTags(uint64_t trace_id) = 0;
   virtual void flush(std::chrono::milliseconds timeout) = 0;
 };
 
@@ -77,6 +119,8 @@ class WritingSpanBuffer : public SpanBuffer {
   OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
                                                OptionalSamplingPriority priority) override;
   OptionalSamplingPriority assignSamplingPriority(const SpanData* span) override;
+
+  std::string serializeTraceTags(uint64_t trace_id) override;
 
   // Causes the Writer to flush, but does not send any PendingTraces.
   void flush(std::chrono::milliseconds timeout) override;

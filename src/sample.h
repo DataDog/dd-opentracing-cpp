@@ -18,6 +18,8 @@
 
 #include "limiter.h"
 #include "propagation.h"
+#include "sampling_mechanism.h"
+#include "sampling_priority.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -30,6 +32,9 @@ struct SampleResult {
   double limiter_rate = std::nan("");
   double priority_rate = std::nan("");
   OptionalSamplingPriority sampling_priority = nullptr;
+  // If `sampling_priority` is `nullptr`, then `sampling_mechanism` has no
+  // meaning.
+  SamplingMechanism sampling_mechanism;
 };
 
 struct SamplingRate {

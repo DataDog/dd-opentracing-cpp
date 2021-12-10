@@ -25,6 +25,10 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
+// `upstream_services_tag` is the name of the tag in which `UpstreamService`
+// objects are encoded.
+extern const ot::string_view upstream_services_tag;
+
 // `UpstreamService` contains the sampling decision made by a service that
 // preceded us in the current trace.
 struct UpstreamService {

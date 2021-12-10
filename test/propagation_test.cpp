@@ -30,8 +30,8 @@ TEST_CASE("SpanContext") {
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      123, PendingTrace{logger, 123,
+                        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "synthetics", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   auto propagation_styles =
@@ -166,8 +166,8 @@ TEST_CASE("deserialize fails") {
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      123, PendingTrace{logger, 123,
+                        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   SpanContext context{logger, 420, 123, "", {{"ayy", "lmao"}, {"hi", "haha"}}};
 
   struct PropagationStyleTestCase {
@@ -243,7 +243,7 @@ TEST_CASE("SamplingPriority values are clamped apropriately for b3") {
   MockTextMapCarrier carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123, PendingTrace{logger, std::make_unique<SamplingPriority>(priority.first)}));
+      123, PendingTrace{logger, 123, std::make_unique<SamplingPriority>(priority.first)}));
   SpanContext context{logger, 420, 123, "", {}};
 
   REQUIRE(context.serialize(carrier, buffer, {PropagationStyle::B3}, true));
@@ -309,8 +309,8 @@ TEST_CASE("Binary Span Context") {
   std::stringstream carrier{};
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      123, PendingTrace{logger, 123,
+                        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
   auto priority_sampling = GENERATE(false, true);
 
   SECTION("can be serialized") {
@@ -613,8 +613,8 @@ TEST_CASE("origin header propagation") {
   auto sampler = std::make_shared<MockRulesSampler>();
   auto buffer = std::make_shared<MockBuffer>();
   buffer->traces().emplace(std::make_pair(
-      123,
-      PendingTrace{logger, std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
+      123, PendingTrace{logger, 123,
+                        std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep)}));
 
   std::shared_ptr<Tracer> tracer{new Tracer{{}, buffer, getRealTime, getId}};
   SpanContext context{logger, 420, 123, "madeuporigin", {{"ayy", "lmao"}, {"hi", "haha"}}};
