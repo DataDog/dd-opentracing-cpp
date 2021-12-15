@@ -475,14 +475,16 @@ TEST_CASE("sampling behaviour") {
     //           | Set here automatically, should succeed
     sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
+    REQUIRE(span);
 
     MockTextMapCarrier carrier;
     auto err = tracer->Inject(span->context(), carrier);
 
     // setSamplingPriority should fail, since it's already set & locked, and should return the
     // assigned value.
-    REQUIRE(*setSamplingPriority(static_cast<Span*>(span.get()), nullptr) ==
-            SamplingPriority::SamplerKeep);
+    auto priority = setSamplingPriority(static_cast<Span*>(span.get()), nullptr);
+    REQUIRE(priority);
+    REQUIRE(*priority == SamplingPriority::SamplerKeep);
     // Double-checking!
     REQUIRE(carrier.text_map["x-datadog-sampling-priority"] == "1");
 
@@ -584,17 +586,20 @@ TEST_CASE("sampling behaviour") {
     //           | Assigned automatically here
     sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
     auto span = ot::Tracer::Global()->StartSpan("operation_name");
+    REQUIRE(span);
     auto child_span = tracer->StartSpan("childA", {ot::ChildOf(&span->context())});
+    REQUIRE(child_span);
 
     MockTextMapCarrier carrier;
     auto err = tracer->Inject(child_span->context(), carrier);
 
     // setSamplingPriority should fail, since it's already set & locked, and should return the
     // assigned value.
-    REQUIRE(*setSamplingPriority(static_cast<Span*>(span.get()), nullptr) ==
-            SamplingPriority::SamplerKeep);
-    REQUIRE(*setSamplingPriority(static_cast<Span*>(child_span.get()), nullptr) ==
-            SamplingPriority::SamplerKeep);
+    auto priority = setSamplingPriority(static_cast<Span*>(span.get()), nullptr);
+    REQUIRE(priority);
+    REQUIRE(*priority == SamplingPriority::SamplerKeep);
+    priority = setSamplingPriority(static_cast<Span*>(child_span.get()), nullptr);
+    REQUIRE(*priority == SamplingPriority::SamplerKeep);
     // Double-checking!
     REQUIRE(carrier.text_map["x-datadog-sampling-priority"] == "1");
 
