@@ -195,7 +195,8 @@ struct MockBuffer : public WritingSpanBuffer {
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
                           WritingSpanBufferOptions{}){};
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service)
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, WritingSpanBufferOptions{true, "localhost", std::nan(""), service}) {}
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+                          WritingSpanBufferOptions{true, "localhost", std::nan(""), service}) {}
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.

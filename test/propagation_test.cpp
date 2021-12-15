@@ -1,12 +1,12 @@
 #include "../src/propagation.h"
 
 #include <datadog/tags.h>
-#include <nlohmann/json.hpp>
 #include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
 
 #include <cassert>
 #include <catch2/catch.hpp>
+#include <nlohmann/json.hpp>
 #include <string>
 
 #include "../src/span.h"
@@ -731,9 +731,11 @@ TEST_CASE("origin header propagation") {
 
     SECTION("is injected") {
       SECTION("as it was extracted, if our sampling decision does not differ from the previous") {
-        const std::string serialized_tags = "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
+        const std::string serialized_tags =
+            "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
         // Our sampler will make the same decision as dHJhY2Utc3RhdHMtcXVlcnk.
-        sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+        sampler->sampling_priority =
+            std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
 
         nlohmann::json json_to_extract;
         json_to_extract["tags"] = serialized_tags;
@@ -754,15 +756,21 @@ TEST_CASE("origin header propagation") {
         REQUIRE(result);
 
         auto injected_json = nlohmann::json::parse(injected.str());
-        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == deserializeTags(serialized_tags));
+        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
+                deserializeTags(serialized_tags));
       }
 
-      SECTION("including an UpstreamService for us, if our sampling decision differs from the previous") {
+      SECTION(
+          "including an UpstreamService for us, if our sampling decision differs from the "
+          "previous") {
         // `serialized_tags` is based off of an example in the internal RFC (the
         // choice of this value here is arbitrary).
-        const std::string serialized_tags = "_dd.p.hello=world,_dd.p.upstream_services=bWNudWx0eS13ZWI|0|1|;dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
+        const std::string serialized_tags =
+            "_dd.p.hello=world,_dd.p.upstream_services=bWNudWx0eS13ZWI|0|1|;"
+            "dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
         // Our sampler will make a decision different from dHJhY2Utc3RhdHMtcXVlcnk's.
-        sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+        sampler->sampling_priority =
+            std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
         sampler->priority_rate = 1.0;
 
         nlohmann::json json_to_extract;
@@ -807,10 +815,12 @@ TEST_CASE("origin header propagation") {
         REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
       }
 
-      SECTION("including an UpstreamService for us, if we are the first to make a sampling decision") {
+      SECTION(
+          "including an UpstreamService for us, if we are the first to make a sampling decision") {
         // Let's omit "tags" ("x-datadog-tags") entirely from the extracted context.
 
-        sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+        sampler->sampling_priority =
+            std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
         sampler->priority_rate = 1.0;
 
         nlohmann::json json_to_extract;
@@ -844,7 +854,8 @@ TEST_CASE("origin header propagation") {
         expected_annex.sampling_rate = sampler->priority_rate;
 
         dict expected_tags;
-        expected_tags.emplace("_dd.p.upstream_services", serializeUpstreamServices({expected_annex}));
+        expected_tags.emplace("_dd.p.upstream_services",
+                              serializeUpstreamServices({expected_annex}));
 
         REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
       }

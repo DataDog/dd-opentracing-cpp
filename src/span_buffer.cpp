@@ -256,7 +256,8 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
       // We made a sampling decision.  Might need to indicate that in
       // `trace.upstream_services`.
       trace.applySamplingDecisionToUpstreamServices();
-    } else if (*priority == SamplingPriority::UserDrop || *priority == SamplingPriority::UserKeep) {
+    } else if (*priority == SamplingPriority::UserDrop ||
+               *priority == SamplingPriority::UserKeep) {
       trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
     }
   }
