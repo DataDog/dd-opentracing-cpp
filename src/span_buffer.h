@@ -43,7 +43,9 @@ struct PendingTrace {
   // differs from the previous service's sampling decision, append an
   // `UpstreamService` value to `upstream_services` indicating this service's
   // sampling decision.  The behavior is undefined unless
-  // `sampling_priority != nullptr`.
+  // `sampling_priority != nullptr`.  Note that because this function does not
+  // append an `UpstreamService` if our sampling decision agrees with the
+  // previous service's, this function is idempotent.
   void applySamplingDecisionToUpstreamServices();
 
   std::shared_ptr<const Logger> logger;
