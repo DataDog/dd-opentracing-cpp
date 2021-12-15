@@ -14,7 +14,7 @@ const ot::string_view trace_tag_prefix = "_dd.p.";
 // The following [eBNF][1] grammar describes the tag propagation encoding.
 // The grammar was copied from [an internal design document][2].
 //
-//     tagset = tag, { ",", tag };
+//     tagset = ( tag, { ",", tag } ) | "";
 //     tag = ( identifier - space ), "=", identifier;
 //     identifier = allowed characters, { allowed characters };
 //     allowed characters = ( ? ASCII characters 32-126 ? - equal or comma );

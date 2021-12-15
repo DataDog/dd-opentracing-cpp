@@ -20,7 +20,7 @@ namespace {
 // The following [eBNF][1] grammar describes the upstream services encoding.
 // The grammar was copied from [an internal design document][2].
 //
-//     upstream services  =  group, { ";", group };
+//     upstream services  =  ( group, { ";", group } ) | "";
 //
 //     group  =  service name, "|",
 //               sampling priority, "|",

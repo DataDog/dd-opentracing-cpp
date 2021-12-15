@@ -87,7 +87,7 @@ double pickSamplingRate(const SampleResult& sample_result) {
                                     case KnownSamplingMechanism::RemoteRateUserDefined:
                                       return std::nan("");
                                   }
-                                  // unreachable
+                                  // unreachable (but difficult to prove)
                                   return std::nan("");
                                 }),
                        sample_result.sampling_mechanism);
