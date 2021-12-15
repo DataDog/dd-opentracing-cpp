@@ -245,6 +245,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
       // assignSamplingPriority.
       logger_->Trace(trace_id, "sampling priority already set and cannot be reassigned");
     }
+    return getSamplingPriorityImpl(trace_id);
   }
   if (priority == nullptr) {
     trace.sampling_priority.reset(nullptr);
