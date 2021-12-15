@@ -119,6 +119,7 @@ class SpanContext : public ot::SpanContext {
   uint64_t trace_id_;
   OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
   std::string origin_;
+  std::unordered_map<std::string, std::string> baggage_;
   // Trace tags are key/value pairs that are propagated along a trace.  If this
   // `SpanContext` was extracted, then `extracted_trace_tags_` contains any
   // trace tags parsed from the "x-datadog-trace-tags" header.  If this
@@ -132,7 +133,6 @@ class SpanContext : public ot::SpanContext {
   std::vector<UpstreamService> extracted_upstream_services_;
 
   mutable std::mutex mutex_;
-  std::unordered_map<std::string, std::string> baggage_;
 };
 
 }  // namespace opentracing

@@ -229,7 +229,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   startupLog(options);
   buffer_ = std::make_shared<WritingSpanBuffer>(
       logger_, writer, sampler,
-      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
+      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options), options.service});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -257,6 +257,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     }
   }
 
+  // TODO: This is where we will inherit `extracted_trace_tags_` and `extracted_upstream_services_`.
   auto span = std::make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id,
                                      trace_id, parent_id, std::move(span_context), get_time_(),
                                      opts_.service, opts_.type, operation_name, operation_name,

@@ -73,6 +73,9 @@ struct PendingTrace {
   // `upstream_services` is attached to the local root span as the
   // "_dd.p.upstream_services" tag.
   std::vector<UpstreamService> upstream_services;
+  // `service` is the same service name specified in `TracerOptions` or deduced
+  // from `DD_SERVICE`.
+  std::string service;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -104,6 +107,7 @@ struct WritingSpanBufferOptions {
   bool enabled = true;
   std::string hostname;
   double analytics_rate = std::nan("");
+  std::string service;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.

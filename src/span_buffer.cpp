@@ -123,18 +123,8 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
   // Either we're the first to make a sampling decision, or our decision
   // differs from the previous service's.  Append a record for this service.
 
-  // First we have to find the service name of our local root span.
-  auto found_root_span =
-      std::find_if(finished_spans->begin(), finished_spans->end(),
-                   [this](const auto& span) { return is_root(*span, all_spans); });
-  if (found_root_span == finished_spans->end()) {
-    logger->Log(LogLevel::error, trace_id, "Pending trace has no local root span");
-    return;
-  }
-  const std::string& root_service_name = (*found_root_span)->service;
-
   UpstreamService this_service;
-  this_service.service_name = root_service_name;
+  this_service.service_name = service;
   this_service.sampling_priority = *sampling_priority;
   this_service.sampling_mechanism = sample_result.sampling_mechanism;
   this_service.sampling_rate = pickSamplingRate(sample_result);
@@ -175,6 +165,7 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
 
     trace.hostname = options_.hostname;
     trace.analytics_rate = options_.analytics_rate;
+    trace.service = options_.service;
   }
   trace_iter->second.all_spans.insert(context.id());
 }
@@ -254,19 +245,19 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
       // assignSamplingPriority.
       logger_->Trace(trace_id, "sampling priority already set and cannot be reassigned");
     }
-    return getSamplingPriorityImpl(trace_id);
   }
   if (priority == nullptr) {
     trace.sampling_priority.reset(nullptr);
   } else {
     trace.sampling_priority.reset(new SamplingPriority(*priority));
-    trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
     if (*priority == SamplingPriority::SamplerDrop || *priority == SamplingPriority::SamplerKeep) {
       // This is an automatically-assigned sampling priority.
       trace.sampling_priority_locked = true;
       // We made a sampling decision.  Might need to indicate that in
       // `trace.upstream_services`.
       trace.applySamplingDecisionToUpstreamServices();
+    } else if (*priority == SamplingPriority::UserDrop || *priority == SamplingPriority::UserKeep) {
+      trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
     }
   }
   return getSamplingPriorityImpl(trace_id);

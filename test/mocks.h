@@ -151,6 +151,7 @@ struct MockRulesSampler : public RulesSampler {
     if (sampling_priority != nullptr) {
       result.rule_rate = rule_rate;
       result.limiter_rate = limiter_rate;
+      result.priority_rate = priority_rate;
       result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
     }
     return result;
@@ -160,6 +161,7 @@ struct MockRulesSampler : public RulesSampler {
   OptionalSamplingPriority sampling_priority = nullptr;
   double rule_rate = 1.0;
   double limiter_rate = 1.0;
+  double priority_rate = std::nan("");
   std::string config;
 };
 
@@ -189,9 +191,11 @@ struct MockBuffer : public WritingSpanBuffer {
   MockBuffer()
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr,
                           std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
-  MockBuffer(std::shared_ptr<RulesSampler> sampler)
+  explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
                           WritingSpanBufferOptions{}){};
+  MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service)
+      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, WritingSpanBufferOptions{true, "localhost", std::nan(""), service}) {}
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.
