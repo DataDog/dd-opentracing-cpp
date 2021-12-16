@@ -296,7 +296,9 @@ std::string WritingSpanBuffer::serializeTraceTags(uint64_t trace_id) {
   auto& trace = trace_found->second;
 
   // TODO: Is is possible that `applySamplingDecisionToUpstreamServices` hasn't been called yet?
-  appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
+  if (!trace.upstream_services.empty()) {
+    appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
+  }
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
   }
