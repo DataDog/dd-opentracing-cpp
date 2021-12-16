@@ -13,6 +13,7 @@ namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
 const std::string datadog_origin_tag = "_dd.origin";
 const std::string datadog_hostname_tag = "_dd.hostname";
+const std::string datadog_upstream_services_tag = "_dd.p.upstream_services";
 const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
@@ -40,7 +41,7 @@ void finish_span(const PendingTrace& trace, SpanData& span) {
 
 // Alter the specified root (i.e. having no parent in the local trace) `span`
 // to prepare it for encoding with the specified `trace`.
-void finish_root_span(const PendingTrace& trace, SpanData& span) {
+void finish_root_span(PendingTrace& trace, SpanData& span) {
   // Check for sampling.
   if (trace.sampling_priority != nullptr) {
     span.metrics[sampling_priority_metric] = static_cast<int>(*trace.sampling_priority);
@@ -61,6 +62,16 @@ void finish_root_span(const PendingTrace& trace, SpanData& span) {
   }
   if (!std::isnan(trace.sample_result.priority_rate)) {
     span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
+  }
+  // If there's a sampling decision, make sure that `trace.upstream_services`
+  // reflects the sampling decision, and include `trace.upstream_services` as a
+  // tag if it's nonempty.
+  if (trace.sampling_priority != nullptr) {
+    trace.applySamplingDecisionToUpstreamServices();
+  }
+  std::string upstream_services = serializeUpstreamServices(trace.upstream_services);
+  if (!upstream_services.empty()) {
+    span.meta[datadog_upstream_services_tag] = std::move(upstream_services);
   }
   // Forward to the finisher that applies to all spans (not just root spans).
   finish_span(trace, span);
@@ -122,6 +133,13 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
 
   // Either we're the first to make a sampling decision, or our decision
   // differs from the previous service's.  Append a record for this service.
+
+  // In unit tests, we sometimes don't have a service name.  In those cases,
+  // omit our `UpstreamService` entry (those tests are not looking for the
+  // corresponding tag).
+  if (service.empty()) {
+    return;
+  }
 
   UpstreamService this_service;
   this_service.service_name = service;

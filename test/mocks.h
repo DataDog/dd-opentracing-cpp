@@ -7,6 +7,7 @@
 #include <list>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -17,6 +18,28 @@
 #include "../src/tracer.h"
 #include "../src/transport.h"
 #include "../src/writer.h"
+
+using dict = std::unordered_map<std::string, std::string>;
+
+namespace std {
+
+// This printing operator is defined here for debugging purposes.
+// This way, `REQUIRE(some_dict == another_dict)` will print the values
+// when they're not equal.
+std::ostream& operator<<(std::ostream& stream, const dict& map) {
+  stream << "unordered_map[";
+  auto iter = map.begin();
+  const auto end = map.end();
+  if (iter != end) {
+    stream << iter->first << " = " << iter->second;
+    for (++iter; iter != end; ++iter) {
+      stream << ", " << iter->first << " = " << iter->second;
+    }
+  }
+  return stream << ']';
+}
+
+}  // namespace std
 
 namespace datadog {
 namespace opentracing {

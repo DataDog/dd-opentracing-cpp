@@ -17,28 +17,6 @@ using namespace datadog::opentracing;
 namespace tags = datadog::tags;
 namespace ot = opentracing;
 
-using dict = std::unordered_map<std::string, std::string>;
-
-namespace std {
-
-// This printing operator is defined here for debugging purposes.
-// This way, `REQUIRE(some_dict == another_dict)` will print the values
-// when they're not equal.
-std::ostream& operator<<(std::ostream& stream, const dict& map) {
-  stream << "unordered_map[";
-  auto iter = map.begin();
-  const auto end = map.end();
-  if (iter != end) {
-    stream << iter->first << " = " << iter->second;
-    for (++iter; iter != end; ++iter) {
-      stream << ", " << iter->first << " = " << iter->second;
-    }
-  }
-  return stream << ']';
-}
-
-}  // namespace std
-
 dict getBaggage(SpanContext* ctx) {
   dict baggage;
   ctx->ForeachBaggageItem([&baggage](const std::string& key, const std::string& value) -> bool {
