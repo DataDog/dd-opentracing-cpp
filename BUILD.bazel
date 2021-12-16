@@ -29,6 +29,7 @@ cc_library(
         "src/span_buffer.h",
         "src/tags.cpp",
         "src/tag_propagation.cpp",
+        "src/tag_propagation.h",
         "src/tracer.cpp",
         "src/tracer.h",
         "src/tracer_options.cpp",
