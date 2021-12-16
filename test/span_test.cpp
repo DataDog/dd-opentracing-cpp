@@ -9,6 +9,8 @@
 #include <thread>
 
 #include "../src/sample.h"
+#include "../src/tag_propagation.h"
+#include "../src/upstream_service.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;
@@ -540,6 +542,104 @@ TEST_CASE("span") {
       REQUIRE(result->metrics.find("_dd.limit_psr") != result->metrics.end());
       REQUIRE(result->metrics["_dd.rule_psr"] == 0.42);
       REQUIRE(result->metrics["_dd.limit_psr"] == 0.99);
+    }
+  }
+
+  SECTION("_dd.p.upstream_services tag") {
+    const auto sampler = std::make_shared<MockRulesSampler>();
+    sampler->priority_rate = 1.0;
+    TracerOptions options;
+    options.service = "supersvc";
+    const auto buffer = std::make_shared<MockBuffer>(sampler, options.service);
+    const auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+
+    SECTION("is included in root span when extracted from context") {
+      sampler->sampling_priority = nullptr;
+
+      UpstreamService upstream;
+      upstream.service_name = "upstreamsvc";
+      upstream.sampling_priority = SamplingPriority::UserKeep;
+      upstream.sampling_mechanism = KnownSamplingMechanism::Manual;
+      upstream.sampling_rate = std::nan("");
+
+      const auto serialized_upstream_services = serializeUpstreamServices({upstream});
+      std::string tags;
+      appendTag(tags, "_dd.p.upstream_services", serialized_upstream_services);
+
+      MockTextMapCarrier carrier;
+      carrier.Set("x-datadog-tags", tags);
+      carrier.Set("x-datadog-trace-id", "123");
+      carrier.Set("x-datadog-parent-id", "456");
+
+      const auto maybe_context = tracer->Extract(carrier);
+      REQUIRE(maybe_context);
+      const auto& context = *maybe_context;
+      REQUIRE(context);
+
+      const auto span =
+          tracer->StartSpan("OperationMoonUnit", {opentracing::ChildOf(context.get())});
+      REQUIRE(span);
+      span->FinishWithOptions(finish_options);
+
+      REQUIRE(buffer->traces().size() == 1);
+      const auto& entry = *buffer->traces().begin();
+      REQUIRE(entry.first == 123);
+
+      const auto& trace = entry.second;
+      REQUIRE(trace.finished_spans);
+      REQUIRE(trace.finished_spans->size() == 1);
+
+      const auto& maybe_span_data = *trace.finished_spans->begin();
+      REQUIRE(maybe_span_data);
+      const auto& span_data = *maybe_span_data;
+
+      const auto found_upstream_services = span_data.meta.find("_dd.p.upstream_services");
+      REQUIRE(found_upstream_services != span_data.meta.end());
+      // We won't have appended an `UpstreamService` for us, because
+      // `sampler->sampling_priority == nullptr`.
+      // The same thing would happen if we chose a sampling priority equal to
+      // the one in `upstream`, i.e. `SamplingPriority::UserKeep`.
+      REQUIRE(found_upstream_services->second == serialized_upstream_services);
+    }
+
+    SECTION("is included in root span when a sampling decision is made") {
+      // We won't extract any context this time, but will make a sampling
+      // decision, and so expect an `UpstreamService` record to appear in the
+      // `_dd.p.upstream_services` tag of the root span.
+      sampler->sampling_priority =
+          std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+
+      const auto span = tracer->StartSpan("OperationMoonUnit");
+      REQUIRE(span);
+      span->FinishWithOptions(finish_options);
+
+      REQUIRE(buffer->traces().size() == 1);
+      const auto& entry = *buffer->traces().begin();
+
+      const auto& trace = entry.second;
+      REQUIRE(trace.finished_spans);
+      REQUIRE(trace.finished_spans->size() == 1);
+
+      const auto& maybe_span_data = *trace.finished_spans->begin();
+      REQUIRE(maybe_span_data);
+      const auto& span_data = *maybe_span_data;
+
+      const auto found_upstream_services = span_data.meta.find("_dd.p.upstream_services");
+      REQUIRE(found_upstream_services != span_data.meta.end());
+
+      const auto upstream_services = deserializeUpstreamServices(found_upstream_services->second);
+      REQUIRE(upstream_services.size() == 1);
+
+      // We expect the one `UpstreamService` to be for this service (us), with
+      // the same sampling priority, mechanism, and rate as produced by
+      // `sampler`.
+      UpstreamService expected;
+      expected.service_name = options.service;
+      expected.sampling_priority = SamplingPriority::SamplerDrop;
+      // Priority sampling without a rate from the agent → `Default` mechanism.
+      expected.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected.sampling_rate = sampler->priority_rate;  // 1.0
+      REQUIRE(upstream_services[0] == expected);
     }
   }
 }

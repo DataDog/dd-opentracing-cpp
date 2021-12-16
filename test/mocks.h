@@ -26,7 +26,11 @@ namespace std {
 // This printing operator is defined here for debugging purposes.
 // This way, `REQUIRE(some_dict == another_dict)` will print the values
 // when they're not equal.
-std::ostream& operator<<(std::ostream& stream, const dict& map) {
+//
+// Doing this is technically [undefined behavior][1], but I can't find a
+// compiler that cares.
+// [1]: https://en.cppreference.com/w/cpp/language/extending_std
+inline std::ostream& operator<<(std::ostream& stream, const dict& map) {
   stream << "unordered_map[";
   auto iter = map.begin();
   const auto end = map.end();
@@ -217,6 +221,8 @@ struct MockBuffer : public WritingSpanBuffer {
   explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
                           WritingSpanBufferOptions{}){};
+  // This constructor overload is provided for tests where the service name is
+  // relevant, such as those involving `PendingTrace::upstream_services`.
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service)
       : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
                           WritingSpanBufferOptions{true, "localhost", std::nan(""), service}) {}
@@ -361,8 +367,10 @@ struct MockHandle : public Handle {
   std::condition_variable perform_called;
 };
 
-// A Mock TextMapReader and TextMapWriter.
-// Not in mocks.h since we only need it here for now.
+// `MockTextMapCarrier` is a `TextMapReader` and a `TextMapWriting` implemented
+// in terms of an owned `std::unordered_map<std::string, std::string>`.
+// Additionally, it can simulate eventual failure of the `Set` member function
+// via the `set_fails_after` data member.
 struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
   MockTextMapCarrier() {}
 
