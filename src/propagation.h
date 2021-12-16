@@ -22,7 +22,7 @@ namespace opentracing {
 extern const ot::string_view baggage_prefix;
 
 // Returns a list of strings, where each string is a header that will be used for propagating
-// traces.
+// traces.  This function is exposed for use in unit tests.
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 

@@ -79,11 +79,51 @@ TEST_CASE("SpanContext") {
         headers_got.insert(header.first);
       }  // This was still less LoC than using std::transformer. Somehow EVEN JAVA gets this right
          // these days...
+      // clang-format off
+      // Even in C++20, the loop is still better:
+      //
+      //     using std::views;
+      //
+      //     auto headers_view =
+      //         carrier.text_map |
+      //         filter([] (const auto& entry) { return entry.first.starts_with(baggage_prefix); }) |
+      //         transform([] (const auto& entry) { return entry.second; });
+      //
+      //     headers_got.insert(headers_view.begin(), headers_view.end());
+      //
+      // Maybe in C++23 we'll have:
+      //
+      //     using std::views;
+      //     using std::ranges;
+      //
+      //     carrier.text_map |
+      //         filter([] (const auto& entry) { return entry.first.starts_with(baggage_prefix); }) |
+      //         transform([] (const auto& entry) { return entry.second; }) |
+      //         to(headers_got);
+      //
+      // Just keep writing loops.
+      //
+      // Maybe in C++38 we'll have:
+      //
+      //     headers_got = [entry.second for const auto& entry : carrier.text_map if entry.first.starts_with(baggage_prefix)];
+      //
+      // clang-format on
+      //
       std::set<std::string> headers_want;
       for (auto header : getPropagationHeaderNames(propagation_styles, priority_sampling)) {
         headers_want.insert(header);
       }
-      REQUIRE(headers_got == headers_want);
+      // With the addition of "x-datadog-tags", it's difficult to know which
+      // headers will be injected.
+      // For example, "x-datadog-tags" will not be injected in this test section,
+      // because no "x-datadog-tags" is extracted and no sampling decision is made.
+      // In actual usage, either a sampling decision will be made (either by an
+      // extracted sampling priority or by the sampler) or "x-datadog-tags"
+      // will be extracted, and so the header will always be injected.
+      // To account for this, I require that `headers_got` is a subset of
+      // `headers_want`, not that they are equivalent.
+      REQUIRE(std::includes(headers_want.begin(), headers_want.end(), headers_got.begin(),
+                            headers_got.end()));
     }
 
     SECTION("can be deserialized") {
