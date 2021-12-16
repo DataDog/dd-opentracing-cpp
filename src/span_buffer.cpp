@@ -303,17 +303,18 @@ OptionalSamplingPriority WritingSpanBuffer::assignSamplingPriorityImpl(const Spa
 
 std::string WritingSpanBuffer::serializeTraceTags(uint64_t trace_id) {
   std::string result;
-  std::lock_guard<std::mutex> lock{mutex_};
+  std::unique_lock<std::mutex> lock{mutex_};
 
   const auto trace_found = traces_.find(trace_id);
   if (trace_found == traces_.end()) {
-    // TODO: unlock and log
+    lock.unlock();
+    logger_->Log(LogLevel::error, trace_id,
+                 "Requested trace_id not found in WritingSpanBuffer::serializeTraceTags");
     return result;
   }
 
   auto& trace = trace_found->second;
 
-  // TODO: Is is possible that `applySamplingDecisionToUpstreamServices` hasn't been called yet?
   if (!trace.upstream_services.empty()) {
     appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
   }

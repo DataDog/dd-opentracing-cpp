@@ -163,7 +163,6 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
   return headers;
 }
 
-// TODO: Do `extracted_trace_tags_` and `extracted_upstream_services_` need to be added here?
 SpanContext::SpanContext(std::shared_ptr<const Logger> logger, uint64_t id, uint64_t trace_id,
                          std::string origin,
                          std::unordered_map<std::string, std::string> &&baggage)
@@ -235,11 +234,10 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
 }
 
 bool SpanContext::operator==(const SpanContext &other) const {
-  // TODO: Does this need to be updated to account for
-  // `extracted_trace_tags_` and `extracted_upstream_services_`?
   if (logger_ != other.logger_ || id_ != other.id_ || trace_id_ != other.trace_id_ ||
       baggage_ != other.baggage_ ||
-      nginx_opentracing_compatibility_hack_ != other.nginx_opentracing_compatibility_hack_) {
+      nginx_opentracing_compatibility_hack_ != other.nginx_opentracing_compatibility_hack_ ||
+      extracted_trace_tags_ != other.extracted_trace_tags_) {
     return false;
   }
   if (propagated_sampling_priority_ == nullptr) {
@@ -325,7 +323,6 @@ std::string SpanContext::baggageItem(ot::string_view key) const {
 SpanContext SpanContext::withId(uint64_t id) const {
   std::lock_guard<std::mutex> lock{mutex_};
   SpanContext context{logger_, id, trace_id_, origin_, decltype(baggage_)(baggage_)};
-  // TODO: Add `extracted_*_` to the constructor?
   context.extracted_trace_tags_ = extracted_trace_tags_;
   context.extracted_upstream_services_ = extracted_upstream_services_;
   if (propagated_sampling_priority_ != nullptr) {

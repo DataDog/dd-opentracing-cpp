@@ -10,7 +10,8 @@
 // respectively.
 //
 // In addition to being propagated along the trace, upstream services are also
-// sent to the agent TODO.
+// sent to the agent as a span tag, "_dd.p.upstream_services", in the local
+// root span.
 
 #include <opentracing/string_view.h>
 
