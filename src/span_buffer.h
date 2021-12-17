@@ -90,12 +90,12 @@ class SpanBuffer {
   virtual OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const = 0;
   // Set the sampling decision for the trace having specified `trace_id` to the
   // specified `priority` if a sampling decision has not already been made.
-  // Return the sampling decision.
+  // Return the resulting sampling decision.
   virtual OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
                                                        OptionalSamplingPriority priority) = 0;
   // Make a sampling decision for the trace corresponding to the specified
   // `span` if a sampling decision has not already been made. Return the
-  // sampling decision.
+  // resulting sampling decision.
   virtual OptionalSamplingPriority assignSamplingPriority(const SpanData* span) = 0;
   // Return the serialization of the trace tags associated with the trace
   // having the specified `trace_id`, or return an empty string if an error
