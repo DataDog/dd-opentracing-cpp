@@ -14,6 +14,7 @@ const std::string sampling_priority_metric = "_sampling_priority_v1";
 const std::string datadog_origin_tag = "_dd.origin";
 const std::string datadog_hostname_tag = "_dd.hostname";
 const std::string datadog_upstream_services_tag = "_dd.p.upstream_services";
+const std::string datadog_propagation_error_tag = "_dd.propagation_error";
 const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
@@ -72,6 +73,11 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
   std::string upstream_services = serializeUpstreamServices(trace.upstream_services);
   if (!upstream_services.empty()) {
     span.meta[datadog_upstream_services_tag] = std::move(upstream_services);
+  }
+  // If there was previously an error during context propagation, note that in
+  // a tag.
+  if (!trace.propagation_error.empty()) {
+    span.meta[datadog_propagation_error_tag] = trace.propagation_error;
   }
   // Forward to the finisher that applies to all spans (not just root spans).
   finish_span(trace, span);
@@ -320,6 +326,19 @@ std::string WritingSpanBuffer::serializeTraceTags(uint64_t trace_id) {
   }
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
+  }
+
+  if (result.size() > options_.trace_tags_propagation_max_length) {
+    trace.propagation_error = "max_size";
+    lock.unlock();
+    std::ostringstream message;
+    message
+        << "Serialized trace tags are too large for propagation.  Configured maximum length is "
+        << options_.trace_tags_propagation_max_length << ", but the following has length "
+        << result.size() << ": " << result;
+    logger_->Log(LogLevel::error, trace_id, message.str());
+    // Return an empty string, which will not be propagated.
+    result.clear();
   }
 
   return result;

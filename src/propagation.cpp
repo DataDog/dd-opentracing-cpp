@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "parse_util.h"
 #include "sample.h"
 #include "span_buffer.h"
 #include "tag_propagation.h"
@@ -126,24 +127,6 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
     return std::make_unique<Result>(ot::make_unexpected(ot::span_context_corrupted_error));
   }
   return nullptr;
-}
-
-// Interpret the specified `text` as a non-negative integer formatted in the
-// specified `base` (e.g. base 10 for decimal, base 16 for hexadecimal),
-// possibly surrounded by whitespace, and return the integer.  Throw an
-// exception derived from `std::logic_error` if an error occurs.
-uint64_t parse_uint64(const std::string &text, int base) {
-  std::size_t end_index;
-  const uint64_t result = std::stoull(text, &end_index, base);
-
-  // If any of the remaining characters are not whitespace, then `text`
-  // contains something other than a base-`base` integer.
-  if (std::any_of(text.begin() + end_index, text.end(),
-                  [](unsigned char ch) { return !std::isspace(ch); })) {
-    throw std::invalid_argument("integer text field has a trailing non-whitespace character");
-  }
-
-  return result;
 }
 
 }  // namespace

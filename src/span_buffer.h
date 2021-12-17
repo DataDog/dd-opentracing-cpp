@@ -78,6 +78,12 @@ struct PendingTrace {
   // `service` is the same service name specified in `TracerOptions` or deduced
   // from `DD_SERVICE`.
   std::string service;
+  // If an error occurs while propagating trace tags (see
+  // `WritingSpanBuffer::serializeTraceTags`), then the "_dd.propagation_error"
+  // tag will be set on the local root span to the value of
+  // `propagation_error`.  If no error occurs, then `propagation_error` will be
+  // empty and the "_dd.propagation_error" tag will not be added.
+  std::string propagation_error;
 };
 
 // Keeps track of Spans until there is a complete trace.
@@ -100,7 +106,9 @@ class SpanBuffer {
   // Return the serialization of the trace tags associated with the trace
   // having the specified `trace_id`, or return an empty string if an error
   // occurs.  Note that an empty string could mean either that there no tags or
-  // that an error occurred.
+  // that an error occurred.  If an encoding error occurs, a corresponding
+  // `_dd.propagation_error` tag value will be added to the relevant trace's
+  // local root span.
   virtual std::string serializeTraceTags(uint64_t trace_id) = 0;
   virtual void flush(std::chrono::milliseconds timeout) = 0;
 };
@@ -110,6 +118,8 @@ struct WritingSpanBufferOptions {
   std::string hostname;
   double analytics_rate = std::nan("");
   std::string service;
+  // See the corresponding field in `TracerOptions`.
+  uint64_t trace_tags_propagation_max_length;
 };
 
 // A SpanBuffer that sends completed traces to a Writer.

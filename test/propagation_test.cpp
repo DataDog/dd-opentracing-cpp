@@ -745,10 +745,12 @@ TEST_CASE("origin header propagation") {
     TracerOptions options;
     options.service = "zappasvc";
     options.environment = "staging";
+    options.trace_tags_propagation_max_length = 512;
 
     auto logger = std::make_shared<const MockLogger>();
     auto sampler = std::make_shared<MockRulesSampler>();
-    auto buffer = std::make_shared<MockBuffer>(sampler, options.service);
+    auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
+                                               options.trace_tags_propagation_max_length);
 
     auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
 
@@ -881,6 +883,42 @@ TEST_CASE("origin header propagation") {
                               serializeUpstreamServices({expected_annex}));
 
         REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
+      }
+    }
+
+    SECTION("is not injected") {
+      SECTION("when the resulting header value is longer than the configured maximum") {
+        // Create a list of tags that, serialized, are longer than the limit.
+        // The tracer will extract the list, but then when it goes to inject it, it will fail.
+        const std::string serialized_tags = "_dd.p.hello=" + std::string(1024, 'x');
+        REQUIRE(serialized_tags.size() > 512);  // by construction
+
+        // Don't make a sampling decision (though it doesn't matter for this
+        // section).
+        sampler->sampling_priority = nullptr;
+
+        nlohmann::json json_to_extract;
+        json_to_extract["tags"] = serialized_tags;
+        json_to_extract["trace_id"] = "123";
+        json_to_extract["parent_id"] = "456";
+        std::istringstream to_extract(json_to_extract.dump());
+
+        const auto maybe_context = tracer->Extract(to_extract);
+        REQUIRE(maybe_context);
+        const auto& context = maybe_context.value();
+        REQUIRE(context);
+
+        const auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+        REQUIRE(span);
+
+        std::ostringstream injected;
+        const auto result = tracer->Inject(span->context(), injected);
+        REQUIRE(result);
+
+        const auto injected_json = nlohmann::json::parse(injected.str());
+        REQUIRE(injected_json.find("tags") == injected_json.end());
+
+        // TODO: error message sent on thing
       }
     }
   }

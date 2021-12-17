@@ -642,4 +642,60 @@ TEST_CASE("span") {
       REQUIRE(upstream_services[0] == expected);
     }
   }
+
+  SECTION("_dd.propagation_error tag") {
+    const auto sampler = std::make_shared<MockRulesSampler>();
+    TracerOptions options;
+    options.service = "supersvc";                     // doesn't matter
+    options.trace_tags_propagation_max_length = 512;  // this matters
+    const auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
+                                                     options.trace_tags_propagation_max_length);
+    const auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+
+    SECTION("is included in root span when x-datadog-tags propagation failed") {
+      SECTION("due to the serialized value being too large") {
+        const std::string tags = "_dd.p.foo=" + std::string(1024, 'x');
+
+        MockTextMapCarrier carrier;
+        carrier.Set("x-datadog-tags", tags);
+        carrier.Set("x-datadog-trace-id", "123");
+        carrier.Set("x-datadog-parent-id", "456");
+
+        const auto maybe_context = tracer->Extract(carrier);
+        REQUIRE(maybe_context);
+        const auto& context = *maybe_context;
+        REQUIRE(context);
+
+        const auto span =
+            tracer->StartSpan("OperationMoonUnit", {opentracing::ChildOf(context.get())});
+        REQUIRE(span);
+
+        // Now inject the context.  x-datadog-tags will fail to serialize, due
+        // to being oversized, and so when the trace is finished there will be
+        // a corresponding error tag.
+        std::ostringstream dummy;
+        const auto rcode = tracer->Inject(span->context(), dummy);
+        REQUIRE(rcode);
+
+        span->FinishWithOptions(finish_options);
+
+        REQUIRE(buffer->traces().size() == 1);
+        const auto& entry = *buffer->traces().begin();
+        REQUIRE(entry.first == 123);
+
+        const auto& trace = entry.second;
+        REQUIRE(trace.finished_spans);
+        REQUIRE(trace.finished_spans->size() == 1);
+
+        const auto& maybe_span_data = *trace.finished_spans->begin();
+        REQUIRE(maybe_span_data);
+        const auto& span_data = *maybe_span_data;
+
+        // Here's the behavior we're testing for.
+        const auto found_error_tag = span_data.meta.find("_dd.propagation_error");
+        REQUIRE(found_error_tag != span_data.meta.end());
+        REQUIRE(found_error_tag->second == "max_size");
+      }
+    }
+  }
 }

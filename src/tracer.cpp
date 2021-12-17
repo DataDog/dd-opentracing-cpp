@@ -16,6 +16,7 @@
 #include <sstream>
 
 #include "bool.h"
+#include "parse_util.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -140,6 +141,26 @@ void startupLog(TracerOptions &options) {
   options.log_func(LogLevel::info, message);
 }
 
+uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logger &logger) {
+  const char env_name[] = "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH";
+  const char *const env_value = std::getenv(env_name);
+  if (env_value == nullptr) {
+    return options.trace_tags_propagation_max_length;
+  }
+
+  try {
+    return parse_uint64(env_value, 10);
+  } catch (const std::logic_error &error) {
+    std::string message = error.what();
+    message += ": Unable to parse integer from ";
+    message += env_name;
+    message += " environment variable value: ";
+    message += env_value;
+    logger.Log(LogLevel::error, message);
+    return options.trace_tags_propagation_max_length;
+  }
+}
+
 }  // namespace
 
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept try {
@@ -230,7 +251,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   buffer_ = std::make_shared<WritingSpanBuffer>(
       logger_, writer, sampler,
       WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
-                               options.service});
+                               options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
