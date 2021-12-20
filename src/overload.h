@@ -18,7 +18,7 @@ namespace datadog {
 namespace opentracing {
 
 template <typename Func, typename... Funcs>
-struct OverloadedInvokable : OverloadedInvokable<Func>, OverloadedInvokable<Funcs>... {
+struct OverloadedInvokable : OverloadedInvokable<Func>, OverloadedInvokable<Funcs...> {
   OverloadedInvokable(Func func, Funcs... funcs)
       : OverloadedInvokable<Func>(func), OverloadedInvokable<Funcs...>(funcs...) {}
 
