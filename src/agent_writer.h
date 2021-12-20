@@ -36,7 +36,7 @@ class AgentWriter : public Writer {
   // Does not flush on destruction, buffered traces may be lost. Stops all threads.
   ~AgentWriter() override;
 
-  void write(Trace trace) override;
+  void write(TraceData &trace_data) override;
 
   // Send all buffered Traces to the destination now. Will block until sending is complete, or
   // timeout passes.

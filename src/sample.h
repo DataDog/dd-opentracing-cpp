@@ -29,7 +29,7 @@ struct SampleResult {
   double rule_rate = std::nan("");
   double limiter_rate = std::nan("");
   double priority_rate = std::nan("");
-  OptionalSamplingPriority sampling_priority = nullptr;
+  SamplingPriority sampling_priority = static_cast<SamplingPriority>(0);
 };
 
 struct SamplingRate {

@@ -13,7 +13,8 @@ namespace datadog {
 namespace opentracing {
 
 class Tracer;
-class SpanBuffer;
+class ActiveTrace;
+struct SamplingStatus;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
 // Contains data that describes a Span.
@@ -53,7 +54,6 @@ struct SpanData {
 
   uint64_t traceId() const;
   uint64_t spanId() const;
-  const std::string env() const;
 
   MSGPACK_DEFINE_MAP(name, service, resource, type, start, duration, meta, metrics, span_id,
                      trace_id, parent_id, error)
@@ -83,14 +83,9 @@ class DatadogSpan : public ot::Span {
 
   // Datadog methods.
 
-  // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
-  // value of the SamplingPriority; this may not be the same as the given parameter if this trace
-  // has propagated from a remote origin and already has a SamplingPriority.
-  virtual OptionalSamplingPriority setSamplingPriority(
-      std::unique_ptr<UserSamplingPriority> priority) = 0;
-  virtual OptionalSamplingPriority getSamplingPriority() const = 0;
   virtual uint64_t traceId() const = 0;
   virtual uint64_t spanId() const = 0;
+  virtual SamplingStatus samplingStatus() const = 0;
 };
 
 // A Span, a component of a trace, a single instrumented event.
@@ -98,7 +93,7 @@ class Span : public DatadogSpan {
  public:
   // Creates a new Span.
   Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> tracer,
-       std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time, uint64_t span_id,
+       std::shared_ptr<ActiveTrace> active_trace, TimeProvider get_time, uint64_t span_id,
        uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
        std::string span_service, std::string span_type, std::string span_name,
        std::string resource, std::string operation_name_override, bool legacy_obfuscation = false);
@@ -132,21 +127,16 @@ class Span : public DatadogSpan {
 
   uint64_t traceId() const override;
   uint64_t spanId() const override;
-  OptionalSamplingPriority setSamplingPriority(
-      std::unique_ptr<UserSamplingPriority> priority) override;
-  OptionalSamplingPriority getSamplingPriority() const override;
+  SamplingStatus samplingStatus() const override;
 
  private:
-  OptionalSamplingPriority assignSamplingPriority()
-      const;  // Sooo not const. See definition of method Span::context.
-
   mutable std::mutex mutex_;
   std::atomic<bool> is_finished_{false};
 
   // Set in constructor initializer:
   std::shared_ptr<const Logger> logger_;
   std::shared_ptr<const Tracer> tracer_;
-  std::shared_ptr<SpanBuffer> buffer_;
+  std::shared_ptr<ActiveTrace> active_trace_;
   TimeProvider get_time_;
   SpanContext context_;
   TimePoint start_time_;

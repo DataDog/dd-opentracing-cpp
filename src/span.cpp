@@ -42,14 +42,6 @@ SpanData::SpanData() {}
 uint64_t SpanData::traceId() const { return trace_id; }
 uint64_t SpanData::spanId() const { return span_id; }
 
-const std::string SpanData::env() const {
-  const auto &env = meta.find(tags::environment);
-  if (env == meta.end()) {
-    return "";
-  }
-  return env->second;
-}
-
 std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
                                        ot::string_view resource, std::string name,
                                        uint64_t trace_id, uint64_t span_id, uint64_t parent_id,
@@ -61,15 +53,15 @@ std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
 std::unique_ptr<SpanData> stubSpanData() { return std::unique_ptr<SpanData>{new SpanData()}; }
 
 Span::Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> tracer,
-           std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time, uint64_t span_id,
+           std::shared_ptr<ActiveTrace> active_trace, TimeProvider get_time, uint64_t span_id,
            uint64_t trace_id, uint64_t parent_id, SpanContext context, TimePoint start_time,
            std::string span_service, std::string span_type, std::string span_name,
            std::string resource, std::string operation_name_override, bool legacy_obfuscation)
-    : logger_(std::move(logger)),
-      tracer_(std::move(tracer)),
-      buffer_(std::move(buffer)),
+    : logger_(logger),
+      tracer_(tracer),
+      active_trace_(active_trace),
       get_time_(get_time),
-      context_(std::move(context)),
+      context_(context),
       start_time_(start_time),
       operation_name_override_(operation_name_override),
       legacy_obfuscation_(legacy_obfuscation),
@@ -84,7 +76,9 @@ Span::Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> t
     span_->meta[tags::operation_name] = span_->name;
     span_->name = operation_name_override;
   }
-  buffer_->registerSpan(context_);
+  context_.setService(span_->service);
+  context_.setName(span_->name);
+  active_trace_->addSpan(span_id);
 }
 
 Span::~Span() {
@@ -198,7 +192,7 @@ void Span::FinishWithOptions(
   }
   // Audit and finish span.
   audit(legacy_obfuscation_, span_.get());
-  buffer_->finishSpan(std::move(span_));
+  active_trace_->finishSpan(context_, std::move(span_));
   // According to the OT lifecycle, no more methods should be called on this Span. But just in case
   // let's make sure that span_ isn't nullptr. Fine line between defensive programming and voodoo.
   span_ = stubSpanData();
@@ -355,13 +349,14 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
     // "sampling.priority"
     try {
-      std::unique_ptr<UserSamplingPriority> sampling_priority = nullptr;
-      if (result != "") {
-        sampling_priority = std::make_unique<UserSamplingPriority>(
-            std::stoi(result) == 0 ? UserSamplingPriority::UserDrop
-                                   : UserSamplingPriority::UserKeep);
+      switch (static_cast<UserSamplingPriority>(std::stoi(result))) {
+        case UserSamplingPriority::UserDrop:
+          active_trace_->setSamplingPriority(UserSamplingPriority::UserDrop);
+          break;
+        case UserSamplingPriority::UserKeep:
+          active_trace_->setSamplingPriority(UserSamplingPriority::UserKeep);
+          break;
       }
-      setSamplingPriority(std::move(sampling_priority));
     } catch (const std::invalid_argument &ia) {
       logger_->Log(LogLevel::debug, span_->trace_id, span_->span_id,
                    "unable to parse sampling priority tag");
@@ -370,9 +365,21 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
                    "unable to parse sampling priority tag");
     }
   } else if (k == tags::manual_keep) {
-    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
+    active_trace_->setSamplingPriority(UserSamplingPriority::UserKeep);
   } else if (k == tags::manual_drop) {
-    setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
+    active_trace_->setSamplingPriority(UserSamplingPriority::UserDrop);
+  }
+
+  // Additionally, if the sampling decision hasn't been made, changes to env, service and name need
+  // to be reflected in the span context, for the eventual sampling decision.
+  if (!active_trace_->samplingStatus().is_set) {
+    if (k == tags::environment) {
+      context_.setEnv(result);
+    } else if (k == tags::service_name) {
+      context_.setService(result);
+    } else if (k == tags::operation_name) {
+      context_.setName(result);
+    }
   }
 }
 
@@ -394,33 +401,12 @@ void Span::Log(
 void Span::Log(ot::SystemTime /* timestamp */,
                const std::vector<std::pair<ot::string_view, ot::Value>> & /* fields */) noexcept {}
 
-OptionalSamplingPriority Span::setSamplingPriority(
-    std::unique_ptr<UserSamplingPriority> user_priority) {
+SamplingStatus Span::samplingStatus() const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  OptionalSamplingPriority priority(nullptr);
-  if (user_priority != nullptr) {
-    priority = asSamplingPriority(static_cast<int>(*user_priority));
-  }
-  return buffer_->setSamplingPriority(context_.traceId(), std::move(priority));
+  return active_trace_->samplingStatus();
 }
 
-OptionalSamplingPriority Span::getSamplingPriority() const {
-  std::lock_guard<std::mutex> lock_guard{mutex_};
-  return buffer_->getSamplingPriority(context_.traceId());
-}
-
-const ot::SpanContext &Span::context() const noexcept {
-  std::lock_guard<std::mutex> lock_guard{mutex_};
-  // First apply sampling. This concern sits more reasonably upon the destructor/Finish method - to
-  // ensure that users have every chance to apply their own SamplingPriority before one is decided.
-  // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
-  // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
-  // here, when the context is fetched before being serialized. The negative side-effect is that if
-  // anything else happens to want to get and/or serialize a SpanContext, that will end up having
-  // this spooky action at a distance of assigning a SamplingPriority.
-  buffer_->assignSamplingPriority(span_.get() /* Doesn't take ownership */);
-  return context_;
-}
+const ot::SpanContext &Span::context() const noexcept { return context_; }
 
 const ot::Tracer &Span::tracer() const noexcept { return *tracer_; }
 

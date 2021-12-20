@@ -18,16 +18,7 @@ const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
 const std::string priority_sampler_applied_rate = "_dd.agent_psr";
 
-// Return whether the specified `span` is without a parent among the specified
-// `all_spans_in_trace`.
-bool is_root(const SpanData& span, const std::unordered_set<uint64_t>& all_spans_in_trace) {
-  return
-      // root span
-      span.parent_id == 0 ||
-      // local root span of a distributed trace
-      all_spans_in_trace.find(span.parent_id) == all_spans_in_trace.end();
-}
-
+#if 0
 // Alter the specified `span` to prepare it for encoding with the specified
 // `trace`.
 void finish_span(const PendingTrace& trace, SpanData& span) {
@@ -38,9 +29,9 @@ void finish_span(const PendingTrace& trace, SpanData& span) {
   }
 }
 
-// Alter the specified root (i.e. having no parent in the local trace) `span`
+// Alter the specified toplevel (i.e. having no parent in the local trace) `span`
 // to prepare it for encoding with the specified `trace`.
-void finish_root_span(const PendingTrace& trace, SpanData& span) {
+void finish_toplevel_span(const PendingTrace& trace, SpanData& span) {
   // Check for sampling.
   if (trace.sampling_priority != nullptr) {
     span.metrics[sampling_priority_metric] = static_cast<int>(*trace.sampling_priority);
@@ -62,11 +53,107 @@ void finish_root_span(const PendingTrace& trace, SpanData& span) {
   if (!std::isnan(trace.sample_result.priority_rate)) {
     span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
   }
-  // Forward to the finisher that applies to all spans (not just root spans).
+  // Forward to the finisher that applies to all spans (not just toplevel spans).
   finish_span(trace, span);
 }
+#endif
 
 }  // namespace
+
+void ActiveTrace::addSpan(uint64_t span_id) {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  expected_spans_.insert(span_id);
+}
+
+void ActiveTrace::finishSpan(SpanContext& context, std::unique_ptr<SpanData> span_data) {
+  // Make sure a sampling priority is set.
+  if (context.topLevel() && !sampling_status_.is_set) {
+    context.sample();
+  }
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  // Finalize span details.
+  if (context.topLevel()) {
+    // Apply tags to toplevel spans when values are set.
+    span_data->metrics[sampling_priority_metric] =
+        static_cast<int>(sampling_status_.sample_result.sampling_priority);
+    if (!hostname_.empty()) {
+      span_data->meta[datadog_hostname_tag] = hostname_;
+    }
+    if (!std::isnan(analytics_rate_) &&
+        span_data->metrics.find(event_sample_rate_metric) == span_data->metrics.end()) {
+      span_data->metrics[event_sample_rate_metric] = analytics_rate_;
+    }
+    if (!std::isnan(sampling_status_.sample_result.rule_rate)) {
+      span_data->metrics[rules_sampler_applied_rate] = sampling_status_.sample_result.rule_rate;
+    }
+    if (!std::isnan(sampling_status_.sample_result.limiter_rate)) {
+      span_data->metrics[rules_sampler_limiter_rate] = sampling_status_.sample_result.limiter_rate;
+    }
+    if (!std::isnan(sampling_status_.sample_result.priority_rate)) {
+      span_data->metrics[priority_sampler_applied_rate] =
+          sampling_status_.sample_result.priority_rate;
+    }
+  }
+
+  // Origin tag is applied to all spans.
+  auto origin = context.origin();
+  if (!origin.empty()) {
+    span_data->meta[datadog_origin_tag] = origin;
+  }
+
+  // Store the span data.
+  finished_spans_.emplace_back(std::move(span_data));
+  // Submit the data to the writer if it's the final expected span.
+  if (finished_spans_.size() == expected_spans_.size()) {
+    if (writer_ != nullptr) {
+      writer_->write(finished_spans_);
+    }
+    finished_spans_.clear();
+    expected_spans_.clear();
+  }
+}
+
+void ActiveTrace::setSamplingPriority(UserSamplingPriority priority) {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  if (sampling_status_.is_propagated) {
+    // TODO: log a warning, because changing the sampling priority isn't
+    // allowed after it has been propagated
+  }
+  sampling_status_.is_set = true;
+  sampling_status_.sample_result.sampling_priority = static_cast<SamplingPriority>(priority);
+}
+
+void ActiveTrace::setSampleResult(SampleResult result) {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  if (sampling_status_.is_set) {
+    // TODO: log a warning, since this should not be set yet.
+    return;
+  }
+  sampling_status_.is_set = true;
+  sampling_status_.sample_result = result;
+}
+
+void ActiveTrace::setPropagated() {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  if (!sampling_status_.is_set) {
+    // TODO: log a warning, since this should be set before propagating
+    return;
+  }
+  if (sampling_status_.is_propagated) {
+    // TODO: log a warning, because this shouldn't be changed after
+    // it was originally propagated
+    return;
+  }
+  sampling_status_.is_propagated = true;
+}
+
+SamplingStatus ActiveTrace::samplingStatus() {
+  std::lock_guard<std::mutex> lock_guard{mutex_};
+  return sampling_status_;
+}
+
+#if 0
+
 
 void PendingTrace::finish() {
   // Apply changes to spans, in particular treating the root / local-root
@@ -94,7 +181,7 @@ void WritingSpanBuffer::registerSpan(const SpanContext& context) {
     traces_.emplace(std::make_pair(trace_id, PendingTrace{logger_}));
     trace = traces_.find(trace_id);
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
-    trace->second.sampling_priority_locked = p != nullptr;
+    trace->second.sampling_priority_propagated = p != nullptr;
     trace->second.sampling_priority = std::move(p);
     if (!context.origin().empty()) {
       trace->second.origin = context.origin();
@@ -170,7 +257,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
     return nullptr;
   }
   PendingTrace& trace = trace_entry->second;
-  if (trace.sampling_priority_locked) {
+  if (trace.sampling_priority_propagated) {
     if (priority == nullptr || *priority == SamplingPriority::UserKeep ||
         *priority == SamplingPriority::UserDrop) {
       // Only print an error if a user is taking this action. This case is legitimate (albeit with
@@ -185,7 +272,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
     trace.sampling_priority.reset(new SamplingPriority(*priority));
     if (*priority == SamplingPriority::SamplerDrop || *priority == SamplingPriority::SamplerKeep) {
       // This is an automatically-assigned sampling priority.
-      trace.sampling_priority_locked = true;
+      trace.sampling_priority_propagated = true;
     }
   }
   return getSamplingPriorityImpl(trace_id);
@@ -221,6 +308,7 @@ void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, SampleResult& sample
         std::make_unique<SamplingPriority>(*sample_result.sampling_priority);
   }
 }
+#endif
 
 }  // namespace opentracing
 }  // namespace datadog

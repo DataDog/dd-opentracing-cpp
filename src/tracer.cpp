@@ -146,47 +146,15 @@ void startupLog(TracerOptions &options) {
   message += "DATADOG TRACER CONFIGURATION - ";
   message += j.dump();
   options.log_func(LogLevel::info, message);
-  /*
-  // C++17's filesystem api would be really nice to have right now..
-  std::string startup_log_path = "/var/tmp/dd-opentracing-cpp";
-  struct stat s;
-  if (stat(startup_log_path.c_str(), &s) == 0) {
-    if (!S_ISDIR(s.st_mode)) {
-      // Path exists but isn't a directory.
-      return;
-    }
-  } else {
-    if (errno != ENOENT) {
-      // Failed to stat directory, but reason was something other than
-      // not existing.
-      return;
-    }
-    if (mkdir(startup_log_path.c_str(), 01777) != 0) {
-      // Unable to create the log path.
-      return;
-    }
-  }
-
-  auto now = std::chrono::system_clock::now();
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-  std::ofstream log_file(startup_log_path + "/startup_options-" + std::to_string(timestamp) +
-                         ".json");
-  if (!log_file.good()) {
-    return;
-  }
-  logTracerOptions(now, options, log_file);
-  log_file.close();
-  */
 }
 
-}  // namespace
-
-void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept try {
+void configureRulesSampler(std::shared_ptr<const Logger> logger,
+                           std::shared_ptr<RulesSampler> sampler,
+                           std::string sampling_rules) noexcept try {
   auto log_invalid_json = [&](const std::string &description, json &object) {
-    logger_->Log(LogLevel::info, description + ": " + object.get<std::string>());
+    logger->Log(LogLevel::info, description + ": " + object.get<std::string>());
   };
-  json config = json::parse(opts_.sampling_rules);
+  json config = json::parse(sampling_rules);
   for (auto &item : config.items()) {
     auto rule = item.value();
     if (!rule.is_object()) {
@@ -244,22 +212,59 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
     }
   }
 } catch (const json::parse_error &error) {
-  logger_->Log(
+  logger->Log(
       LogLevel::error,
       std::string("rules sampler: unable to parse JSON config for rules sampler: ", error.what()));
 }
 
-Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id)
+struct CreateContextResult {
+  SpanContext context;
+  uint64_t parent_id;
+  bool new_trace;
+};
+
+// Checks for special NGINX context, or a parent context from the span options,
+// or falls back to creating a new context.
+CreateContextResult createContext(std::shared_ptr<const Logger> logger,
+                                  std::shared_ptr<RulesSampler> sampler,
+                                  std::shared_ptr<Writer> writer, ot::string_view operation_name,
+                                  const ot::StartSpanOptions &options, uint64_t span_id) {
+  if (operation_name == "dummySpan") {
+    return {SpanContext::NginxOpenTracingCompatibilityHackSpanContext(logger, sampler, span_id,
+                                                                      span_id),
+            0, true};
+  }
+  // Create context from parent context if possible.
+  for (auto &reference : options.references) {
+    if (auto parent_context = dynamic_cast<const SpanContext *>(reference.second)) {
+      return {parent_context->childContext(span_id), parent_context->id(),
+              parent_context->extracted()};
+    }
+  }
+
+  // Create a new span context.
+  return {SpanContext(logger, sampler, std::make_shared<ActiveTrace>(logger, writer, span_id),
+                      span_id, span_id, "", {}),
+          0, true};
+}
+
+}  // namespace
+
+Tracer::Tracer(TracerOptions options, TimeProvider get_time, IdProvider get_id)
     : opts_(options),
-      buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
-      legacy_obfuscation_(legacyObfuscationEnabled()) {}
+      legacy_obfuscation_(legacyObfuscationEnabled()) {
+  (void)analyticsRate;
+  (void)reportingHostname;
+  (void)isEnabled;
+}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
                std::shared_ptr<RulesSampler> sampler)
-    : opts_(options),
+    : writer_(writer),
+      sampler_(sampler),
+      opts_(options),
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
@@ -268,11 +273,8 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   } else {
     logger_ = std::make_shared<StandardLogger>(opts_.log_func);
   }
-  configureRulesSampler(sampler);
+  configureRulesSampler(logger_, sampler_, opts_.sampling_rules);
   startupLog(options);
-  buffer_ = std::make_shared<WritingSpanBuffer>(
-      logger_, writer, sampler,
-      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
@@ -280,30 +282,13 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     noexcept try {
   // Get a new span id.
   auto span_id = get_id_();
+  auto result = createContext(logger_, sampler_, writer_, operation_name, options, span_id);
+  auto context = result.context;
 
-  SpanContext span_context = SpanContext{logger_, span_id, span_id, "", {}};
-  // See the comment in propagation.h on nginx_opentracing_compatibility_hack_.
-  if (operation_name == "dummySpan") {
-    span_context =
-        SpanContext::NginxOpenTracingCompatibilityHackSpanContext(logger_, span_id, span_id, {});
-  }
-  auto trace_id = span_id;
-  auto parent_id = uint64_t{0};
-
-  // Create context from parent context if possible.
-  for (auto &reference : options.references) {
-    if (auto parent_context = dynamic_cast<const SpanContext *>(reference.second)) {
-      span_context = parent_context->withId(span_id);
-      trace_id = parent_context->traceId();
-      parent_id = parent_context->id();
-      break;
-    }
-  }
-
-  auto span = std::make_unique<Span>(logger_, shared_from_this(), buffer_, get_time_, span_id,
-                                     trace_id, parent_id, std::move(span_context), get_time_(),
-                                     opts_.service, opts_.type, operation_name, operation_name,
-                                     opts_.operation_name_override, legacy_obfuscation_);
+  auto span = std::make_unique<Span>(
+      logger_, shared_from_this(), context.activeTrace(), get_time_, span_id, context.traceId(),
+      result.parent_id, context, get_time_(), opts_.service, opts_.type, operation_name,
+      operation_name, opts_.operation_name_override, legacy_obfuscation_);
 
   if (!opts_.environment.empty()) {
     span->SetTag(datadog::tags::environment, opts_.environment);
@@ -316,7 +301,7 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     span->SetTag(tag.first, tag.second);
   }
   for (auto &tag : options.tags) {
-    if (tag.first == ::ot::ext::sampling_priority && span->getSamplingPriority() != nullptr) {
+    if (tag.first == ::ot::ext::sampling_priority && span->samplingStatus().is_set) {
       // Do not apply this tag if sampling priority is already assigned.
       continue;
     }
@@ -333,7 +318,18 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc, std::ostream &write
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.priority_sampling);
+
+  auto active_trace = span_context->activeTrace();
+  if (!active_trace->samplingStatus().is_set) {
+    // We need to update the sampling status, so temporarily make the span context mutable.
+    auto mutable_span_context = const_cast<SpanContext *>(span_context);
+    if (mutable_span_context == nullptr) {
+      return ot::make_unexpected(ot::span_context_corrupted_error);
+    }
+    mutable_span_context->sample();
+  }
+
+  return span_context->serialize(writer);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
@@ -342,7 +338,18 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
+
+  auto active_trace = span_context->activeTrace();
+  if (!active_trace->samplingStatus().is_set) {
+    // We need to update the sampling status, so temporarily make the span context mutable.
+    auto mutable_span_context = const_cast<SpanContext *>(span_context);
+    if (mutable_span_context == nullptr) {
+      return ot::make_unexpected(ot::span_context_corrupted_error);
+    }
+    mutable_span_context->sample();
+  }
+
+  return span_context->serialize(writer, opts_.inject);
 }
 
 ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
@@ -351,24 +358,35 @@ ot::expected<void> Tracer::Inject(const ot::SpanContext &sc,
   if (span_context == nullptr) {
     return ot::make_unexpected(ot::invalid_span_context_error);
   }
-  return span_context->serialize(writer, buffer_, opts_.inject, opts_.priority_sampling);
+
+  auto active_trace = span_context->activeTrace();
+  if (!active_trace->samplingStatus().is_set) {
+    // We need to update the sampling status, so temporarily make the span context mutable.
+    auto mutable_span_context = const_cast<SpanContext *>(span_context);
+    if (mutable_span_context == nullptr) {
+      return ot::make_unexpected(ot::span_context_corrupted_error);
+    }
+    mutable_span_context->sample();
+  }
+
+  return span_context->serialize(writer, opts_.inject);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(std::istream &reader) const {
-  return SpanContext::deserialize(logger_, reader);
+  return SpanContext::deserialize(logger_, sampler_, writer_, reader);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::TextMapReader &reader) const {
-  return SpanContext::deserialize(logger_, reader, opts_.extract);
+  return SpanContext::deserialize(logger_, sampler_, writer_, reader, opts_.extract);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> Tracer::Extract(
     const ot::HTTPHeadersReader &reader) const {
-  return SpanContext::deserialize(logger_, reader, opts_.extract);
+  return SpanContext::deserialize(logger_, sampler_, writer_, reader, opts_.extract);
 }
 
-void Tracer::Close() noexcept { buffer_->flush(std::chrono::seconds(5)); }
+void Tracer::Close() noexcept { writer_->flush(std::chrono::seconds(5)); }
 
 }  // namespace opentracing
 }  // namespace datadog

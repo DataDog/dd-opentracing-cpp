@@ -35,24 +35,26 @@ const std::string agent_api_path = "/v0.4/traces";
 
 const std::string& AgentHttpEncoder::path() { return agent_api_path; }
 
-void AgentHttpEncoder::clearTraces() { traces_.clear(); }
+std::size_t AgentHttpEncoder::pendingTraces() { return trace_data_.size(); }
 
-std::size_t AgentHttpEncoder::pendingTraces() { return traces_.size(); }
+void AgentHttpEncoder::clearTraces() { trace_data_.clear(); }
 
 const std::map<std::string, std::string> AgentHttpEncoder::headers() {
   std::map<std::string, std::string> headers(common_headers_);
-  headers[header_dd_trace_count] = std::to_string(traces_.size());
+  headers[header_dd_trace_count] = std::to_string(trace_data_.size());
   return headers;
 }
 
 const std::string AgentHttpEncoder::payload() {
   buffer_.clear();
   buffer_.str(std::string{});
-  msgpack::pack(buffer_, traces_);
+  msgpack::pack(buffer_, trace_data_);
   return buffer_.str();
 }
 
-void AgentHttpEncoder::addTrace(Trace trace) { traces_.push_back(std::move(trace)); }
+void AgentHttpEncoder::addTraceData(TraceData& trace_data) {
+  trace_data_.emplace_back(std::move(trace_data));
+}
 
 void AgentHttpEncoder::handleResponse(const std::string& response) {
   if (sampler_ != nullptr) {

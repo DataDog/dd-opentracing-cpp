@@ -25,8 +25,8 @@ class Writer {
 
   virtual ~Writer() {}
 
-  // Writes the given Trace.
-  virtual void write(Trace trace) = 0;
+  // Writes the given TraceData.
+  virtual void write(TraceData &trace_data) = 0;
 
   // Send any buffered Traces to the destination now. Will block until sending is complete, or
   // timeout passes.
@@ -44,7 +44,7 @@ class ExternalWriter : public Writer {
   ~ExternalWriter() override {}
 
   // Implements Writer methods.
-  void write(Trace trace) override;
+  void write(TraceData &trace_data) override;
 
   // No flush implementation, since ExternalWriter is not in charge of its own writing schedule.
   void flush(std::chrono::milliseconds /* timeout (unused) */) override{};

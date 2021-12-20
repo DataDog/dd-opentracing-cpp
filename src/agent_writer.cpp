@@ -5,6 +5,7 @@
 #include "encoder.h"
 #include "sample.h"
 #include "span.h"
+#include "span_buffer.h"
 #include "transport.h"
 
 namespace datadog {
@@ -115,7 +116,7 @@ void AgentWriter::stop() {
   worker_->join();
 }
 
-void AgentWriter::write(Trace trace) {
+void AgentWriter::write(TraceData &trace_data) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;
@@ -123,7 +124,7 @@ void AgentWriter::write(Trace trace) {
   if (trace_encoder_->pendingTraces() >= max_queued_traces_) {
     return;
   }
-  trace_encoder_->addTrace(std::move(trace));
+  trace_encoder_->addTraceData(trace_data);
 }
 
 void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
