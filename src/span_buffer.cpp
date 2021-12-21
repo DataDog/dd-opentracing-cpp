@@ -86,28 +86,34 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
 // Return the rate from within the specified `sample_result` that applied in
 // the sampling decision, or return `std::nan("")` if no rate applied.
 double pickSamplingRate(const SampleResult& sample_result) {
-  return apply_visitor(overload([](UnknownSamplingMechanism) { return std::nan(""); },
-                                [&](KnownSamplingMechanism reason) {
-                                  switch (reason) {
-                                    case KnownSamplingMechanism::Default:
-                                      return sample_result.priority_rate;
-                                    case KnownSamplingMechanism::AgentRate:
-                                      return sample_result.priority_rate;
-                                    case KnownSamplingMechanism::RemoteRateAuto:
-                                      return std::nan("");
-                                    case KnownSamplingMechanism::Rule:
-                                      return sample_result.rule_rate;
-                                    case KnownSamplingMechanism::Manual:
-                                      return std::nan("");
-                                    case KnownSamplingMechanism::AppSec:
-                                      return std::nan("");
-                                    case KnownSamplingMechanism::RemoteRateUserDefined:
-                                      return std::nan("");
-                                  }
-                                  // unreachable (but difficult to prove)
-                                  return std::nan("");
-                                }),
-                       sample_result.sampling_mechanism);
+  return apply_visitor(
+      overload([](std::nullptr_t) { return std::nan(""); },
+               [&](SamplingMechanism mechanism) {
+                 return apply_visitor(
+                     overload([](UnknownSamplingMechanism) { return std::nan(""); },
+                              [&](KnownSamplingMechanism reason) {
+                                switch (reason) {
+                                  case KnownSamplingMechanism::Default:
+                                    return sample_result.priority_rate;
+                                  case KnownSamplingMechanism::AgentRate:
+                                    return sample_result.priority_rate;
+                                  case KnownSamplingMechanism::RemoteRateAuto:
+                                    return std::nan("");
+                                  case KnownSamplingMechanism::Rule:
+                                    return sample_result.rule_rate;
+                                  case KnownSamplingMechanism::Manual:
+                                    return std::nan("");
+                                  case KnownSamplingMechanism::AppSec:
+                                    return std::nan("");
+                                  case KnownSamplingMechanism::RemoteRateUserDefined:
+                                    return std::nan("");
+                                }
+                                // unreachable (but difficult to prove)
+                                return std::nan("");
+                              }),
+                     mechanism);
+               }),
+      sample_result.sampling_mechanism);
 }
 
 }  // namespace
@@ -147,10 +153,19 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
     return;
   }
 
+  if (sample_result.sampling_mechanism == nullptr) {
+    // If we have a sampling priority (by assumption) but not a sampling
+    // mechanism, then the sampling decision was inherited from an
+    // upstream service.  There might or might not be an `UpstreamService`
+    // record, depending on the version of the sending service, but either way,
+    // we will not append a record for ourselves here.
+    return;
+  }
+
   UpstreamService this_service;
   this_service.service_name = service;
   this_service.sampling_priority = *sampling_priority;
-  this_service.sampling_mechanism = sample_result.sampling_mechanism;
+  this_service.sampling_mechanism = sample_result.sampling_mechanism.get<SamplingMechanism>();
   this_service.sampling_rate = pickSamplingRate(sample_result);
 
   upstream_services.push_back(std::move(this_service));
@@ -281,8 +296,9 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
       // We made a sampling decision.  Might need to indicate that in
       // `trace.upstream_services`.
       trace.applySamplingDecisionToUpstreamServices();
-    } else if (*priority == SamplingPriority::UserDrop ||
-               *priority == SamplingPriority::UserKeep) {
+    } else if ((*priority == SamplingPriority::UserDrop ||
+                *priority == SamplingPriority::UserKeep) &&
+               trace.sample_result.sampling_mechanism == nullptr) {
       trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
     }
   }
@@ -358,6 +374,7 @@ void WritingSpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& 
     trace.sample_result.sampling_priority =
         std::make_unique<SamplingPriority>(*sample_result.sampling_priority);
   }
+  trace.sample_result.sampling_mechanism = sample_result.sampling_mechanism;
 }
 
 }  // namespace opentracing

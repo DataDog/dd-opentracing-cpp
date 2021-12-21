@@ -608,6 +608,7 @@ TEST_CASE("span") {
       // `_dd.p.upstream_services` tag of the root span.
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
 
       const auto span = tracer->StartSpan("OperationMoonUnit");
       REQUIRE(span);

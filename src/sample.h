@@ -32,9 +32,7 @@ struct SampleResult {
   double limiter_rate = std::nan("");
   double priority_rate = std::nan("");
   OptionalSamplingPriority sampling_priority = nullptr;
-  // If `sampling_priority` is `nullptr`, then `sampling_mechanism` has no
-  // meaning.
-  SamplingMechanism sampling_mechanism;
+  OptionalSamplingMechanism sampling_mechanism;
 };
 
 struct SamplingRate {

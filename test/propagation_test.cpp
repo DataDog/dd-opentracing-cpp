@@ -736,190 +736,206 @@ TEST_CASE("origin header propagation") {
     REQUIRE(sc->traceId() == 321);
     REQUIRE(sc->origin() == "madeuporigin");
   }
+}
 
-  SECTION("propagated Datadog tags (x-datadog-tags)") {
-    // `x-datadog-tags` is a header containing special "trace tags" that
-    // should be propagated with outgoing requests, possibly with added
-    // information about a sampling decision made by us (this service).
+TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
+  // `x-datadog-tags` is a header containing special "trace tags" that
+  // should be propagated with outgoing requests, possibly with added
+  // information about a sampling decision made by us (this service).
 
-    TracerOptions options;
-    options.service = "zappasvc";
-    options.environment = "staging";
-    options.trace_tags_propagation_max_length = 512;
+  TracerOptions options;
+  options.service = "zappasvc";
+  options.environment = "staging";
+  options.trace_tags_propagation_max_length = 512;
 
-    auto logger = std::make_shared<const MockLogger>();
-    auto sampler = std::make_shared<MockRulesSampler>();
-    auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
-                                               options.trace_tags_propagation_max_length);
+  auto logger = std::make_shared<const MockLogger>();
+  auto sampler = std::make_shared<MockRulesSampler>();
+  auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
+                                             options.trace_tags_propagation_max_length);
 
-    auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+  auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
 
-    SECTION("is injected") {
-      SECTION("as it was extracted, if our sampling decision does not differ from the previous") {
-        const std::string serialized_tags =
-            "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
-        // Our sampler will make the same decision as dHJhY2Utc3RhdHMtcXVlcnk.
-        sampler->sampling_priority =
-            std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+  SECTION("is injected") {
+    SECTION("as it was extracted, if our sampling decision does not differ from the previous") {
+      const std::string serialized_tags =
+          "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
+      // Our sampler will make the same decision as dHJhY2Utc3RhdHMtcXVlcnk.
+      sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
 
-        nlohmann::json json_to_extract;
-        json_to_extract["tags"] = serialized_tags;
-        json_to_extract["trace_id"] = "123";
-        json_to_extract["parent_id"] = "456";
-        std::istringstream to_extract(json_to_extract.dump());
+      nlohmann::json json_to_extract;
+      json_to_extract["tags"] = serialized_tags;
+      json_to_extract["trace_id"] = "123";
+      json_to_extract["parent_id"] = "456";
+      std::istringstream to_extract(json_to_extract.dump());
 
-        auto maybe_context = tracer->Extract(to_extract);
-        REQUIRE(maybe_context);
-        auto& context = maybe_context.value();
-        REQUIRE(context);
+      auto maybe_context = tracer->Extract(to_extract);
+      REQUIRE(maybe_context);
+      auto& context = maybe_context.value();
+      REQUIRE(context);
 
-        auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
-        REQUIRE(span);
+      auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+      REQUIRE(span);
 
-        std::ostringstream injected;
-        auto result = tracer->Inject(span->context(), injected);
-        REQUIRE(result);
+      std::ostringstream injected;
+      auto result = tracer->Inject(span->context(), injected);
+      REQUIRE(result);
 
-        auto injected_json = nlohmann::json::parse(injected.str());
-        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
-                deserializeTags(serialized_tags));
-      }
-
-      SECTION(
-          "including an UpstreamService for us, if our sampling decision differs from the "
-          "previous") {
-        // `serialized_tags` is based off of an example in the internal RFC (the
-        // choice of this value here is arbitrary).
-        const std::string serialized_tags =
-            "_dd.p.hello=world,_dd.p.upstream_services=bWNudWx0eS13ZWI|0|1|;"
-            "dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
-        // Our sampler will make a decision different from dHJhY2Utc3RhdHMtcXVlcnk's.
-        sampler->sampling_priority =
-            std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-        sampler->priority_rate = 1.0;
-
-        nlohmann::json json_to_extract;
-        json_to_extract["tags"] = serialized_tags;
-        json_to_extract["trace_id"] = "123";
-        json_to_extract["parent_id"] = "456";
-        std::istringstream to_extract(json_to_extract.dump());
-
-        auto maybe_context = tracer->Extract(to_extract);
-        REQUIRE(maybe_context);
-        auto& context = maybe_context.value();
-        REQUIRE(context);
-
-        auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
-        REQUIRE(span);
-
-        std::ostringstream injected;
-        auto result = tracer->Inject(span->context(), injected);
-        REQUIRE(result);
-
-        auto injected_json = nlohmann::json::parse(injected.str());
-
-        // The injected tags will look like `serialized_tags`, but with an
-        // additional `UpstreamService` appended describing our sampling
-        // decision (because it differs from the previous in
-        // `serialized_tags`).
-        UpstreamService expected_annex;
-        expected_annex.service_name = options.service;
-        assert(sampler->sampling_priority);
-        expected_annex.sampling_priority = *sampler->sampling_priority;
-        // Default → priority sampling without an agent-provided rate.
-        expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
-        expected_annex.sampling_rate = sampler->priority_rate;
-
-        auto expected_tags = deserializeTags(serialized_tags);
-        auto serialized_services = expected_tags.find("_dd.p.upstream_services");
-        REQUIRE(serialized_services != expected_tags.end());
-        auto services = deserializeUpstreamServices(serialized_services->second);
-        services.push_back(expected_annex);
-        serialized_services->second = serializeUpstreamServices(services);
-
-        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
-      }
-
-      SECTION(
-          "including an UpstreamService for us, if we are the first to make a sampling decision") {
-        // Let's omit "tags" ("x-datadog-tags") entirely from the extracted context.
-
-        sampler->sampling_priority =
-            std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-        sampler->priority_rate = 1.0;
-
-        nlohmann::json json_to_extract;
-        json_to_extract["trace_id"] = "123";
-        json_to_extract["parent_id"] = "456";
-        std::istringstream to_extract(json_to_extract.dump());
-
-        auto maybe_context = tracer->Extract(to_extract);
-        REQUIRE(maybe_context);
-        auto& context = maybe_context.value();
-        REQUIRE(context);
-
-        auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
-        REQUIRE(span);
-
-        std::ostringstream injected;
-        auto result = tracer->Inject(span->context(), injected);
-        REQUIRE(result);
-
-        auto injected_json = nlohmann::json::parse(injected.str());
-
-        // The injected tags will contain only the "_dd.p.upstream_services"
-        // tag, which will contain a single `UpstreamService` record describing
-        // our sampling decision.
-        UpstreamService expected_annex;
-        expected_annex.service_name = options.service;
-        assert(sampler->sampling_priority);
-        expected_annex.sampling_priority = *sampler->sampling_priority;
-        // Default → priority sampling without an agent-provided rate.
-        expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
-        expected_annex.sampling_rate = sampler->priority_rate;
-
-        dict expected_tags;
-        expected_tags.emplace("_dd.p.upstream_services",
-                              serializeUpstreamServices({expected_annex}));
-
-        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
-      }
+      auto injected_json = nlohmann::json::parse(injected.str());
+      REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
+              deserializeTags(serialized_tags));
     }
 
-    SECTION("is not injected") {
-      SECTION("when the resulting header value is longer than the configured maximum") {
-        // Create a list of tags that, serialized, are longer than the limit.
-        // The tracer will extract the list, but then when it goes to inject it, it will fail.
-        const std::string serialized_tags = "_dd.p.hello=" + std::string(1024, 'x');
-        REQUIRE(serialized_tags.size() > 512);  // by construction
+    SECTION(
+        "including an UpstreamService for us, if our sampling decision differs from the "
+        "previous") {
+      // `serialized_tags` is based off of an example in the internal RFC (the
+      // choice of this value here is arbitrary).
+      const std::string serialized_tags =
+          "_dd.p.hello=world,_dd.p.upstream_services=bWNudWx0eS13ZWI|0|1|;"
+          "dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
+      // Our sampler will make a decision different from dHJhY2Utc3RhdHMtcXVlcnk's.
+      sampler->sampling_priority =
+          std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->priority_rate = 1.0;
 
-        // Don't make a sampling decision (though it doesn't matter for this
-        // section).
-        sampler->sampling_priority = nullptr;
+      nlohmann::json json_to_extract;
+      json_to_extract["tags"] = serialized_tags;
+      json_to_extract["trace_id"] = "123";
+      json_to_extract["parent_id"] = "456";
+      std::istringstream to_extract(json_to_extract.dump());
 
-        nlohmann::json json_to_extract;
-        json_to_extract["tags"] = serialized_tags;
-        json_to_extract["trace_id"] = "123";
-        json_to_extract["parent_id"] = "456";
-        std::istringstream to_extract(json_to_extract.dump());
+      auto maybe_context = tracer->Extract(to_extract);
+      REQUIRE(maybe_context);
+      auto& context = maybe_context.value();
+      REQUIRE(context);
 
-        const auto maybe_context = tracer->Extract(to_extract);
-        REQUIRE(maybe_context);
-        const auto& context = maybe_context.value();
-        REQUIRE(context);
+      auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+      REQUIRE(span);
 
-        const auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
-        REQUIRE(span);
+      std::ostringstream injected;
+      auto result = tracer->Inject(span->context(), injected);
+      REQUIRE(result);
 
-        std::ostringstream injected;
-        const auto result = tracer->Inject(span->context(), injected);
-        REQUIRE(result);
+      auto injected_json = nlohmann::json::parse(injected.str());
 
-        const auto injected_json = nlohmann::json::parse(injected.str());
-        REQUIRE(injected_json.find("tags") == injected_json.end());
+      // The injected tags will look like `serialized_tags`, but with an
+      // additional `UpstreamService` appended describing our sampling
+      // decision (because it differs from the previous in
+      // `serialized_tags`).
+      UpstreamService expected_annex;
+      expected_annex.service_name = options.service;
+      assert(sampler->sampling_priority);
+      expected_annex.sampling_priority = *sampler->sampling_priority;
+      // Default → priority sampling without an agent-provided rate.
+      expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected_annex.sampling_rate = sampler->priority_rate;
 
-        // TODO: error message sent on thing
-      }
+      auto expected_tags = deserializeTags(serialized_tags);
+      auto serialized_services = expected_tags.find("_dd.p.upstream_services");
+      REQUIRE(serialized_services != expected_tags.end());
+      auto services = deserializeUpstreamServices(serialized_services->second);
+      services.push_back(expected_annex);
+      serialized_services->second = serializeUpstreamServices(services);
+
+      REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
+    }
+
+    SECTION(
+        "including an UpstreamService for us, if we are the first to make a sampling decision") {
+      // Let's omit "tags" ("x-datadog-tags") entirely from the extracted context.
+
+      sampler->sampling_priority =
+          std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->priority_rate = 1.0;
+
+      nlohmann::json json_to_extract;
+      json_to_extract["trace_id"] = "123";
+      json_to_extract["parent_id"] = "456";
+      std::istringstream to_extract(json_to_extract.dump());
+
+      auto maybe_context = tracer->Extract(to_extract);
+      REQUIRE(maybe_context);
+      auto& context = maybe_context.value();
+      REQUIRE(context);
+
+      auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+      REQUIRE(span);
+
+      std::ostringstream injected;
+      auto result = tracer->Inject(span->context(), injected);
+      REQUIRE(result);
+
+      auto injected_json = nlohmann::json::parse(injected.str());
+
+      // The injected tags will contain only the "_dd.p.upstream_services"
+      // tag, which will contain a single `UpstreamService` record describing
+      // our sampling decision.
+      UpstreamService expected_annex;
+      expected_annex.service_name = options.service;
+      assert(sampler->sampling_priority);
+      expected_annex.sampling_priority = *sampler->sampling_priority;
+      // Default → priority sampling without an agent-provided rate.
+      expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected_annex.sampling_rate = sampler->priority_rate;
+
+      dict expected_tags;
+      expected_tags.emplace("_dd.p.upstream_services",
+                            serializeUpstreamServices({expected_annex}));
+
+      REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
+    }
+  }
+
+  SECTION("is not injected") {
+    SECTION("when the resulting header value is longer than the configured maximum") {
+      // Create a list of tags that, serialized, are longer than the limit.
+      // The tracer will extract the list, but then when it goes to inject it, it will fail.
+      const std::string serialized_tags = "_dd.p.hello=" + std::string(1024, 'x');
+      REQUIRE(serialized_tags.size() > 512);  // by construction
+
+      // Don't make a sampling decision (though it doesn't matter for this
+      // section).
+      sampler->sampling_priority = nullptr;
+
+      nlohmann::json json_to_extract;
+      json_to_extract["tags"] = serialized_tags;
+      json_to_extract["trace_id"] = "123";
+      json_to_extract["parent_id"] = "456";
+      std::istringstream to_extract(json_to_extract.dump());
+
+      const auto maybe_context = tracer->Extract(to_extract);
+      REQUIRE(maybe_context);
+      const auto& context = maybe_context.value();
+      REQUIRE(context);
+
+      const auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+      REQUIRE(span);
+
+      std::ostringstream injected;
+      const auto result = tracer->Inject(span->context(), injected);
+      REQUIRE(result);
+
+      const auto injected_json = nlohmann::json::parse(injected.str());
+      REQUIRE(injected_json.find("tags") == injected_json.end());
+
+      // Because the tags were omitted due to being oversized, there will be a
+      // specific error tag on the local root span.
+      span->Finish();
+
+      REQUIRE(buffer->traces().size() == 1);
+      const auto entry_iter = buffer->traces().begin();
+      REQUIRE(entry_iter->first == 123);
+      const auto& trace = entry_iter->second;
+      REQUIRE(trace.finished_spans);
+      REQUIRE(trace.finished_spans->size() == 1);
+      const auto& maybe_finished_span = trace.finished_spans->front();
+      REQUIRE(maybe_finished_span);
+      const auto& finished_span = *maybe_finished_span;
+      const auto found = finished_span.meta.find("_dd.propagation_error");
+      REQUIRE(found != finished_span.meta.end());
+      REQUIRE(found->second == "max_size");
     }
   }
 }

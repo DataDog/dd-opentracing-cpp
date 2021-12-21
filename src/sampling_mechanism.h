@@ -56,6 +56,7 @@
 // clang-format on
 
 #include <opentracing/variant/variant.hpp>
+#include <cstddef>
 
 namespace ot = opentracing;
 
@@ -103,6 +104,10 @@ using SamplingMechanism = ot::util::variant<KnownSamplingMechanism, UnknownSampl
 SamplingMechanism asSamplingMechanism(int value);
 
 int asInt(SamplingMechanism value);
+
+// `OptionalSamplingMechanism` is either a `SamplingMechanism` or "empty,"
+// indicated by the type `std::nullptr_t`.
+using OptionalSamplingMechanism = ot::util::variant<std::nullptr_t, SamplingMechanism>;
 
 }  // namespace opentracing
 }  // namespace datadog

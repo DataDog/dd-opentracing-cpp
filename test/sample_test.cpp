@@ -253,4 +253,39 @@ TEST_CASE("rules sampler") {
       }
     }
   }
+
+  SECTION("reports \"rule\" sampling mechanism") {
+    TracerOptions tracer_options;
+    tracer_options.service = "zappasvc";
+    tracer_options.sampling_rules = R"([
+    {"sample_rate": 1.0}
+])";
+    const auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
+
+    const auto span = tracer->StartSpanWithOptions("OperationMoonUnit", span_options);
+    span->FinishWithOptions(finish_options);
+
+    // The `SpanBuffer` will have made a sampling decision based on the
+    // matching rule, and the resulting `SamplingMechanism` will be visible in
+    // the `UpstreamService` record serialized in the local root span's
+    // "_dd.p.upstream_services" tag.
+    //
+    // The expectation is that, since sampling was performed on account of a
+    // sampling rule, the sampling mechanism will be
+    // `KnownSamplingMechanism::Rule`.
+
+    REQUIRE(mwriter->traces.size() == 1);
+    REQUIRE(mwriter->traces[0].size() == 1);
+    const auto& maybe_span = mwriter->traces[0][0];
+    REQUIRE(maybe_span);
+    const auto& span_data = *maybe_span;
+
+    const auto tag_found = span_data.meta.find("_dd.p.upstream_services");
+    REQUIRE(tag_found != span_data.meta.end());
+    const auto upstream_services = deserializeUpstreamServices(tag_found->second);
+    REQUIRE(upstream_services.size() == 1);  // just this service
+    const auto& this_service = upstream_services[0];
+    REQUIRE(asInt(this_service.sampling_mechanism) == asInt(KnownSamplingMechanism::Rule));
+  }
 }
