@@ -4,7 +4,6 @@
       "error": 0,
       "meta": {
         "_dd.origin": "synthetics",
-        "_dd.p.upstream_services": "bmdpbng|1|0|",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",

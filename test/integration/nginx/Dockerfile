@@ -1,10 +1,13 @@
 # Creates an image with nginx and the Datadog OpenTracing nginx module installed.
 # Runs a simple integration test.
-ARG NGINX_VERSION=1.14.2
+ARG NGINX_VERSION=1.18.0
 ARG OPENTRACING_NGINX_VERSION=0.16.0
 
 # The nginx testbed. Build this image first since we don't want it rebuilt if just the code changes.
-FROM ubuntu:18.04 as nginx-testbed
+FROM ubuntu:20.04 as nginx-testbed
+
+# Prevent installation of "tzdata" from blocking for input.
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
   apt-get install -y git gnupg lsb-release wget curl tar openjdk-8-jre golang jq iproute2
@@ -22,7 +25,7 @@ RUN CODENAME=$(lsb_release -s -c) && \
   apt-key add nginx_signing.key && \
   echo deb https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
   echo deb-src https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
-  apt-get update && \
+  DEBIAN_FRONTEND=noninteractive apt-get update && \
   apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
 
 # Install nginx-opentracing
@@ -32,7 +35,10 @@ RUN wget https://github.com/opentracing-contrib/nginx-opentracing/releases/downl
   tar zxvf linux-amd64-nginx-${NGINX_VERSION}-ot16-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
 
 # Build the Datadog nginx module.
-FROM ubuntu:18.04 as build
+FROM ubuntu:20.04 as build
+
+# Prevent installation of "tzdata" from blocking for input.
+ENV DEBIAN_FRONTEND=noninteractive
 
 ENV CFLAGS="-march=x86-64 -fPIC"
 ENV CXXFLAGS="-march=x86-64 -fPIC"
