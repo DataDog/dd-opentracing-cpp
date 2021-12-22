@@ -87,26 +87,26 @@ TEST_CASE("parsing fails") {
 
   // invalid base64 in service name
   REQUIRE_THROWS_AS(deserializeUpstreamServices("{curlies are invalid base64}"),
-                    std::runtime_error);
+                    std::invalid_argument);
   // missing sampling priority field
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1|0.1;"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1|0.1;"), std::invalid_argument);
   // bogus sampling priority
   REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|totally not an integer"),
-                    std::runtime_error);
+                    std::invalid_argument);
   // sampling priority doesn't fit into an integer
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|9999999999"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|9999999999"), std::invalid_argument);
   // unknown sampling priority integer value
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|1337"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|1337"), std::invalid_argument);
   // missing sampling mechanism field
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0"), std::invalid_argument);
   // bogus sampling mechanism
   REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|also not an integer"),
-                    std::runtime_error);
+                    std::invalid_argument);
   // sampling mechanism doesn't fit into an integer
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|9999999999"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|9999999999"), std::invalid_argument);
   // missing sampling rate field
-  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1"), std::invalid_argument);
   // bogus sampling rate
   REQUIRE_THROWS_AS(deserializeUpstreamServices("foosvc|0|1|not a decimal number"),
-                    std::runtime_error);
+                    std::invalid_argument);
 }

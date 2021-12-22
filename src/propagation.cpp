@@ -489,12 +489,10 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
 } catch (const std::invalid_argument &) {
+  // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
   return ot::make_unexpected(ot::span_context_corrupted_error);
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
-} catch (const std::runtime_error &) {
-  // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
-  return ot::make_unexpected(ot::span_context_corrupted_error);
 }
 
 ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
@@ -587,11 +585,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             }
           }
         } catch (const std::invalid_argument &) {
+          // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
           return ot::make_unexpected(ot::span_context_corrupted_error);
         } catch (const std::out_of_range &) {
-          return ot::make_unexpected(ot::span_context_corrupted_error);
-        } catch (const std::runtime_error &) {
-          // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
           return ot::make_unexpected(ot::span_context_corrupted_error);
         }
         return {};

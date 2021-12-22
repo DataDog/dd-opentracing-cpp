@@ -73,7 +73,7 @@ TEST_CASE("tag propagation codec expected values") {
 
 TEST_CASE("tag propagation decoding duplicate tags") {
   SECTION("fails when the values are different") {
-    REQUIRE_THROWS_AS(deserializeTags("dupe=foo,dupe=bar"), std::runtime_error);
+    REQUIRE_THROWS_AS(deserializeTags("dupe=foo,dupe=bar"), std::invalid_argument);
   }
 
   SECTION("succeeds when the values are the same") {
@@ -83,6 +83,6 @@ TEST_CASE("tag propagation decoding duplicate tags") {
 }
 
 TEST_CASE("key/value items must contain an equal sign") {
-  REQUIRE_THROWS_AS(deserializeTags("valid=version,invalid_version"), std::runtime_error);
-  REQUIRE_THROWS_AS(deserializeTags("valid=version,"), std::runtime_error);
+  REQUIRE_THROWS_AS(deserializeTags("valid=version,invalid_version"), std::invalid_argument);
+  REQUIRE_THROWS_AS(deserializeTags("valid=version,"), std::invalid_argument);
 }

@@ -38,7 +38,7 @@ ot::string_view range(const char* begin, const char* end) {
 }
 
 // Insert into the specified `destination` a tag decoded from the specified
-// `entry`.  Throw a `std::runtime_error` if an error occurs.  It is an error
+// `entry`.  Throw a `std::invalid_argument` if an error occurs.  It is an error
 // if the decoded tag is already in `destination` with a different value.
 void deserializeTag(std::unordered_map<std::string, std::string>& destination,
                     ot::string_view entry) {
@@ -46,7 +46,7 @@ void deserializeTag(std::unordered_map<std::string, std::string>& destination,
   if (separator == entry.end()) {
     std::ostringstream error;
     error << "invalid key=value pair for encoded tag: missing \"=\" in: " << entry;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   }
 
   const ot::string_view key = range(entry.begin(), separator);
@@ -56,7 +56,7 @@ void deserializeTag(std::unordered_map<std::string, std::string>& destination,
     std::ostringstream error;
     error << "duplicate tag in encoded tags: " << key << "=" << existing->second << " versus "
           << key << "=" << value;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   } else if (existing == destination.end()) {
     destination.emplace(key, value);
   }

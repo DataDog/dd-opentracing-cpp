@@ -26,7 +26,7 @@ namespace opentracing {
 extern const ot::string_view trace_tag_prefix;
 
 // Return a name->value mapping of tags parsed from the specified
-// `header_value`.  Throw a `std::runtime_error` if an error occurs.
+// `header_value`.  Throw a `std::invalid_argument` if an error occurs.
 std::unordered_map<std::string, std::string> deserializeTags(ot::string_view header_value);
 
 // Serialize the tag having the specified `tag_key` and the specified

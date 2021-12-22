@@ -49,7 +49,7 @@ struct UpstreamService {
 bool operator==(const UpstreamService& left, const UpstreamService& right);
 
 // Return upstream service objects parsed from the specified `text`, or throw a
-// `std::runtime_error` if an error occurs.
+// `std::invalid_argument` if an error occurs.
 std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text);
 
 // Return the result of encoding the specified `upstream_services`.

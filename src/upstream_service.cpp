@@ -62,7 +62,7 @@ void deserializeServiceName(std::string& destination, ot::string_view text) {
   try {
     base64_rfc4648_unpadded::decode(destination, text);
   } catch (const cppcodec::parse_error& error) {
-    throw std::runtime_error(error.what());
+    throw std::invalid_argument(error.what());
   }
 }
 
@@ -75,19 +75,19 @@ SamplingPriority deserializeSamplingPriority(ot::string_view text) try {
     error << "Unable to parse a sampling priority integer from the following text (consumed "
           << bytes_parsed << " bytes out of " << sampling_priority_string.size()
           << "): " << sampling_priority_string;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   }
   const OptionalSamplingPriority sampling_priority_maybe =
       asSamplingPriority(sampling_priority_int);
   if (sampling_priority_maybe == nullptr) {
     std::ostringstream error;
     error << "Unrecognized integer value for sampling priority: " << sampling_priority_int;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   }
   return *sampling_priority_maybe;
 } catch (const std::logic_error& error) {
-  throw std::runtime_error(std::string("Unable to parse sampling priority (") + error.what() +
-                           ") from the following text: " + std::string(text));
+  throw std::invalid_argument(std::string("Unable to parse sampling priority (") + error.what() +
+                              ") from the following text: " + std::string(text));
 }
 
 SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
@@ -99,12 +99,12 @@ SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
     error << "Unable to parse a sampling mechanism integer from the following text (consumed "
           << bytes_parsed << " bytes out of " << sampling_mechanism_string.size()
           << "): " << sampling_mechanism_string;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   }
   return asSamplingMechanism(sampling_mechanism_int);
 } catch (const std::logic_error& error) {
-  throw std::runtime_error(std::string("Unable to parse sampling mechanism (") + error.what() +
-                           ") from the following text: " + std::string(text));
+  throw std::invalid_argument(std::string("Unable to parse sampling mechanism (") + error.what() +
+                              ") from the following text: " + std::string(text));
 }
 
 double deserializeSamplingRate(ot::string_view text) try {
@@ -120,17 +120,17 @@ double deserializeSamplingRate(ot::string_view text) try {
     error << "Unable to parse a sampling rate float from the following text (consumed "
           << bytes_parsed << " bytes out of " << sampling_rate_string.size()
           << "): " << sampling_rate_string;
-    throw std::runtime_error(error.str());
+    throw std::invalid_argument(error.str());
   }
 
   return sampling_rate;
 } catch (const std::logic_error& error) {
-  throw std::runtime_error(std::string("Unable to parse sampling rate (") + error.what() +
-                           ") from the following text: " + std::string(text));
+  throw std::invalid_argument(std::string("Unable to parse sampling rate (") + error.what() +
+                              ") from the following text: " + std::string(text));
 }
 
 // Return an `UpstreamService` parsed from the specified `text`, or throw a
-// `std::runtime_error` if an error occurs.
+// `std::invalid_argument` if an error occurs.
 UpstreamService deserialize(ot::string_view text) {
   UpstreamService result;
   const auto end = text.end();
@@ -150,7 +150,7 @@ UpstreamService deserialize(ot::string_view text) {
       error += field_name_for_diagnostic;
       error += " to decode. Offending text: ";
       error += text;
-      throw std::runtime_error(error);
+      throw std::invalid_argument(error);
     }
     iter = next + 1;
     next = std::find(iter, end, '|');
