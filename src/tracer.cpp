@@ -231,8 +231,8 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id)
-    : logger_(std::make_shared<StandardLogger>(options.log_func)),
+               IdProvider get_id, std::shared_ptr<const Logger> logger)
+    : logger_(logger ? logger : std::make_shared<StandardLogger>(options.log_func)),
       opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),

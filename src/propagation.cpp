@@ -129,6 +129,10 @@ std::unique_ptr<ot::expected<std::unique_ptr<ot::SpanContext>>> enforce_tag_pres
   return nullptr;
 }
 
+// Return the specified `raw` string encoded as JSON, i.e. double-quoted and
+// with character escapes.
+std::string json_quote(const std::string &raw) { return json(raw).dump(); }
+
 }  // namespace
 
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
@@ -471,12 +475,19 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   }
   if (j.find(json_tags_key) != j.end()) {
     std::string tags;
-    j.at(json_tags_key).get_to(tags);
-    trace_tags = deserializeTags(tags);
-    auto tag_found = trace_tags.find(upstream_services_tag);
-    if (tag_found != trace_tags.end()) {
-      upstream_services = deserializeUpstreamServices(tag_found->second);
-      trace_tags.erase(tag_found);
+    try {
+      j.at(json_tags_key).get_to(tags);
+      trace_tags = deserializeTags(tags);
+      auto tag_found = trace_tags.find(upstream_services_tag);
+      if (tag_found != trace_tags.end()) {
+        upstream_services = deserializeUpstreamServices(tag_found->second);
+        trace_tags.erase(tag_found);
+      }
+    } catch (const std::invalid_argument &error) {
+      std::ostringstream message;
+      message << "Error decoding context key " << json_quote(json_tags_key) << " with value "
+              << json_quote(tags) << ": " << error.what();
+      logger->Log(LogLevel::error, message.str());
     }
   }
 
@@ -488,9 +499,9 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-} catch (const std::invalid_argument &) {
-  // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
-  return ot::make_unexpected(ot::span_context_corrupted_error);
+} catch (const std::logic_error &) {
+  // The `std::logic_error` might have been thrown by `parse_uint64`.
+  return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 }
@@ -584,11 +595,15 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
               trace_tags.erase(found_tag);
             }
           }
-        } catch (const std::invalid_argument &) {
-          // TODO(dgoffredo): Use finer-grained error reporting, or add logging.
-          return ot::make_unexpected(ot::span_context_corrupted_error);
-        } catch (const std::out_of_range &) {
-          return ot::make_unexpected(ot::span_context_corrupted_error);
+        } catch (const std::logic_error &error) {
+          std::ostringstream message;
+          message << "Error decoding context key " << json_quote(key) << " with value "
+                  << json_quote(value) << ": " << error.what();
+          logger->Log(LogLevel::error, message.str());
+          // Tolerate failure to parse `tags_header`, but not e.g. `trace_id_header`.
+          if (!equals_ignore_case(key, headers_impl.tags_header)) {
+            return ot::make_unexpected(ot::span_context_corrupted_error);
+          }
         }
         return {};
       });

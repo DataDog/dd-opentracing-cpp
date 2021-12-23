@@ -753,7 +753,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
                                              options.trace_tags_propagation_max_length);
 
-  auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+  auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId, logger);
 
   SECTION("is injected") {
     SECTION("as it was extracted, if our sampling decision does not differ from the previous") {
@@ -937,5 +937,26 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       REQUIRE(found != finished_span.meta.end());
       REQUIRE(found->second == "max_size");
     }
+  }
+
+  SECTION("can fail to decode; extraction continues with an error message") {
+    const std::string serialized_tags = "_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|bogus|";
+
+    nlohmann::json json_to_extract;
+    json_to_extract["tags"] = serialized_tags;
+    json_to_extract["trace_id"] = "123";
+    json_to_extract["parent_id"] = "456";
+    std::istringstream to_extract(json_to_extract.dump());
+
+    // Extraction succeeds.
+    auto maybe_context = tracer->Extract(to_extract);
+    REQUIRE(maybe_context);
+    auto& context = maybe_context.value();
+    REQUIRE(context);
+
+    // An error was logged (about the bogus `serialized_tags`).
+    REQUIRE(logger->records.size() == 1);
+    const auto& log_record = logger->records[0];
+    REQUIRE(log_record.level == LogLevel::error);
   }
 }

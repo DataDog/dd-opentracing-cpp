@@ -103,8 +103,8 @@ SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
   }
   return asSamplingMechanism(sampling_mechanism_int);
 } catch (const std::logic_error& error) {
-  throw std::invalid_argument(std::string("Unable to parse sampling mechanism (") + error.what() +
-                              ") from the following text: " + std::string(text));
+  throw std::invalid_argument(std::string("Unable to parse sampling mechanism (error: ") +
+                              error.what() + ") from the following text: " + std::string(text));
 }
 
 double deserializeSamplingRate(ot::string_view text) try {
@@ -125,8 +125,8 @@ double deserializeSamplingRate(ot::string_view text) try {
 
   return sampling_rate;
 } catch (const std::logic_error& error) {
-  throw std::invalid_argument(std::string("Unable to parse sampling rate (") + error.what() +
-                              ") from the following text: " + std::string(text));
+  throw std::invalid_argument(std::string("Unable to parse sampling rate (error: ") +
+                              error.what() + ") from the following text: " + std::string(text));
 }
 
 // Return an `UpstreamService` parsed from the specified `text`, or throw a
