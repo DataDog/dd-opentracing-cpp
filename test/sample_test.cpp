@@ -95,7 +95,8 @@ TEST_CASE("rules sampler") {
     {"name": "overridden operation name", "sample_rate": 0.4},
     {"sample_rate": 1.0}
 ])";
-    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
     struct RulesSamplerTestCase {
       std::string service;
       std::string name;
@@ -123,7 +124,8 @@ TEST_CASE("rules sampler") {
     tracer_options.sampling_rules = R"([
     {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
 ])";
-    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
 
     auto span = tracer->StartSpanWithOptions("operation.name", span_options);
     span->FinishWithOptions(finish_options);
@@ -142,7 +144,8 @@ TEST_CASE("rules sampler") {
     {"sample_rate": 1.0}
 ])";
     tracer_options.operation_name_override = "overridden operation name";
-    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
 
     auto span = tracer->StartSpanWithOptions("operation name", span_options);
     span->FinishWithOptions(finish_options);
@@ -158,7 +161,8 @@ TEST_CASE("rules sampler") {
     tracer_options.sampling_rules = R"([
     {"sample_rate": 0.0}
 ])";
-    auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+    auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
 
     auto span = tracer->StartSpanWithOptions("operation name", span_options);
     span->FinishWithOptions(finish_options);
@@ -188,7 +192,8 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 0.0}
 ])";
-      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler,
+                                                   std::make_shared<MockLogger>());
 
       const auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
@@ -207,7 +212,8 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 1.0}
 ])";
-      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler,
+                                                   std::make_shared<MockLogger>());
 
       const auto span = tracer->StartSpanWithOptions("operation name", span_options);
       span->FinishWithOptions(finish_options);
@@ -226,7 +232,8 @@ TEST_CASE("rules sampler") {
       tracer_options.sampling_rules = R"([
     {"sample_rate": 1.0}
 ])";
-      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler);
+      const auto tracer = std::make_shared<Tracer>(tracer_options, writer, sampler,
+                                                   std::make_shared<MockLogger>());
 
       // The first span will be allowed by the limiter (tested in the previous section).
       auto span = tracer->StartSpanWithOptions("operation name", span_options);

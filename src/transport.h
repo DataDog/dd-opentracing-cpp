@@ -7,6 +7,8 @@
 #include <sstream>
 #include <string>
 
+#include "logger.h"
+
 namespace datadog {
 namespace opentracing {
 
@@ -28,7 +30,7 @@ class Handle {
 class CurlHandle : public Handle {
  public:
   // May throw runtime_error.
-  CurlHandle();
+  explicit CurlHandle(std::shared_ptr<const Logger> logger);
   ~CurlHandle() override;
   CURLcode setopt(CURLoption key, const char* value) override;
   CURLcode setopt(CURLoption key, long value) override;
@@ -48,6 +50,7 @@ class CurlHandle : public Handle {
   std::map<std::string, std::string> headers_;
   char curl_error_buffer_[CURL_ERROR_SIZE];
   std::stringstream response_buffer_;  // So much more humane than a fixed sized buffer.
+  std::shared_ptr<const Logger> logger_;
 
   // Called with the response from perform().
   friend size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata);

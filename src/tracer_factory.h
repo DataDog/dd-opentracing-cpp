@@ -55,12 +55,13 @@ ot::expected<std::shared_ptr<ot::Tracer>> TracerFactory<TracerImpl>::MakeTracer(
   }
   TracerOptions options = maybe_options.value();
 
+  auto logger = makeLogger(options);
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::shared_ptr<Writer>{
       new AgentWriter(options.agent_host, options.agent_port, options.agent_url,
-                      std::chrono::milliseconds(llabs(options.write_period_ms)), sampler)};
+                      std::chrono::milliseconds(llabs(options.write_period_ms)), sampler, logger)};
 
-  return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer, sampler}};
+  return std::shared_ptr<ot::Tracer>{new TracerImpl{options, writer, sampler, logger}};
 } catch (const std::bad_alloc &) {
   return ot::make_unexpected(std::make_error_code(std::errc::not_enough_memory));
 } catch (const std::runtime_error &e) {
