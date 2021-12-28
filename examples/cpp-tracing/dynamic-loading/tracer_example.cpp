@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
   // Read in the tracer's configuration.
   std::string tracer_config = R"({
       "service": "dynamic-load example",
-      "agent_host": "dd-agent",
+      "agent_host": "localhost",
       "agent_port": 8126
     })";
 
