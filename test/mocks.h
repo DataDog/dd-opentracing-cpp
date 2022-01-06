@@ -179,6 +179,7 @@ struct MockRulesSampler : public RulesSampler {
       result.rule_rate = rule_rate;
       result.limiter_rate = limiter_rate;
       result.priority_rate = priority_rate;
+      result.applied_rate = applied_rate;
       result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
       result.sampling_mechanism = sampling_mechanism;
     }
@@ -191,6 +192,7 @@ struct MockRulesSampler : public RulesSampler {
   double rule_rate = 1.0;
   double limiter_rate = 1.0;
   double priority_rate = std::nan("");
+  double applied_rate = std::nan("");
   std::string config;
 };
 

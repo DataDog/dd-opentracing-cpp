@@ -31,6 +31,10 @@ struct SampleResult {
   double rule_rate = std::nan("");
   double limiter_rate = std::nan("");
   double priority_rate = std::nan("");
+  // `applied_rate` is whichever of `rule_rate`, `limiter_rate`, or
+  // `priority_rate` was relevant to this sampling decision, as indicated by
+  // `sampling_mechanism`.
+  double applied_rate = std::nan("");
   OptionalSamplingPriority sampling_priority = nullptr;
   OptionalSamplingMechanism sampling_mechanism;
 };

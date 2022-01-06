@@ -6,12 +6,28 @@
 #include <catch2/catch.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
+#include <ostream>
 #include <thread>
+#include <vector>
 
 #include "../src/sample.h"
 #include "../src/tag_propagation.h"
 #include "../src/upstream_service.h"
 #include "mocks.h"
+
+namespace datadog {
+namespace opentracing {
+
+// catch2 will print values in failed assertions, but only if those values have a corresponding
+// `operator<<`.
+std::ostream& operator<<(std::ostream& stream, const UpstreamService& value) {
+  const std::vector<UpstreamService> wrapper = {value};
+  return stream << serializeUpstreamServices(wrapper);
+}
+
+}  // namespace opentracing
+}  // namespace datadog
+
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;
 using json = nlohmann::json;
@@ -609,6 +625,7 @@ TEST_CASE("span") {
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
       sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->applied_rate = sampler->priority_rate;
 
       const auto span = tracer->StartSpan("OperationMoonUnit");
       REQUIRE(span);
@@ -639,7 +656,7 @@ TEST_CASE("span") {
       expected.sampling_priority = SamplingPriority::SamplerDrop;
       // Priority sampling without a rate from the agent → `Default` mechanism.
       expected.sampling_mechanism = KnownSamplingMechanism::Default;
-      expected.sampling_rate = sampler->priority_rate;  // 1.0
+      expected.sampling_rate = sampler->applied_rate;  // 1.0
       REQUIRE(upstream_services[0] == expected);
     }
   }

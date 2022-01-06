@@ -50,6 +50,8 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
   } else {
     result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   }
+
+  result.applied_rate = applied_rate.rate;
   return result;
 }
 
@@ -95,7 +97,7 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
   // `SamplingPriority::SamplerDrop`.
 
   SampleResult result;
-  result.rule_rate = rule_result.rate;
+  result.applied_rate = result.rule_rate = rule_result.rate;
   result.sampling_mechanism = KnownSamplingMechanism::Rule;
   auto max_hash = maxIdFromSampleRate(rule_result.rate);
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
@@ -108,7 +110,7 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
   // still might drop the span in order to satify the configured maximum
   // sampling rate for spans selected by rule based sampling overall.
   auto limit_result = sampling_limiter_.allow();
-  result.limiter_rate = limit_result.effective_rate;
+  result.applied_rate = result.limiter_rate = limit_result.effective_rate;
   if (limit_result.allowed) {
     result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
   } else {

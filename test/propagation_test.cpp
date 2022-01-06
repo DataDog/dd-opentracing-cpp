@@ -797,7 +797,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
       sampler->sampling_mechanism = KnownSamplingMechanism::Default;
-      sampler->priority_rate = 1.0;
+      sampler->applied_rate = sampler->priority_rate = 1.0;
 
       nlohmann::json json_to_extract;
       json_to_extract["tags"] = serialized_tags;
@@ -848,7 +848,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
       sampler->sampling_mechanism = KnownSamplingMechanism::Default;
-      sampler->priority_rate = 1.0;
+      sampler->applied_rate = sampler->priority_rate = 1.0;
 
       nlohmann::json json_to_extract;
       json_to_extract["trace_id"] = "123";
