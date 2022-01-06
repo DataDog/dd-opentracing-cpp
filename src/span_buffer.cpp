@@ -1,6 +1,5 @@
 #include "span_buffer.h"
 
-#include "overload.h"
 #include "sample.h"
 #include "span.h"
 #include "tag_propagation.h"
@@ -132,7 +131,7 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
   UpstreamService this_service;
   this_service.service_name = service;
   this_service.sampling_priority = *sampling_priority;
-  this_service.sampling_mechanism = sample_result.sampling_mechanism.get<SamplingMechanism>();
+  this_service.sampling_mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
   this_service.sampling_rate = sample_result.applied_rate;
 
   upstream_services.push_back(std::move(this_service));
@@ -266,7 +265,7 @@ OptionalSamplingPriority WritingSpanBuffer::setSamplingPriorityImpl(
     } else if ((*priority == SamplingPriority::UserDrop ||
                 *priority == SamplingPriority::UserKeep) &&
                trace.sample_result.sampling_mechanism == nullptr) {
-      trace.sample_result.sampling_mechanism = KnownSamplingMechanism::Manual;
+      trace.sample_result.sampling_mechanism = SamplingMechanism::Manual;
     }
   }
   return getSamplingPriorityImpl(trace_id);

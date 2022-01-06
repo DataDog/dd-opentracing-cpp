@@ -796,7 +796,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       // Our sampler will make a decision different from dHJhY2Utc3RhdHMtcXVlcnk's.
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->sampling_mechanism = SamplingMechanism::Default;
       sampler->applied_rate = sampler->priority_rate = 1.0;
 
       nlohmann::json json_to_extract;
@@ -828,7 +828,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       assert(sampler->sampling_priority);
       expected_annex.sampling_priority = *sampler->sampling_priority;
       // Default → priority sampling without an agent-provided rate.
-      expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected_annex.sampling_mechanism = int(SamplingMechanism::Default);
       expected_annex.sampling_rate = sampler->priority_rate;
 
       auto expected_tags = deserializeTags(serialized_tags);
@@ -847,7 +847,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
 
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
-      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->sampling_mechanism = SamplingMechanism::Default;
       sampler->applied_rate = sampler->priority_rate = 1.0;
 
       nlohmann::json json_to_extract;
@@ -877,7 +877,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       assert(sampler->sampling_priority);
       expected_annex.sampling_priority = *sampler->sampling_priority;
       // Default → priority sampling without an agent-provided rate.
-      expected_annex.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected_annex.sampling_mechanism = int(SamplingMechanism::Default);
       expected_annex.sampling_rate = sampler->priority_rate;
 
       dict expected_tags;

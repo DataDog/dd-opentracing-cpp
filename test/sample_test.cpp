@@ -273,7 +273,7 @@ TEST_CASE("rules sampler") {
     //
     // The expectation is that, since sampling was performed on account of a
     // sampling rule, the sampling mechanism will be
-    // `KnownSamplingMechanism::Rule`.
+    // `SamplingMechanism::Rule`.
 
     REQUIRE(mwriter->traces.size() == 1);
     REQUIRE(mwriter->traces[0].size() == 1);
@@ -286,6 +286,6 @@ TEST_CASE("rules sampler") {
     const auto upstream_services = deserializeUpstreamServices(tag_found->second);
     REQUIRE(upstream_services.size() == 1);  // just this service
     const auto& this_service = upstream_services[0];
-    REQUIRE(asInt(this_service.sampling_mechanism) == asInt(KnownSamplingMechanism::Rule));
+    REQUIRE(this_service.sampling_mechanism == int(SamplingMechanism::Rule));
   }
 }

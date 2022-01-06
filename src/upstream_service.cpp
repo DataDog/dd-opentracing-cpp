@@ -90,7 +90,7 @@ SamplingPriority deserializeSamplingPriority(ot::string_view text) try {
                               ") from the following text: " + std::string(text));
 }
 
-SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
+int deserializeSamplingMechanism(ot::string_view text) try {
   const std::string sampling_mechanism_string = text;
   std::size_t bytes_parsed = 0;
   const int sampling_mechanism_int = std::stoi(sampling_mechanism_string, &bytes_parsed);
@@ -101,7 +101,7 @@ SamplingMechanism deserializeSamplingMechanism(ot::string_view text) try {
           << "): " << sampling_mechanism_string;
     throw std::invalid_argument(error.str());
   }
-  return asSamplingMechanism(sampling_mechanism_int);
+  return sampling_mechanism_int;
 } catch (const std::logic_error& error) {
   throw std::invalid_argument(std::string("Unable to parse sampling mechanism (error: ") +
                               error.what() + ") from the following text: " + std::string(text));
@@ -184,7 +184,7 @@ void serialize(std::string& output, const UpstreamService& upstream_service) {
   output += std::to_string(int(upstream_service.sampling_priority));
 
   output += '|';
-  output += std::to_string(asInt(upstream_service.sampling_mechanism));
+  output += std::to_string(upstream_service.sampling_mechanism);
 
   output += '|';
   appendSamplingRate(output, upstream_service.sampling_rate);

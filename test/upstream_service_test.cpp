@@ -60,17 +60,17 @@ TEST_CASE("serializeUpstreamServices/deserializeUpstreamServices") {
       ""
     },
     { // just one service
-      {{"mysvc", SamplingPriority::UserKeep, KnownSamplingMechanism::Rule, 0.01234, {"extra", "junk"}}},
+      {{"mysvc", SamplingPriority::UserKeep, int(SamplingMechanism::Rule), 0.01234, {"extra", "junk"}}},
       "bXlzdmM|2|3|0.0124|extra|junk"
     },
     { // two services
-      {{"yoursvc", SamplingPriority::SamplerDrop, UnknownSamplingMechanism{1337}, 1.0, {}},
-       {"mysvc", SamplingPriority::UserKeep, KnownSamplingMechanism::Rule, 0.01234, {"extra", "junk"}}},
+      {{"yoursvc", SamplingPriority::SamplerDrop, 1337, 1.0, {}},
+       {"mysvc", SamplingPriority::UserKeep, int(SamplingMechanism::Rule), 0.01234, {"extra", "junk"}}},
       "eW91cnN2Yw|0|1337|1.0000;bXlzdmM|2|3|0.0124|extra|junk"
     },
     { // example based on internal design document
-      {{"mcnulty-web", SamplingPriority::SamplerDrop, KnownSamplingMechanism::AgentRate, std::nan(""), {}},
-       {"trace-stats-query", SamplingPriority::UserKeep, KnownSamplingMechanism::Manual, std::nan(""), {"foo"}}},
+      {{"mcnulty-web", SamplingPriority::SamplerDrop, int(SamplingMechanism::AgentRate), std::nan(""), {}},
+       {"trace-stats-query", SamplingPriority::UserKeep, int(SamplingMechanism::Manual), std::nan(""), {"foo"}}},
       "bWNudWx0eS13ZWI|0|1|;dHJhY2Utc3RhdHMtcXVlcnk|2|4||foo"
     }
   }));

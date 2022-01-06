@@ -35,7 +35,9 @@ extern const ot::string_view upstream_services_tag;
 struct UpstreamService {
   std::string service_name;
   SamplingPriority sampling_priority;
-  SamplingMechanism sampling_mechanism;
+  // `sampling_mechanism` could be one of the known `SamplingMechanism` values,
+  // or some other (future) value.
+  int sampling_mechanism;
   double sampling_rate;  // `std::nan("")` means "no sampling rate"
   // The serialization format for `UpstreamService` allows for the future
   // addition of fields.  When parsing, additional fields that don't

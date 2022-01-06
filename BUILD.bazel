@@ -13,8 +13,6 @@ cc_library(
         "src/logger.cpp",
         "src/logger.h",
         "src/opentracing_external.cpp",
-        "src/overload.cpp",
-        "src/overload.h",
         "src/parse_util.cpp",
         "src/parse_util.h",
         "src/propagation.cpp",

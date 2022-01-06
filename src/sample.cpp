@@ -28,7 +28,7 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
                                      uint64_t trace_id) const {
   SampleResult result;
   SamplingRate applied_rate = default_sample_rate_;
-  result.sampling_mechanism = KnownSamplingMechanism::Default;
+  result.sampling_mechanism = SamplingMechanism::Default;
   std::ostringstream key;
   key << "service:" << service << ",env:" << environment;
   {
@@ -36,7 +36,7 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
     auto const rule = agent_sampling_rates_.find(key.str());
     if (rule != agent_sampling_rates_.end()) {
       applied_rate = rule->second;
-      result.sampling_mechanism = KnownSamplingMechanism::AgentRate;
+      result.sampling_mechanism = SamplingMechanism::AgentRate;
     }
   }
   // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
@@ -98,7 +98,7 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
 
   SampleResult result;
   result.applied_rate = result.rule_rate = rule_result.rate;
-  result.sampling_mechanism = KnownSamplingMechanism::Rule;
+  result.sampling_mechanism = SamplingMechanism::Rule;
   auto max_hash = maxIdFromSampleRate(rule_result.rate);
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
   if (hashed_id >= max_hash) {

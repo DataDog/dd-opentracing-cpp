@@ -575,7 +575,7 @@ TEST_CASE("span") {
       UpstreamService upstream;
       upstream.service_name = "upstreamsvc";
       upstream.sampling_priority = SamplingPriority::UserKeep;
-      upstream.sampling_mechanism = KnownSamplingMechanism::Manual;
+      upstream.sampling_mechanism = int(SamplingMechanism::Manual);
       upstream.sampling_rate = std::nan("");
 
       const auto serialized_upstream_services = serializeUpstreamServices({upstream});
@@ -624,7 +624,7 @@ TEST_CASE("span") {
       // `_dd.p.upstream_services` tag of the root span.
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
-      sampler->sampling_mechanism = KnownSamplingMechanism::Default;
+      sampler->sampling_mechanism = SamplingMechanism::Default;
       sampler->applied_rate = sampler->priority_rate;
 
       const auto span = tracer->StartSpan("OperationMoonUnit");
@@ -655,7 +655,7 @@ TEST_CASE("span") {
       expected.service_name = options.service;
       expected.sampling_priority = SamplingPriority::SamplerDrop;
       // Priority sampling without a rate from the agent → `Default` mechanism.
-      expected.sampling_mechanism = KnownSamplingMechanism::Default;
+      expected.sampling_mechanism = int(SamplingMechanism::Default);
       expected.sampling_rate = sampler->applied_rate;  // 1.0
       REQUIRE(upstream_services[0] == expected);
     }

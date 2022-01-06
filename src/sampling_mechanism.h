@@ -29,43 +29,21 @@
 // sampling rule, a user-specified override, an agent-specified priority
 // sampling rate, etc.
 //
-// To allow forward compatibility with future `SamplingMechanism` values, the
-// `SamplingMechanism` type is defined as a variant between
-// `KnownSamplingMechanism`, which is an enumeration, and
-// `UnknownSamplingMechanism`, which contains any other integer.
-//
-// `SamplingMechanism` instances can be inspected by visitation using the
-// `::opentracing::apply_visitor` function template, which can be invoked
-// unqualified due to argument dependent lookup.
-//
-// For example:
-// clang-format off
-//
-//     void echo(SamplingMechanism reason) {
-//       apply_visitor(overload(
-//                         [](KnownSamplingMechanism reason) {
-//                           std::cout << "It has one of the known values: " << int(reason);
-//                         },
-//                         [](UnknownSamplingMechanism reason) {
-//                           std::cout << "It has some other, probably future, value: " << reason.value;
-//                         }),
-//                     reason);
-//       std::cout << '\n';
-//     }
-//
-// clang-format on
+// To allow forward compatibility with future `SamplingMechanism` values,
+// sampling mechanism is treated as just an integer when being deserialized or
+// serialized.  `SamplingMechanism` enumerates integer values relevant to logic
+// within the tracer.
 
-#include <opentracing/variant/variant.hpp>
 #include <cstddef>
+#include <opentracing/variant/variant.hpp>
 
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
-// `KnownSamplingMechanism` is a sampling mechanism value with a known
-// interpretation.
-enum class KnownSamplingMechanism {
+// `SamplingMechanism` is a reason for a trace to be dropped or kept.
+enum class SamplingMechanism {
   // There are no sampling rules configured, and the tracer has not yet
   // received any rates from the agent.
   Default = 0,
@@ -82,28 +60,7 @@ enum class KnownSamplingMechanism {
   AppSec = 5,
   // Reserved for future use.
   RemoteRateUserDefined = 6
-
-  // Note: Update `asSamplingMechanism` when a new value is added.
 };
-
-// `UnknownSamplingMechanism` is a sampling mechanism value that does not have
-// a corresponding `KnownSamplingMechanism` value.
-struct UnknownSamplingMechanism {
-  int value;
-};
-
-inline bool operator==(UnknownSamplingMechanism left, UnknownSamplingMechanism right) {
-  return left.value == right.value;
-}
-
-// `SamplingMechanism` is either one of the known values, above, or some
-// unknown value.  This allows us to propagate future sampling mechanism values
-// without requiring that all clients first upgrade their tracers.
-using SamplingMechanism = ot::util::variant<KnownSamplingMechanism, UnknownSamplingMechanism>;
-
-SamplingMechanism asSamplingMechanism(int value);
-
-int asInt(SamplingMechanism value);
 
 // `OptionalSamplingMechanism` is either a `SamplingMechanism` or "empty,"
 // indicated by the type `std::nullptr_t`.
