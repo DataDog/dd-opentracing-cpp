@@ -7,7 +7,7 @@ get_latest_release() {
 }
 
 VERSION="$(get_latest_release DataDog/dd-opentracing-cpp)"
-wget https://github.com/DataDog/dd-opentracing-cpp/archive/${VERSION}.tar.gz -O dd-opentracing-cpp.tar.gz
+wget "https://github.com/DataDog/dd-opentracing-cpp/archive/${VERSION}.tar.gz" -O dd-opentracing-cpp.tar.gz
 
 mkdir -p dd-opentracing-cpp/.build
 tar zxvf dd-opentracing-cpp.tar.gz -C ./dd-opentracing-cpp/ --strip-components=1
