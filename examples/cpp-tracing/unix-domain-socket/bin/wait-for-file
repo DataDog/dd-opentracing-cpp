@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Wait for a file to exist, up until a specified timeout.
+#
+# usage:
+#
+#     $ wait-for-file <path-to-file> [<timeout-seconds>]
+#
+
+if [ $# -lt 1 ]; then
+  >&2 echo 'not enough arguments passed to wait-for-file'
+  exit 1
+fi
+
+file=$1
+
+timeout=5
+if [ $# -eq 2 ]; then
+  timeout=$2
+elif [ $# -gt 2 ]; then
+  >&2 echo 'too many arguments passed to wait-for-file'
+  exit 1
+fi
+
+start=$(date +%s)
+deadline=$((start + timeout))
+now=$start
+while ! [ -e "$file" ]; do
+  if [ "$now" -ge "$deadline" ]; then
+    >&2 echo "timed out waiting for file to exist: $file"
+    exit 2
+  fi
+  sleep 1
+  now=$(date +%s)
+done
