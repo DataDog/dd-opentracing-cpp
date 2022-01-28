@@ -59,42 +59,8 @@ struct SpanData {
                      trace_id, parent_id, error)
 };
 
-// A common interface for Datadog-specific Span operations.
-class DatadogSpan : public ot::Span {
- public:
-  // ot::Span methods.
-  virtual void FinishWithOptions(
-      const ot::FinishSpanOptions &finish_span_options) noexcept override = 0;
-  virtual void SetOperationName(ot::string_view name) noexcept override = 0;
-  virtual void SetTag(ot::string_view key, const ot::Value &value) noexcept override = 0;
-  virtual void SetBaggageItem(ot::string_view restricted_key,
-                              ot::string_view value) noexcept override = 0;
-  virtual std::string BaggageItem(ot::string_view restricted_key) const noexcept override = 0;
-  virtual void Log(
-      std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override = 0;
-  virtual void Log(
-      ot::SystemTime timestamp,
-      std::initializer_list<std::pair<ot::string_view, ot::Value>> fields) noexcept override = 0;
-  virtual void Log(
-      ot::SystemTime timestamp,
-      const std::vector<std::pair<ot::string_view, ot::Value>> &fields) noexcept override = 0;
-  virtual const ot::SpanContext &context() const noexcept override = 0;
-  virtual const ot::Tracer &tracer() const noexcept override = 0;
-
-  // Datadog methods.
-
-  // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
-  // value of the SamplingPriority; this may not be the same as the given parameter if this trace
-  // has propagated from a remote origin and already has a SamplingPriority.
-  virtual OptionalSamplingPriority setSamplingPriority(
-      std::unique_ptr<UserSamplingPriority> priority) = 0;
-  virtual OptionalSamplingPriority getSamplingPriority() const = 0;
-  virtual uint64_t traceId() const = 0;
-  virtual uint64_t spanId() const = 0;
-};
-
 // A Span, a component of a trace, a single instrumented event.
-class Span : public DatadogSpan {
+class Span : public ot::Span {
  public:
   // Creates a new Span.
   Span(std::shared_ptr<const Logger> logger, std::shared_ptr<const Tracer> tracer,
@@ -130,11 +96,16 @@ class Span : public DatadogSpan {
 
   const ot::Tracer &tracer() const noexcept override;
 
-  uint64_t traceId() const override;
-  uint64_t spanId() const override;
+  // Datadog-specific member functions
+
+  uint64_t traceId() const;
+  uint64_t spanId() const; 
+  // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
+  // value of the SamplingPriority; this may not be the same as the given parameter if this trace
+  // has propagated from a remote origin and already has a SamplingPriority.
   OptionalSamplingPriority setSamplingPriority(
-      std::unique_ptr<UserSamplingPriority> priority) override;
-  OptionalSamplingPriority getSamplingPriority() const override;
+      std::unique_ptr<UserSamplingPriority> priority);
+  OptionalSamplingPriority getSamplingPriority() const;
 
  private:
   OptionalSamplingPriority decideSamplingPriority()
