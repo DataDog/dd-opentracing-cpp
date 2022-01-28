@@ -283,9 +283,8 @@ TEST_CASE("rules sampler") {
 
     const auto tag_found = span_data.meta.find("_dd.p.upstream_services");
     REQUIRE(tag_found != span_data.meta.end());
-    const auto upstream_services = deserializeUpstreamServices(tag_found->second);
-    REQUIRE(upstream_services.size() == 1);  // just this service
-    const auto& this_service = upstream_services[0];
-    REQUIRE(this_service.sampling_mechanism == int(SamplingMechanism::Rule));
+    const std::string& upstream_services = tag_found->second;
+    // One service, with the expected sampling mechanism (`SamplingMechanism::Rule == 3`).
+    REQUIRE(upstream_services == "TODO");
   }
 }

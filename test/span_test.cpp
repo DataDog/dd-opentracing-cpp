@@ -15,19 +15,6 @@
 #include "../src/upstream_service.h"
 #include "mocks.h"
 
-namespace datadog {
-namespace opentracing {
-
-// catch2 will print values in failed assertions, but only if those values have a corresponding
-// `operator<<`.
-std::ostream& operator<<(std::ostream& stream, const UpstreamService& value) {
-  const std::vector<UpstreamService> wrapper = {value};
-  return stream << serializeUpstreamServices(wrapper);
-}
-
-}  // namespace opentracing
-}  // namespace datadog
-
 using namespace datadog::opentracing;
 namespace tags = datadog::tags;
 using json = nlohmann::json;
@@ -578,7 +565,8 @@ TEST_CASE("span") {
       upstream.sampling_mechanism = int(SamplingMechanism::Manual);
       upstream.sampling_rate = std::nan("");
 
-      const auto serialized_upstream_services = serializeUpstreamServices({upstream});
+      std::string serialized_upstream_services;
+      appendUpstreamService(serialized_upstream_services, upstream);
       std::string tags;
       appendTag(tags, "_dd.p.upstream_services", serialized_upstream_services);
 
@@ -644,9 +632,7 @@ TEST_CASE("span") {
 
       const auto found_upstream_services = span_data.meta.find("_dd.p.upstream_services");
       REQUIRE(found_upstream_services != span_data.meta.end());
-
-      const auto upstream_services = deserializeUpstreamServices(found_upstream_services->second);
-      REQUIRE(upstream_services.size() == 1);
+      const std::string& upstream_services = found_upstream_services->second;
 
       // We expect the one `UpstreamService` to be for this service (us), with
       // the same sampling priority, mechanism, and rate as produced by
@@ -657,7 +643,10 @@ TEST_CASE("span") {
       // Priority sampling without a rate from the agent → `Default` mechanism.
       expected.sampling_mechanism = int(SamplingMechanism::Default);
       expected.sampling_rate = sampler->applied_rate;  // 1.0
-      REQUIRE(upstream_services[0] == expected);
+
+      std::string expected_upstream_services;
+      appendUpstreamService(expected_upstream_services, expected);
+      REQUIRE(upstream_services == expected_upstream_services);
     }
   }
 

@@ -194,12 +194,12 @@ OptionalSamplingPriority SpanBuffer::getSamplingPriorityImpl(uint64_t trace_id) 
 
 OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  return setSamplingPriorityFromExtractedContext(trace_id, value);
+  return setSamplingPriorityFromExtractedContextImpl(trace_id, value);
 }
 
 OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromUser(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  return setSamplingPriorityFromUser(trace_id, value);
+  return setSamplingPriorityFromUserImpl(trace_id, value);
 }
 
 OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContextImpl(uint64_t trace_id, SamplingPriority value) {

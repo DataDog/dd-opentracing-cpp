@@ -834,9 +834,8 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       auto expected_tags = deserializeTags(serialized_tags);
       auto serialized_services = expected_tags.find("_dd.p.upstream_services");
       REQUIRE(serialized_services != expected_tags.end());
-      auto services = deserializeUpstreamServices(serialized_services->second);
-      services.push_back(expected_annex);
-      serialized_services->second = serializeUpstreamServices(services);
+      std::string& services = serialized_services->second;
+      appendUpstreamService(services, expected_annex);
 
       REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
     }
@@ -881,8 +880,9 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       expected_annex.sampling_rate = sampler->priority_rate;
 
       dict expected_tags;
-      expected_tags.emplace("_dd.p.upstream_services",
-                            serializeUpstreamServices({expected_annex}));
+      std::string upstream_services;
+      appendUpstreamService(upstream_services, expected_annex);
+      expected_tags.emplace("_dd.p.upstream_services", upstream_services);
 
       REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
     }

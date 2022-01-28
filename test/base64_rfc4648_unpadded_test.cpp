@@ -20,8 +20,7 @@ TEST_CASE("unpadded base64 codec") {
                                               {"hell", "aGVsbA"},
                                               {"hello", "aGVsbG8"}}));
 
-  REQUIRE(base64_rfc4648_unpadded::encode(test_case.decoded) == test_case.encoded);
-  std::string actual;
-  base64_rfc4648_unpadded::decode(actual, test_case.encoded);
-  REQUIRE(actual == test_case.decoded);
+  std::string encoded;
+  appendBase64Unpadded(encoded, test_case.decoded);
+  REQUIRE(encoded == test_case.encoded);
 }
