@@ -104,12 +104,14 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
   // This is true until this trace is finished and written by the span buffer.
   assert(finished_spans);
 
+  /* TODO
   if (!upstream_services.empty() &&
       upstream_services.back().sampling_priority == *sampling_priority) {
     // Our sampling decision is the same as the previous guy's, so we have
     // nothing to add.
     return;
   }
+  */
 
   // Either we're the first to make a sampling decision, or our decision
   // differs from the previous service's.  Append a record for this service.
@@ -136,7 +138,9 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
   this_service.sampling_mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
   this_service.sampling_rate = sample_result.applied_rate;
 
+  /* TODO
   upstream_services.push_back(std::move(this_service));
+  */
 }
 
 SpanBuffer::SpanBuffer(std::shared_ptr<const Logger> logger,
@@ -161,7 +165,9 @@ void SpanBuffer::registerSpan(const SpanContext& context) {
       trace.origin = context.origin();
     }
     trace.trace_tags = context.getExtractedTraceTags();
+    /* TODO
     trace.upstream_services = context.getExtractedUpstreamServices();
+    */
 
     if (trace.sampling_priority_locked) {
       // A sampling decision has been made. Let `trace.upstream_services`
@@ -251,6 +257,7 @@ OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContextImpl
   trace.sampling_priority = std::make_unique<SamplingPriority>(value);
   // An upstream service has made a decision -- the user can no longer override it.
   trace.sampling_priority_locked = true;
+  trace.sampling_decision_extracted = true;
   // We can't infer the sampling mechanism from the priority, so mechanism will
   // be left null.  Setting the mechanism makes sense when we are the one
   // making the sampling decision.
@@ -272,6 +279,7 @@ OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromUserImpl(uint64_t tr
   }
 
   trace.sampling_priority = asSamplingPriority(value);
+  trace.sampling_decision_extracted = false;
   trace.sample_result.sampling_mechanism = SamplingMechanism::Manual;
   // We do _not_ lock the sampling decision here, because the user could change
   // it again before we need to use it.
@@ -294,6 +302,7 @@ OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromSampler(uint64_t tra
   trace.sampling_priority = clone(value.sampling_priority);
   // The sampler has made a decision -- the user can no longer override it.
   trace.sampling_priority_locked = true;
+  trace.sampling_decision_extracted = false;
   
   return getSamplingPriorityImpl(trace_id);
 }
@@ -314,18 +323,17 @@ OptionalSamplingPriority SpanBuffer::decideSamplingPriorityImpl(const SpanData* 
   // saved decision.
   auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
   setSamplerResult(span->trace_id, sampler_result);
-  // Note that `setSamplingPriorityFromSampler` will lock the sampling decision.
+  // Note that `setSamplingPriorityFromSampler` will lock the sampling priority.
   setSamplingPriorityFromSampler(span->trace_id, sampler_result);
   return getSamplingPriorityImpl(span->trace_id);
 }
 
 std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
   std::string result;
-  std::unique_lock<std::mutex> lock{mutex_};
+  std::lock_guard<std::mutex> lock{mutex_};
 
   const auto trace_found = traces_.find(trace_id);
   if (trace_found == traces_.end()) {
-    lock.unlock();
     logger_->Log(LogLevel::error, trace_id,
                  "Requested trace_id not found in SpanBuffer::serializeTraceTags");
     return result;
@@ -333,16 +341,17 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
 
   auto& trace = trace_found->second;
 
+  /* TODO
   if (!trace.upstream_services.empty()) {
-    // TODO appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
+    appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
   }
+  */
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
   }
 
   if (result.size() > options_.trace_tags_propagation_max_length) {
     trace.propagation_error = "max_size";
-    lock.unlock();
     std::ostringstream message;
     message
         << "Serialized trace tags are too large for propagation.  Configured maximum length is "
@@ -354,6 +363,16 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
   }
 
   return result;
+}
+
+void SpanBuffer::setSamplingDecisionExtracted(uint64_t trace_id, bool was_extracted) {
+  auto trace_entry = traces_.find(trace_id);
+  if (trace_entry == traces_.end()) {
+    logger_->Trace(trace_id, "cannot mark whether sampling decision was extracted, trace not found");
+    return;
+  }
+
+  trace_entry->second.sampling_decision_extracted = was_extracted;
 }
 
 void SpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& sample_result) {

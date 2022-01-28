@@ -65,16 +65,8 @@ struct PendingTrace {
   // `trace_tags` are similarly added.  `trace_tags` names all begin with the
   // same prefix, `trace_tag_prefix`, defined in `tag_propagation.h`.
   // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
-  // trace tags require special handling, e.g. `upstream_services`, below.
+  // trace tags require special handling, e.g. "_dd.p.upstream_services".
   std::unordered_map<std::string, std::string> trace_tags;
-  // `upstream_services` contains the parsed value of the
-  // "_dd.p.upstream_services" tag from the trace tags.  Additionally, if this
-  // service is the first to make a sampling decision, or if it changes the
-  // sampling decision (currently not possible), `upstream_services` ends with
-  // an `UpstreamService` object describing this service's sampling decision.
-  // `upstream_services` is attached to the local root span as the
-  // "_dd.p.upstream_services" tag.
-  std::vector<UpstreamService> upstream_services;
   // TODO: Describe where `service` comes from and when it changes.
   std::string service;
   // If an error occurs while propagating trace tags (see
@@ -83,6 +75,11 @@ struct PendingTrace {
   // `propagation_error`.  If no error occurs, then `propagation_error` will be
   // empty and the "_dd.propagation_error" tag will not be added.
   std::string propagation_error;
+  // `sampling_decision_extracted` is whether `sampling_priority` was
+  // determined by a decision within this tracer (`true`), or inherited from an
+  // upstream service when span context was extracted (`false`), or has not yet
+  // been decided (`false`).
+  bool sampling_decision_extracted = false;
 };
 
 struct SpanBufferOptions {
@@ -136,6 +133,10 @@ class SpanBuffer {
   // `_dd.propagation_error` tag value will be added to the relevant trace's
   // local root span.
   std::string serializeTraceTags(uint64_t trace_id);
+
+  // Mark whether the trace having the specified `trace_id` inherited its
+  // sampling decision (sampling priority) from an upstream service.
+  void setSamplingDecisionExtracted(uint64_t trace_id, bool was_extracted);
 
   // Causes the Writer to flush, but does not send any PendingTraces.
   // This function is `virtual` so that it can be overridden in unit tests.
