@@ -373,6 +373,8 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
   } else if (k == tags::manual_drop) {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
+  } else if (k == tags::service_name) {
+    setServiceName(result);
   }
 }
 
@@ -403,6 +405,11 @@ OptionalSamplingPriority Span::setSamplingPriority(
 OptionalSamplingPriority Span::getSamplingPriority() const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   return buffer_->getSamplingPriority(context_.traceId());
+}
+
+void Span::setServiceName(ot::string_view service_name) {
+  span_->service = service_name;
+  buffer_->setServiceName(traceId(), service_name);
 }
 
 const ot::SpanContext &Span::context() const noexcept {

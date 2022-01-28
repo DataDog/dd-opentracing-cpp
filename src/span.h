@@ -107,10 +107,11 @@ class Span : public ot::Span {
       std::unique_ptr<UserSamplingPriority> priority);
   OptionalSamplingPriority getSamplingPriority() const;
 
- private:
-  OptionalSamplingPriority decideSamplingPriority()
-      const;  // Sooo not const. See definition of method Span::context.
+  // Change the service name of this span and its associated trace to the
+  // specified `service_name`.
+  void setServiceName(ot::string_view service_name);
 
+ private:
   mutable std::mutex mutex_;
   std::atomic<bool> is_finished_{false};
 

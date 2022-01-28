@@ -67,7 +67,9 @@ struct PendingTrace {
   // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
   // trace tags require special handling, e.g. "_dd.p.upstream_services".
   std::unordered_map<std::string, std::string> trace_tags;
-  // TODO: Describe where `service` comes from and when it changes.
+  // `service` is the name of the service associated with this trace.  If the
+  // service name changes (such as by calling `Span::setServiceName`), then
+  // this is the most recent value.
   std::string service;
   // If an error occurs while propagating trace tags (see
   // `SpanBuffer::serializeTraceTags`), then the "_dd.propagation_error"
@@ -137,6 +139,10 @@ class SpanBuffer {
   // Mark whether the trace having the specified `trace_id` inherited its
   // sampling decision (sampling priority) from an upstream service.
   void setSamplingDecisionExtracted(uint64_t trace_id, bool was_extracted);
+  
+  // Change the name of the service associated with the trace having the
+  // specified `trace_id` to the specified `service_name`.
+  void setServiceName(uint64_t trace_id, ot::string_view service_name);
 
   // Causes the Writer to flush, but does not send any PendingTraces.
   // This function is `virtual` so that it can be overridden in unit tests.

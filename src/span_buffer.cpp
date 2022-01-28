@@ -375,6 +375,16 @@ void SpanBuffer::setSamplingDecisionExtracted(uint64_t trace_id, bool was_extrac
   trace_entry->second.sampling_decision_extracted = was_extracted;
 }
 
+void SpanBuffer::setServiceName(uint64_t trace_id, ot::string_view service_name) {
+  auto trace_entry = traces_.find(trace_id);
+  if (trace_entry == traces_.end()) {
+    logger_->Trace(trace_id, "cannot set service name for trace; trace not found");
+    return;
+  }
+
+  trace_entry->second.service = service_name;
+}
+
 void SpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& sample_result) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
