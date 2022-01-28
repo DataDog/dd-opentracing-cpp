@@ -63,20 +63,8 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
   if (!std::isnan(trace.sample_result.priority_rate)) {
     span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
   }
-  // If there's a sampling decision, make sure that `trace.upstream_services`
-  // reflects the sampling decision, and include `trace.upstream_services` as a
-  // tag if it's nonempty.
-  if (trace.sampling_priority != nullptr) {
-    trace.applySamplingDecisionToUpstreamServices();
-  }
-  /* TODO
-  std::string upstream_services = serializeUpstreamServices(trace.upstream_services);
-  if (!upstream_services.empty()) {
-    span.meta[datadog_upstream_services_tag] = std::move(upstream_services);
-  }
-  */
-  // If there was previously an error during context propagation, note that in
-  // a tag.
+  trace.applySamplingDecisionToUpstreamServices();
+  span.meta.insert(trace.trace_tags.begin(), trace.trace_tags.end());
   if (!trace.propagation_error.empty()) {
     span.meta[datadog_propagation_error_tag] = trace.propagation_error;
   }
@@ -99,22 +87,10 @@ void PendingTrace::finish() {
 }
 
 void PendingTrace::applySamplingDecisionToUpstreamServices() {
-  // This is a precondition.
-  assert(sampling_priority);
-  // This is true until this trace is finished and written by the span buffer.
-  assert(finished_spans);
-
-  /* TODO
-  if (!upstream_services.empty() &&
-      upstream_services.back().sampling_priority == *sampling_priority) {
-    // Our sampling decision is the same as the previous guy's, so we have
-    // nothing to add.
+  if (applied_sampling_decision_to_upstream_services || sampling_decision_extracted || sampling_priority == nullptr) {
+    // We did not make the sampling decision, or we've already done this.
     return;
   }
-  */
-
-  // Either we're the first to make a sampling decision, or our decision
-  // differs from the previous service's.  Append a record for this service.
 
   // In unit tests, we sometimes don't have a service name.  In those cases,
   // omit our `UpstreamService` entry (those tests are not looking for the
@@ -123,24 +99,19 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
     return;
   }
 
-  if (sample_result.sampling_mechanism == nullptr) {
-    // If we have a sampling priority (by assumption) but not a sampling
-    // mechanism, then the sampling decision was inherited from an
-    // upstream service.  There might or might not be an `UpstreamService`
-    // record, depending on the version of the sending service, but either way,
-    // we will not append a record for ourselves here.
-    return;
-  }
-
+  // If we have a sampling priority and `sampling_decision_extracted == false`,
+  // then the sampling priority was determined by this tracer, and so we will
+  // have set a corresponding sampling mechanism.
+  assert(sample_result.sampling_mechanism != nullptr);
+  
   UpstreamService this_service;
   this_service.service_name = service;
   this_service.sampling_priority = *sampling_priority;
   this_service.sampling_mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
   this_service.sampling_rate = sample_result.applied_rate;
 
-  /* TODO
-  upstream_services.push_back(std::move(this_service));
-  */
+  appendUpstreamService(trace_tags[upstream_services_tag], this_service);
+  applied_sampling_decision_to_upstream_services = true;
 }
 
 SpanBuffer::SpanBuffer(std::shared_ptr<const Logger> logger,
@@ -165,17 +136,6 @@ void SpanBuffer::registerSpan(const SpanContext& context) {
       trace.origin = context.origin();
     }
     trace.trace_tags = context.getExtractedTraceTags();
-    /* TODO
-    trace.upstream_services = context.getExtractedUpstreamServices();
-    */
-
-    if (trace.sampling_priority_locked) {
-      // A sampling decision has been made. Let `trace.upstream_services`
-      // reflect our decision, if it is the first decision or is different from
-      // the one before.
-      trace.applySamplingDecisionToUpstreamServices();
-    }
-
     trace.hostname = options_.hostname;
     trace.analytics_rate = options_.analytics_rate;
     trace.service = options_.service;
@@ -341,11 +301,7 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
 
   auto& trace = trace_found->second;
 
-  /* TODO
-  if (!trace.upstream_services.empty()) {
-    appendTag(result, upstream_services_tag, serializeUpstreamServices(trace.upstream_services));
-  }
-  */
+  trace.applySamplingDecisionToUpstreamServices();
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
   }

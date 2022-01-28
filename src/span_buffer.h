@@ -39,13 +39,8 @@ struct PendingTrace {
         sampling_priority(std::move(sampling_priority)) {}
 
   void finish();
-  // If this service's sampling decision is the first in the trace, or if it
-  // differs from the previous service's sampling decision, append an
-  // `UpstreamService` value to `upstream_services` indicating this service's
-  // sampling decision.  The behavior is undefined unless
-  // `sampling_priority != nullptr`.  Note that because this function does not
-  // append an `UpstreamService` if our sampling decision agrees with the
-  // previous service's, this function is idempotent.
+  // TODO: document
+  // Note that this function is idempotent.
   void applySamplingDecisionToUpstreamServices();
 
   std::shared_ptr<const Logger> logger;
@@ -62,8 +57,7 @@ struct PendingTrace {
   // rather than with a single span.  Some other tags are added to the local
   // root span when the trace chunk is sent to the agent (see
   // `finish_root_span` in `span_buffer.cpp`).  In addition to those tags,
-  // `trace_tags` are similarly added.  `trace_tags` names all begin with the
-  // same prefix, `trace_tag_prefix`, defined in `tag_propagation.h`.
+  // `trace_tags` are similarly added.
   // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
   // trace tags require special handling, e.g. "_dd.p.upstream_services".
   std::unordered_map<std::string, std::string> trace_tags;
@@ -82,6 +76,9 @@ struct PendingTrace {
   // upstream service when span context was extracted (`false`), or has not yet
   // been decided (`false`).
   bool sampling_decision_extracted = false;
+  // `applied_sampling_decision_to_upstream_services` is whether the function
+  // `applySamplingDecisionToUpstreamServices` has done its work.
+  bool applied_sampling_decision_to_upstream_services = true;
 };
 
 struct SpanBufferOptions {

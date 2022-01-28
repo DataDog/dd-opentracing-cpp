@@ -478,11 +478,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
     try {
       j.at(json_tags_key).get_to(tags);
       trace_tags = deserializeTags(tags);
-      auto tag_found = trace_tags.find(upstream_services_tag);
-      if (tag_found != trace_tags.end()) {
-        // TODO upstream_services = deserializeUpstreamServices(tag_found->second);
-        trace_tags.erase(tag_found);
-      }
     } catch (const std::invalid_argument &error) {
       std::ostringstream message;
       message << "Error decoding context key " << json_quote(json_tags_key) << " with value "
@@ -589,11 +584,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
                             value);
           } else if (equals_ignore_case(key, headers_impl.tags_header)) {
             trace_tags = deserializeTags(value);
-            const auto found_tag = trace_tags.find(upstream_services_tag);
-            if (found_tag != trace_tags.end()) {
-              // TODO upstream_services = deserializeUpstreamServices(found_tag->second);
-              trace_tags.erase(found_tag);
-            }
           }
         } catch (const std::logic_error &error) {
           std::ostringstream message;

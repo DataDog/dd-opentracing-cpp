@@ -82,6 +82,10 @@ void appendSamplingRate(std::string& destination, double value) {
 }
 
 void appendUpstreamService(std::string& output, const UpstreamService& upstream_service) {
+  if (output.empty()) {
+    output += ';';
+  }
+  
   appendBase64Unpadded(output, upstream_service.service_name);
 
   output += '|';

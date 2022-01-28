@@ -22,9 +22,6 @@ namespace ot = opentracing;
 namespace datadog {
 namespace opentracing {
 
-// The names of designated trace-wide tags all have the same prefix, "_dd.p.".
-extern const ot::string_view trace_tag_prefix;
-
 // Return a name->value mapping of tags parsed from the specified
 // `header_value`.  Throw a `std::invalid_argument` if an error occurs.
 std::unordered_map<std::string, std::string> deserializeTags(ot::string_view header_value);
