@@ -36,7 +36,13 @@ enum class UserSamplingPriority : int {
 // Move to std::optional in C++17 when it has better compiler support.
 using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
 
-OptionalSamplingPriority asSamplingPriority(int i);
+OptionalSamplingPriority asSamplingPriority(int);
+OptionalSamplingPriority asSamplingPriority(const std::unique_ptr<UserSamplingPriority>&);
+
+// Return an `OptionalSamplingPriority` `result` for which either `result ==
+// nullptr && priority == nullptr` or `*result == *priority`, and for which
+// `&*result` is distinct from `&*priority`.
+OptionalSamplingPriority clone(const OptionalSamplingPriority& priority);
 
 }  // namespace opentracing
 }  // namespace datadog

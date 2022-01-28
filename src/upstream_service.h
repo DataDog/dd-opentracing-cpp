@@ -39,23 +39,12 @@ struct UpstreamService {
   // or some other (future) value.
   int sampling_mechanism;
   double sampling_rate;  // `std::nan("")` means "no sampling rate"
-  // The serialization format for `UpstreamService` allows for the future
-  // addition of fields.  When parsing, additional fields that don't
-  // correspond to any above are included verbatim in `unknown_fields`.
-  std::vector<std::string> unknown_fields;
 };
 
-// Return whether the specified `left` and the specified `right` have the same
-// value.  Two `UpstreamService` objects have the same value when their
-// serialized values are the same.
-bool operator==(const UpstreamService& left, const UpstreamService& right);
-
-// Return upstream service objects parsed from the specified `text`, or throw a
-// `std::invalid_argument` if an error occurs.
-std::vector<UpstreamService> deserializeUpstreamServices(ot::string_view text);
-
-// Return the result of encoding the specified `upstream_services`.
-std::string serializeUpstreamServices(const std::vector<UpstreamService>& upstream_services);
+// Extend the specified `destination` to contain the encoded value of the
+// specified `upstream_service`.  If `destination` is not empty, then a
+// delimiter character will be added before the encoded `upstream_service`.
+void appendUpstreamService(std::string& destination, const UpstreamService& upstream_service);
 
 // Round the specified sampling rate `value` up to the fourth decimal place,
 // format it as a decimal with at most four significant digits, and append the

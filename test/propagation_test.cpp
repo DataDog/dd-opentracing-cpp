@@ -421,7 +421,7 @@ TEST_CASE("sampling behaviour") {
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
   auto buffer =
-      std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});
+      std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -636,7 +636,7 @@ TEST_CASE("force tracing behaviour") {
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
   auto buffer =
-      std::make_shared<WritingSpanBuffer>(logger, writer, sampler, WritingSpanBufferOptions{});
+      std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);

@@ -248,16 +248,16 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
       legacy_obfuscation_(legacyObfuscationEnabled()) {
   configureRulesSampler(sampler);
   startupLog(options);
-  buffer_ = std::make_shared<WritingSpanBuffer>(
+  buffer_ = std::make_shared<SpanBuffer>(
       logger_, writer, sampler,
-      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
+      SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
                                options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  // Get a new span id.
+  // Generate a span ID for the new span to use.
   auto span_id = get_id_();
 
   SpanContext span_context = SpanContext{logger_, span_id, span_id, "", {}};

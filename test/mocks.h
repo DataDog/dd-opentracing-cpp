@@ -156,9 +156,7 @@ struct MockPrioritySampler : public PrioritySampler {
                       uint64_t /* trace_id */) const override {
     SampleResult result;
     result.priority_rate = sampling_rate;
-    if (sampling_priority != nullptr) {
-      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
-    }
+    result.sampling_priority = clone(sampling_priority);
     return result;
   }
   void configure(json new_config) override { config = new_config.dump(); }
@@ -218,19 +216,19 @@ struct MockWriter : public Writer {
   mutable std::mutex mutex_;
 };
 
-struct MockBuffer : public WritingSpanBuffer {
+struct MockBuffer : public SpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr,
-                          std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr,
+                          std::make_shared<RulesSampler>(), SpanBufferOptions{}){};
   explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
-                          WritingSpanBufferOptions{}){};
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+                          SpanBufferOptions{}){};
   // This constructor overload is provided for tests where the service name is
   // relevant, such as those involving `PendingTrace::upstream_services`.
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service,
              uint64_t trace_tags_propagation_max_length = 512)
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
-                          WritingSpanBufferOptions{true, "localhost", std::nan(""), service,
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+                          SpanBufferOptions{true, "localhost", std::nan(""), service,
                                                    trace_tags_propagation_max_length}) {}
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{

@@ -1,35 +1,18 @@
 #ifndef DD_OPENTRACING_BASE64_RFC4648_UNPADDED_H
 #define DD_OPENTRACING_BASE64_RFC4648_UNPADDED_H
 
-// This component extends the `cppcodec` library by defining a base64 codec
-// that does not use padding, but that is otherwise compatible with RFC 4648.
-//
-// Example usage:
-//
-//     std::string base64_greeting = base64_rfc4648_unpadded::encode("hello");
-//     std::string greeting;
-//     base64_rfc4648_unpadded::decode(greeting, base64_greeting);
-//     assert(greeting == "hello");
+#include <opentracing/string_view.h>
 
-#include <cppcodec/base64_rfc4648.hpp>
-#include <cppcodec/detail/base64.hpp>
-#include <cppcodec/detail/codec.hpp>
+namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
-class base64_rfc4648_unpadded_policy : public cppcodec::detail::base64_rfc4648 {
- public:
-  template <typename Codec>
-  using codec_impl = cppcodec::detail::stream_codec<Codec, base64_rfc4648_unpadded_policy>;
-
-  static CPPCODEC_ALWAYS_INLINE constexpr bool generates_padding() { return false; }
-  static CPPCODEC_ALWAYS_INLINE constexpr bool requires_padding() { return false; }
-  // Other static member functions are inherited from the base class.
-};
-
-using base64_rfc4648_unpadded =
-    cppcodec::detail::codec<cppcodec::detail::base64<base64_rfc4648_unpadded_policy>>;
+// Encode the specified `source` data as base64, where the encoding is
+// compatible with RFC 4648 _except_ that any trailing padding characters are
+// omitted.  Append to the specified `destination` the encoded result,
+// expanding the storage of `destination` as needed.
+void appendBase64Unpadded(std::string& destination, ot::string_view source);
 
 }  // namespace opentracing
 }  // namespace datadog

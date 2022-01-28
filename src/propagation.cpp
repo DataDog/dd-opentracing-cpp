@@ -480,7 +480,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       trace_tags = deserializeTags(tags);
       auto tag_found = trace_tags.find(upstream_services_tag);
       if (tag_found != trace_tags.end()) {
-        upstream_services = deserializeUpstreamServices(tag_found->second);
+        // TODO upstream_services = deserializeUpstreamServices(tag_found->second);
         trace_tags.erase(tag_found);
       }
     } catch (const std::invalid_argument &error) {
@@ -591,7 +591,7 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
             trace_tags = deserializeTags(value);
             const auto found_tag = trace_tags.find(upstream_services_tag);
             if (found_tag != trace_tags.end()) {
-              upstream_services = deserializeUpstreamServices(found_tag->second);
+              // TODO upstream_services = deserializeUpstreamServices(found_tag->second);
               trace_tags.erase(found_tag);
             }
           }

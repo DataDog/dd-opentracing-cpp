@@ -137,7 +137,7 @@ class Span : public DatadogSpan {
   OptionalSamplingPriority getSamplingPriority() const override;
 
  private:
-  OptionalSamplingPriority assignSamplingPriority()
+  OptionalSamplingPriority decideSamplingPriority()
       const;  // Sooo not const. See definition of method Span::context.
 
   mutable std::mutex mutex_;
