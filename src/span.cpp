@@ -421,7 +421,7 @@ const ot::SpanContext &Span::context() const noexcept {
   // here, when the context is fetched before being serialized. The disadvantage of doing this here is that if
   // anything else happens to want to get and/or serialize a SpanContext, doing
   // so will have the side-effect of locking-in a sampling decision.
-  buffer_->decideSamplingPriority(span_.get());
+  buffer_->generateSamplingPriority(span_.get());
   return context_;
 }
 

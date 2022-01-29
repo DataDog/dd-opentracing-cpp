@@ -333,6 +333,7 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
   j[json_parent_id_key] = std::to_string(id_);
   OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
   if (sampling_priority != nullptr && prioritySamplingEnabled) {
+    pending_traces->lockSamplingPriority(trace_id_);
     j[json_sampling_priority_key] = static_cast<int>(*sampling_priority);
     if (!origin_.empty()) {
       j[json_origin_key] = origin_;
@@ -389,6 +390,7 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
   if (prioritySamplingEnabled) {
     OptionalSamplingPriority sampling_priority = pending_traces->getSamplingPriority(trace_id_);
     if (sampling_priority != nullptr) {
+      pending_traces->lockSamplingPriority(trace_id_);
       result = writer.Set(headers_impl.sampling_priority_header,
                           headers_impl.encode_sampling_priority(*sampling_priority));
       if (!result) {

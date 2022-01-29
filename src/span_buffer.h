@@ -116,14 +116,14 @@ class SpanBuffer {
   // For example, `setSamplingPriorityFromUser` is called to set the
   // sampling priority when it is decided by a method invoked on a `Span` by
   // client code.
-  OptionalSamplingPriority setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value);
   OptionalSamplingPriority setSamplingPriorityFromUser(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
-  // There is also the private `setSamplingPriorityFromSampler`.
+  // There is also the private `setSamplingPriorityFromSampler` and
+  // `setSamplingPriorityFromExtractedContext`.
 
   // Make a sampling decision for the trace corresponding to the specified
   // `span` if a sampling decision has not already been made. Return the
   // resulting sampling decision.
-  OptionalSamplingPriority decideSamplingPriority(const SpanData* span);
+  OptionalSamplingPriority generateSamplingPriority(const SpanData* span);
 
   // Return the serialization of the trace tags associated with the trace
   // having the specified `trace_id`, or return an empty string if an error
@@ -133,13 +133,13 @@ class SpanBuffer {
   // local root span.
   std::string serializeTraceTags(uint64_t trace_id);
 
-  // Mark whether the trace having the specified `trace_id` inherited its
-  // sampling decision (sampling priority) from an upstream service.
-  void setSamplingDecisionExtracted(uint64_t trace_id, bool was_extracted);
-  
   // Change the name of the service associated with the trace having the
   // specified `trace_id` to the specified `service_name`.
   void setServiceName(uint64_t trace_id, ot::string_view service_name);
+
+  // Do not permit any further changes to the sampling decision for the trace
+  // having the specified `trace_id`.
+  void lockSamplingPriority(uint64_t trace_id);
 
   // Causes the Writer to flush, but does not send any PendingTraces.
   // This function is `virtual` so that it can be overridden in unit tests.
@@ -151,17 +151,18 @@ class SpanBuffer {
 
   OptionalSamplingPriority getSamplingPriorityImpl(uint64_t trace_id) const;
 
-  OptionalSamplingPriority setSamplingPriorityFromExtractedContextImpl(uint64_t trace_id, SamplingPriority value);
   OptionalSamplingPriority setSamplingPriorityFromUserImpl(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
-  // `setSamplingPriorityFromSampler` is only called by
-  // `decideSamplingPriorityImpl`, so it does not need a mutex-locking version.
+  // `setSamplingPriorityFromSampler` and
+  // `setSamplingPriorityFromExtractedContext` are called internally, so they
+  // don't need mutex-locking versions.
   OptionalSamplingPriority setSamplingPriorityFromSampler(uint64_t trace_id, const SampleResult& value);
+  OptionalSamplingPriority setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value);
 
-  OptionalSamplingPriority decideSamplingPriorityImpl(const SpanData* span);
+  OptionalSamplingPriority generateSamplingPriorityImpl(const SpanData* span);
 
   void setSamplerResult(uint64_t trace_id, const SampleResult& sample_result);
   
-  void lockSamplingPriority(uint64_t trace_id);
+  void lockSamplingPriorityImpl(uint64_t trace_id);
 
   std::shared_ptr<const Logger> logger_;
   std::shared_ptr<Writer> writer_;

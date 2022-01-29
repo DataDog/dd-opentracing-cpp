@@ -82,7 +82,7 @@ void appendSamplingRate(std::string& destination, double value) {
 }
 
 void appendUpstreamService(std::string& output, const UpstreamService& upstream_service) {
-  if (output.empty()) {
+  if (!output.empty()) {
     output += ';';
   }
   

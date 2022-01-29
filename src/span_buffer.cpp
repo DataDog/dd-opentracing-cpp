@@ -129,8 +129,9 @@ void SpanBuffer::registerSpan(const SpanContext& context) {
     auto& trace = trace_iter->second;
     // If a sampling priority was extracted, apply it to the pending trace.
     OptionalSamplingPriority p = context.getPropagatedSamplingPriority();
-    trace.sampling_priority_locked = p != nullptr;
-    trace.sampling_priority = std::move(p);
+    if (p != nullptr) {
+      setSamplingPriorityFromExtractedContext(trace_id, *p);
+    }
     // If an origin was extracted, apply it to the pending trace.
     if (!context.origin().empty()) {
       trace.origin = context.origin();
@@ -159,7 +160,7 @@ void SpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   uint64_t trace_id = span->traceId();
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
-    decideSamplingPriorityImpl(trace.finished_spans->back().get());
+    generateSamplingPriorityImpl(trace.finished_spans->back().get());
     trace.finish();
     unbufferAndWriteTrace(trace_id);
   }
@@ -192,17 +193,12 @@ OptionalSamplingPriority SpanBuffer::getSamplingPriorityImpl(uint64_t trace_id) 
   return clone(trace->second.sampling_priority);
 }
 
-OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value) {
-  std::lock_guard<std::mutex> lock_guard{mutex_};
-  return setSamplingPriorityFromExtractedContextImpl(trace_id, value);
-}
-
 OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromUser(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   return setSamplingPriorityFromUserImpl(trace_id, value);
 }
 
-OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContextImpl(uint64_t trace_id, SamplingPriority value) {
+OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value) {
   const auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
     logger_->Trace(trace_id, "cannot set sampling priority, trace not found");
@@ -260,22 +256,21 @@ OptionalSamplingPriority SpanBuffer::setSamplingPriorityFromSampler(uint64_t tra
   }
 
   trace.sampling_priority = clone(value.sampling_priority);
-  // The sampler has made a decision -- the user can no longer override it.
-  trace.sampling_priority_locked = true;
+  // The sampler has made a decision, but we don't know whether the user will
+  // override it before it's needed, so we don't modify
+  // `trace.sampling_priority_locked` here.
   trace.sampling_decision_extracted = false;
   
   return getSamplingPriorityImpl(trace_id);
 }
 
-OptionalSamplingPriority SpanBuffer::decideSamplingPriority(const SpanData* span) {
+OptionalSamplingPriority SpanBuffer::generateSamplingPriority(const SpanData* span) {
   std::lock_guard<std::mutex> lock{mutex_};
-  return decideSamplingPriorityImpl(span);
+  return generateSamplingPriorityImpl(span);
 }
 
-OptionalSamplingPriority SpanBuffer::decideSamplingPriorityImpl(const SpanData* span) {
+OptionalSamplingPriority SpanBuffer::generateSamplingPriorityImpl(const SpanData* span) {
   if (auto sampling_priority = getSamplingPriorityImpl(span->trace_id)) {
-    // We already have a sampling priority.  Let it be the final one.
-    lockSamplingPriority(span->trace_id);
     return sampling_priority;
   }
 
@@ -283,7 +278,6 @@ OptionalSamplingPriority SpanBuffer::decideSamplingPriorityImpl(const SpanData* 
   // saved decision.
   auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
   setSamplerResult(span->trace_id, sampler_result);
-  // Note that `setSamplingPriorityFromSampler` will lock the sampling priority.
   setSamplingPriorityFromSampler(span->trace_id, sampler_result);
   return getSamplingPriorityImpl(span->trace_id);
 }
@@ -321,16 +315,6 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
   return result;
 }
 
-void SpanBuffer::setSamplingDecisionExtracted(uint64_t trace_id, bool was_extracted) {
-  auto trace_entry = traces_.find(trace_id);
-  if (trace_entry == traces_.end()) {
-    logger_->Trace(trace_id, "cannot mark whether sampling decision was extracted, trace not found");
-    return;
-  }
-
-  trace_entry->second.sampling_decision_extracted = was_extracted;
-}
-
 void SpanBuffer::setServiceName(uint64_t trace_id, ot::string_view service_name) {
   auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
@@ -357,6 +341,11 @@ void SpanBuffer::setSamplerResult(uint64_t trace_id, const SampleResult& sample_
 }
 
 void SpanBuffer::lockSamplingPriority(uint64_t trace_id) {
+  std::lock_guard<std::mutex> lock{mutex_};
+  lockSamplingPriorityImpl(trace_id);
+}
+
+void SpanBuffer::lockSamplingPriorityImpl(uint64_t trace_id) {
   const auto trace_entry = traces_.find(trace_id);
   if (trace_entry == traces_.end()) {
     logger_->Trace(trace_id, "cannot lock sampling decision, trace not found");

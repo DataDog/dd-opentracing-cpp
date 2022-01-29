@@ -786,14 +786,9 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
     }
 
     SECTION(
-        "including an UpstreamService for us, if our sampling decision differs from the "
-        "previous") {
-      // `serialized_tags` is based off of an example in the internal RFC (the
-      // choice of this value here is arbitrary).
-      const std::string serialized_tags =
-          "_dd.p.hello=world,_dd.p.upstream_services=bWNudWx0eS13ZWI|0|1|;"
-          "dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
-      // Our sampler will make a decision different from dHJhY2Utc3RhdHMtcXVlcnk's.
+        "including an UpstreamService for us, if we make the sampling decision") {
+      const std::string serialized_tags = "_dd.p.hello=world";
+      // Our sampler will make a decision.
       sampler->sampling_priority =
           std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
       sampler->sampling_mechanism = SamplingMechanism::Default;
@@ -813,6 +808,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
       REQUIRE(span);
 
+      // TODO: maybe SpanContext::serialize needs to make a sampling decision if the priority is null
       std::ostringstream injected;
       auto result = tracer->Inject(span->context(), injected);
       REQUIRE(result);
@@ -821,20 +817,17 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
 
       // The injected tags will look like `serialized_tags`, but with an
       // additional `UpstreamService` appended describing our sampling
-      // decision (because it differs from the previous in
-      // `serialized_tags`).
+      // decision.
       UpstreamService expected_annex;
       expected_annex.service_name = options.service;
-      assert(sampler->sampling_priority);
+      assert(sampler->sampling_priority != nullptr);
       expected_annex.sampling_priority = *sampler->sampling_priority;
-      // Default → priority sampling without an agent-provided rate.
-      expected_annex.sampling_mechanism = int(SamplingMechanism::Default);
-      expected_annex.sampling_rate = sampler->priority_rate;
+      assert(sampler->sampling_mechanism != nullptr);
+      expected_annex.sampling_mechanism = int(sampler->sampling_mechanism.get<SamplingMechanism>());
+      expected_annex.sampling_rate = sampler->applied_rate;
 
       auto expected_tags = deserializeTags(serialized_tags);
-      auto serialized_services = expected_tags.find("_dd.p.upstream_services");
-      REQUIRE(serialized_services != expected_tags.end());
-      std::string& services = serialized_services->second;
+      auto& services = expected_tags["_dd.p.upstream_services"];
       appendUpstreamService(services, expected_annex);
 
       REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) == expected_tags);
