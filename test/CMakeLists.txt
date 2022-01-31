@@ -13,7 +13,7 @@ macro(_datadog_test TEST_NAME)
 endmacro()
 
 _datadog_test(agent_writer_test agent_writer_test.cpp)
-_datadog_test(base64_rfc4648_unpadded_test base64_rfc4648_unpadded_test.cpp)
+_datadog_test(base64_rfc4648_test base64_rfc4648_test.cpp)
 _datadog_test(opentracing_test opentracing_test.cpp)
 _datadog_test(propagation_test propagation_test.cpp)
 _datadog_test(sample_test sample_test.cpp)

@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "base64_rfc4648_unpadded.h"
+#include "base64_rfc4648.h"
 
 namespace datadog {
 namespace opentracing {
@@ -86,7 +86,7 @@ void appendUpstreamService(std::string& output, const UpstreamService& upstream_
     output += ';';
   }
 
-  appendBase64Unpadded(output, upstream_service.service_name);
+  appendBase64(output, upstream_service.service_name);
 
   output += '|';
   output += std::to_string(int(upstream_service.sampling_priority));

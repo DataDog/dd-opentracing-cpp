@@ -1,4 +1,4 @@
-#include "base64_rfc4648_unpadded.h"
+#include "base64_rfc4648.h"
 
 #include <cassert>
 #include <cstddef>
@@ -62,8 +62,8 @@ void base64(const unsigned char *src, size_t src_len, char *dst, size_t dst_len,
 
 }  // namespace
 
-void appendBase64Unpadded(std::string &destination, ot::string_view source) {
-  const bool padding = false;
+void appendBase64(std::string &destination, ot::string_view source) {
+  const bool padding = true;
   const auto base64_length = base64_expected_output_len(source.size(), padding);
   destination.resize(destination.size() + base64_length);
   base64(reinterpret_cast<const unsigned char *>(source.data()), source.size(),
