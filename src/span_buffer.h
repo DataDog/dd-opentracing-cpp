@@ -39,8 +39,10 @@ struct PendingTrace {
         sampling_priority(std::move(sampling_priority)) {}
 
   void finish();
-  // TODO: document
-  // Note that this function is idempotent.
+  // If this tracer did not inherit a sampling decision from an upstream
+  // service, but instead made a sampling decision, then append an
+  // `UpstreamService` record to the "_dd.p.upstream_services" member of
+  // `trace_tags`.  Note that this function is idempotent.
   void applySamplingDecisionToUpstreamServices();
 
   std::shared_ptr<const Logger> logger;
