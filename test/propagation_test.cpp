@@ -756,16 +756,20 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId, logger);
 
   SECTION("is injected") {
-    SECTION("as it was extracted, if our sampling decision does not differ from the previous") {
+    SECTION("as it was extracted, if we did not make a sampling decision") {
+      try {
       const std::string serialized_tags =
           "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
-      // Our sampler will make the same decision as dHJhY2Utc3RhdHMtcXVlcnk.
+      // The sampler's sampling priority won't matter, because we're going to
+      // inherit the sampling priority from extracted context.
       sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+      sampler->sampling_mechanism = SamplingMechanism::Manual;
 
       nlohmann::json json_to_extract;
       json_to_extract["tags"] = serialized_tags;
       json_to_extract["trace_id"] = "123";
       json_to_extract["parent_id"] = "456";
+      json_to_extract["sampling_priority"] = "1";  // sampler keep
       std::istringstream to_extract(json_to_extract.dump());
 
       auto maybe_context = tracer->Extract(to_extract);
@@ -777,12 +781,16 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       REQUIRE(span);
 
       std::ostringstream injected;
-      auto result = tracer->Inject(span->context(), injected);
+      const auto& span_context = span->context();
+      auto result = tracer->Inject(span_context, injected);
       REQUIRE(result);
 
       auto injected_json = nlohmann::json::parse(injected.str());
       REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
               deserializeTags(serialized_tags));
+      } catch (const std::exception& error) {
+        std::cerr << "Exception thrown in test: " << error.what() << '\n';
+      }
     }
 
     SECTION(
@@ -808,7 +816,6 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
       REQUIRE(span);
 
-      // TODO: maybe SpanContext::serialize needs to make a sampling decision if the priority is null
       std::ostringstream injected;
       auto result = tracer->Inject(span->context(), injected);
       REQUIRE(result);
@@ -933,7 +940,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   }
 
   SECTION("can fail to decode; extraction continues with an error message") {
-    const std::string serialized_tags = "_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|bogus|";
+    const std::string serialized_tags = "_dd.p.upstream_services_we_are_missing_an_equal_sign";
 
     nlohmann::json json_to_extract;
     json_to_extract["tags"] = serialized_tags;

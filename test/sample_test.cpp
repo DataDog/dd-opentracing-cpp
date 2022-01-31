@@ -285,6 +285,6 @@ TEST_CASE("rules sampler") {
     REQUIRE(tag_found != span_data.meta.end());
     const std::string& upstream_services = tag_found->second;
     // One service, with the expected sampling mechanism (`SamplingMechanism::Rule == 3`).
-    REQUIRE(upstream_services == "TODO");
+    REQUIRE(upstream_services == "emFwcGFzdmM|2|3|1.0000");
   }
 }

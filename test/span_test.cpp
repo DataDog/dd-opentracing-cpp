@@ -244,8 +244,8 @@ TEST_CASE("span") {
 
     auto& result = buffer->traces().at(100).finished_spans->at(0);
     // Datadog special tags aren't kept, they just set the Span values.
-    REQUIRE(result->meta == std::unordered_map<std::string, std::string>{
-                                {"tag with no special meaning", "ayy lmao"}});
+    REQUIRE(result->meta.find("tag with no special meaning") != result->meta.end());
+    REQUIRE(result->meta.find("tag with no special meaning")->second == "ayy lmao");
     REQUIRE(result->name == "original span name");
     REQUIRE(result->service == "new service");
     REQUIRE(result->type == "new type");

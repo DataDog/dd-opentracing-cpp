@@ -78,7 +78,7 @@ struct PendingTrace {
   bool sampling_decision_extracted = false;
   // `applied_sampling_decision_to_upstream_services` is whether the function
   // `applySamplingDecisionToUpstreamServices` has done its work.
-  bool applied_sampling_decision_to_upstream_services = true;
+  bool applied_sampling_decision_to_upstream_services = false;
 };
 
 struct SpanBufferOptions {

@@ -13,6 +13,9 @@ Options:
   --verbose
     Emit verbose output.  Pass the VERBOSE=1 option to `make` when building,
     and pass the `--verbose` flag to `ctest` when running the tests.
+  
+  --build-only
+    Don't run the tests, just build them.
 
   --help
   -h
@@ -23,9 +26,10 @@ END_USAGE
 # Exit if any non-conditional command returns a nonzero exit status.
 set -e
 
-cmake_flags=('-DBUILD_TESTING=ON')
+cmake_flags=('-DBUILD_TESTING=ON' '-DCMAKE_BUILD_TYPE=Debug')
 make_flags=("--jobs=${MAKE_JOB_COUNT:-$(nproc)}")
 ctest_flags=('--output-on-failure')
+build_only=0
 
 # Parse command line options.
 while [ $# -gt 0 ]; do
@@ -38,6 +42,8 @@ while [ $# -gt 0 ]; do
     --verbose)
       make_flags+=('VERBOSE=1')
       ctest_flags+=('--verbose') ;;
+    --build-only)
+      build_only=1 ;;
     *)
       >&2 usage 
       >&2 printf "\nUnknown option: %s\n" "$1"
@@ -58,4 +64,6 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 cmake "${cmake_flags[@]}" ..
 make "${make_flags[@]}"
-ctest "${ctest_flags[@]}"
+if [ "$build_only" -ne 1 ]; then
+  ctest "${ctest_flags[@]}"
+fi

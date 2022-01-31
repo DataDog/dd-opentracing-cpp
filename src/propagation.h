@@ -85,7 +85,6 @@ class SpanContext : public ot::SpanContext {
   // Returns the propagated "origin". It returns an empty string if no origin was provided.
   const std::string origin() const;
   std::unordered_map<std::string, std::string> getExtractedTraceTags() const;
-  std::vector<UpstreamService> getExtractedUpstreamServices() const;
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -126,11 +125,6 @@ class SpanContext : public ot::SpanContext {
   // `SpanContext` is later injected, these trace tags will be included as the
   // "x-datadog-trace-tags" header, possibly modified.
   std::unordered_map<std::string, std::string> extracted_trace_tags_;
-  // `extracted_upstream_services_` contains the parsed value of the
-  // "_dd.p.upstream_services" tag from the trace tags.  If this `SpanContext`
-  // is later injected, then the upstream services will be included as a trace
-  // tag, possibly with this service's information appended to it.
-  std::vector<UpstreamService> extracted_upstream_services_;
 
   mutable std::mutex mutex_;
 };

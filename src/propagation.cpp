@@ -173,8 +173,7 @@ SpanContext::SpanContext(const SpanContext &other)
       trace_id_(other.trace_id_),
       origin_(other.origin_),
       baggage_(other.baggage_),
-      extracted_trace_tags_(other.extracted_trace_tags_),
-      extracted_upstream_services_(other.extracted_upstream_services_) {
+      extracted_trace_tags_(other.extracted_trace_tags_) {
   if (other.propagated_sampling_priority_ != nullptr) {
     propagated_sampling_priority_.reset(
         new SamplingPriority(*other.propagated_sampling_priority_));
@@ -203,8 +202,7 @@ SpanContext::SpanContext(SpanContext &&other)
       propagated_sampling_priority_(std::move(other.propagated_sampling_priority_)),
       origin_(other.origin_),
       baggage_(std::move(other.baggage_)),
-      extracted_trace_tags_(std::move(other.extracted_trace_tags_)),
-      extracted_upstream_services_(std::move(other.extracted_upstream_services_)) {}
+      extracted_trace_tags_(std::move(other.extracted_trace_tags_)) {}
 
 SpanContext &SpanContext::operator=(SpanContext &&other) {
   std::lock_guard<std::mutex> lock{mutex_};
@@ -216,7 +214,6 @@ SpanContext &SpanContext::operator=(SpanContext &&other) {
   baggage_ = std::move(other.baggage_);
   nginx_opentracing_compatibility_hack_ = other.nginx_opentracing_compatibility_hack_;
   extracted_trace_tags_ = std::move(other.extracted_trace_tags_);
-  extracted_upstream_services_ = std::move(other.extracted_upstream_services_);
   return *this;
 }
 
@@ -268,11 +265,7 @@ uint64_t SpanContext::traceId() const {
 
 OptionalSamplingPriority SpanContext::getPropagatedSamplingPriority() const {
   // Not locked. Both these members are only ever written in the constructor/builder.
-  OptionalSamplingPriority p = nullptr;
-  if (propagated_sampling_priority_ != nullptr) {
-    p.reset(new SamplingPriority(*propagated_sampling_priority_));
-  }
-  return p;
+  return clone(propagated_sampling_priority_);
 }
 
 const std::string SpanContext::origin() const {
@@ -284,12 +277,6 @@ std::unordered_map<std::string, std::string> SpanContext::getExtractedTraceTags(
   // No need to lock `mutex_`, because `extracted_trace_tags_` isn't modified
   // after being initially set by `deserialize`.
   return extracted_trace_tags_;
-}
-
-std::vector<UpstreamService> SpanContext::getExtractedUpstreamServices() const {
-  // No need to lock `mutex_`, because `extracted_upstream_services_` isn't
-  // modified after being initially set by `deserialize`.
-  return extracted_upstream_services_;
 }
 
 void SpanContext::setBaggageItem(ot::string_view key, ot::string_view value) noexcept try {
@@ -311,7 +298,6 @@ SpanContext SpanContext::withId(uint64_t id) const {
   std::lock_guard<std::mutex> lock{mutex_};
   SpanContext context{logger_, id, trace_id_, origin_, decltype(baggage_)(baggage_)};
   context.extracted_trace_tags_ = extracted_trace_tags_;
-  context.extracted_upstream_services_ = extracted_upstream_services_;
   if (propagated_sampling_priority_ != nullptr) {
     context.propagated_sampling_priority_.reset(
         new SamplingPriority(*propagated_sampling_priority_));
@@ -492,7 +478,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   context->extracted_trace_tags_ = std::move(trace_tags);
-  context->extracted_upstream_services_ = std::move(upstream_services);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 } catch (const json::parse_error &) {
   return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
@@ -609,7 +594,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
       std::make_unique<SpanContext>(logger, parent_id, trace_id, origin, std::move(baggage));
   context->propagated_sampling_priority_ = std::move(sampling_priority);
   context->extracted_trace_tags_ = std::move(trace_tags);
-  context->extracted_upstream_services_ = std::move(upstream_services);
   return std::unique_ptr<ot::SpanContext>(std::move(context));
 }
 
