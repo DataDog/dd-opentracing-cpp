@@ -432,7 +432,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   std::string origin;
   std::unordered_map<std::string, std::string> baggage;
   std::unordered_map<std::string, std::string> trace_tags;
-  std::vector<UpstreamService> upstream_services;
   json j;
 
   reader >> j;
@@ -544,7 +543,6 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
   bool origin_set = false;
   std::unordered_map<std::string, std::string> baggage;
   std::unordered_map<std::string, std::string> trace_tags;
-  std::vector<UpstreamService> upstream_services;
   auto result =
       reader.ForeachKey([&](ot::string_view key, ot::string_view value) -> ot::expected<void> {
         try {
