@@ -72,11 +72,12 @@ TEST_CASE("tag propagation codec expected values") {
 }
 
 TEST_CASE("tag propagation decoding duplicate tags") {
-  SECTION("fails when the values are different") {
-    REQUIRE_THROWS_AS(deserializeTags("dupe=foo,dupe=bar"), std::invalid_argument);
+  SECTION("chooses latests value when different") {
+    const std::unordered_map<std::string, std::string> expected{{"dupe", "bar"}};
+    REQUIRE(deserializeTags("dupe=foo,dupe=bar") == expected);
   }
 
-  SECTION("succeeds when the values are the same") {
+  SECTION("chooses lastest value when the same") {
     const std::unordered_map<std::string, std::string> expected{{"dupe", "same"}};
     REQUIRE(deserializeTags("dupe=same,dupe=same") == expected);
   }
@@ -84,5 +85,7 @@ TEST_CASE("tag propagation decoding duplicate tags") {
 
 TEST_CASE("key/value items must contain an equal sign") {
   REQUIRE_THROWS_AS(deserializeTags("valid=version,invalid_version"), std::invalid_argument);
+  // The trailing comma means that there's a second key=value that is the empty
+  // string, and thus missing an equal sign.
   REQUIRE_THROWS_AS(deserializeTags("valid=version,"), std::invalid_argument);
 }

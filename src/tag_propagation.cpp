@@ -13,11 +13,10 @@ namespace opentracing {
 // The grammar was copied from [an internal design document][2].
 //
 //     tagset = ( tag, { ",", tag } ) | "";
-//     tag = ( identifier - space ), "=", identifier;
+//     tag = ( identifier - space or equal ), "=", identifier;
 //     identifier = allowed characters, { allowed characters };
-//     allowed characters = ( ? ASCII characters 32-126 ? - equal or comma );
-//     equal or comma = "=" | ",";
-//     space = " ";
+//     allowed characters = ( ? ASCII characters 32-126 ? - "," );
+//     space or equal = " " | "=";
 //
 // That is, comma-separated "<key>=<value>" pairs.
 //
@@ -36,8 +35,7 @@ ot::string_view range(const char* begin, const char* end) {
 }
 
 // Insert into the specified `destination` a tag decoded from the specified
-// `entry`.  Throw a `std::invalid_argument` if an error occurs.  It is an error
-// if the decoded tag is already in `destination` with a different value.
+// `entry`.  Throw a `std::invalid_argument` if an error occurs.
 void deserializeTag(std::unordered_map<std::string, std::string>& destination,
                     ot::string_view entry) {
   const auto separator = std::find(entry.begin(), entry.end(), '=');
@@ -49,15 +47,8 @@ void deserializeTag(std::unordered_map<std::string, std::string>& destination,
 
   const ot::string_view key = range(entry.begin(), separator);
   const ot::string_view value = range(separator + 1, entry.end());
-  const auto existing = destination.find(key);
-  if (existing != destination.end() && existing->second != value) {
-    std::ostringstream error;
-    error << "duplicate tag in encoded tags: " << key << "=" << existing->second << " versus "
-          << key << "=" << value;
-    throw std::invalid_argument(error.str());
-  } else if (existing == destination.end()) {
-    destination.emplace(key, value);
-  }
+  // Among duplicate keys, most recent value wins.
+  destination[key] = value;
 }
 
 }  // namespace
