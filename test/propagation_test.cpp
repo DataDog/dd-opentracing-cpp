@@ -420,8 +420,7 @@ TEST_CASE("sampling behaviour") {
   auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer =
-      std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
+  auto buffer = std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -635,8 +634,7 @@ TEST_CASE("force tracing behaviour") {
   auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer =
-      std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
+  auto buffer = std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -758,43 +756,43 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   SECTION("is injected") {
     SECTION("as it was extracted, if we did not make a sampling decision") {
       try {
-      const std::string serialized_tags =
-          "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
-      // The sampler's sampling priority won't matter, because we're going to
-      // inherit the sampling priority from extracted context.
-      sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
-      sampler->sampling_mechanism = SamplingMechanism::Manual;
+        const std::string serialized_tags =
+            "_dd.p.hello=world,_dd.p.upstream_services=dHJhY2Utc3RhdHMtcXVlcnk|2|4|";
+        // The sampler's sampling priority won't matter, because we're going to
+        // inherit the sampling priority from extracted context.
+        sampler->sampling_priority =
+            std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+        sampler->sampling_mechanism = SamplingMechanism::Manual;
 
-      nlohmann::json json_to_extract;
-      json_to_extract["tags"] = serialized_tags;
-      json_to_extract["trace_id"] = "123";
-      json_to_extract["parent_id"] = "456";
-      json_to_extract["sampling_priority"] = "1";  // sampler keep
-      std::istringstream to_extract(json_to_extract.dump());
+        nlohmann::json json_to_extract;
+        json_to_extract["tags"] = serialized_tags;
+        json_to_extract["trace_id"] = "123";
+        json_to_extract["parent_id"] = "456";
+        json_to_extract["sampling_priority"] = "1";  // sampler keep
+        std::istringstream to_extract(json_to_extract.dump());
 
-      auto maybe_context = tracer->Extract(to_extract);
-      REQUIRE(maybe_context);
-      auto& context = maybe_context.value();
-      REQUIRE(context);
+        auto maybe_context = tracer->Extract(to_extract);
+        REQUIRE(maybe_context);
+        auto& context = maybe_context.value();
+        REQUIRE(context);
 
-      auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
-      REQUIRE(span);
+        auto span = tracer->StartSpan("OperationMoonUnit", {ot::ChildOf(context.get())});
+        REQUIRE(span);
 
-      std::ostringstream injected;
-      const auto& span_context = span->context();
-      auto result = tracer->Inject(span_context, injected);
-      REQUIRE(result);
+        std::ostringstream injected;
+        const auto& span_context = span->context();
+        auto result = tracer->Inject(span_context, injected);
+        REQUIRE(result);
 
-      auto injected_json = nlohmann::json::parse(injected.str());
-      REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
-              deserializeTags(serialized_tags));
+        auto injected_json = nlohmann::json::parse(injected.str());
+        REQUIRE(deserializeTags(injected_json["tags"].get<std::string>()) ==
+                deserializeTags(serialized_tags));
       } catch (const std::exception& error) {
         std::cerr << "Exception thrown in test: " << error.what() << '\n';
       }
     }
 
-    SECTION(
-        "including an UpstreamService for us, if we make the sampling decision") {
+    SECTION("including an UpstreamService for us, if we make the sampling decision") {
       const std::string serialized_tags = "_dd.p.hello=world";
       // Our sampler will make a decision.
       sampler->sampling_priority =
@@ -830,7 +828,8 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       assert(sampler->sampling_priority != nullptr);
       expected_annex.sampling_priority = *sampler->sampling_priority;
       assert(sampler->sampling_mechanism != nullptr);
-      expected_annex.sampling_mechanism = int(sampler->sampling_mechanism.get<SamplingMechanism>());
+      expected_annex.sampling_mechanism =
+          int(sampler->sampling_mechanism.get<SamplingMechanism>());
       expected_annex.sampling_rate = sampler->applied_rate;
 
       auto expected_tags = deserializeTags(serialized_tags);

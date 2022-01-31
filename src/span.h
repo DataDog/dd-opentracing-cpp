@@ -99,12 +99,11 @@ class Span : public ot::Span {
   // Datadog-specific member functions
 
   uint64_t traceId() const;
-  uint64_t spanId() const; 
+  uint64_t spanId() const;
   // Sets the SamplingPriority. If priority is null, then unsets SamplingPriority. Returns the
   // value of the SamplingPriority; this may not be the same as the given parameter if this trace
   // has propagated from a remote origin and already has a SamplingPriority.
-  OptionalSamplingPriority setSamplingPriority(
-      std::unique_ptr<UserSamplingPriority> priority);
+  OptionalSamplingPriority setSamplingPriority(std::unique_ptr<UserSamplingPriority> priority);
   OptionalSamplingPriority getSamplingPriority() const;
 
   // Change the service name of this span and its associated trace to the

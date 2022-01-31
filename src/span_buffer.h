@@ -95,7 +95,7 @@ struct SpanBufferOptions {
 class SpanBuffer {
  public:
   SpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
-                    std::shared_ptr<RulesSampler> sampler, SpanBufferOptions options);
+             std::shared_ptr<RulesSampler> sampler, SpanBufferOptions options);
   virtual ~SpanBuffer() = default;
 
   void registerSpan(const SpanContext& context);
@@ -116,7 +116,8 @@ class SpanBuffer {
   // For example, `setSamplingPriorityFromUser` is called to set the
   // sampling priority when it is decided by a method invoked on a `Span` by
   // client code.
-  OptionalSamplingPriority setSamplingPriorityFromUser(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
+  OptionalSamplingPriority setSamplingPriorityFromUser(
+      uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
   // There is also the private `setSamplingPriorityFromSampler` and
   // `setSamplingPriorityFromExtractedContext`.
 
@@ -151,17 +152,20 @@ class SpanBuffer {
 
   OptionalSamplingPriority getSamplingPriorityImpl(uint64_t trace_id) const;
 
-  OptionalSamplingPriority setSamplingPriorityFromUserImpl(uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
+  OptionalSamplingPriority setSamplingPriorityFromUserImpl(
+      uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
   // `setSamplingPriorityFromSampler` and
   // `setSamplingPriorityFromExtractedContext` are called internally, so they
   // don't need mutex-locking versions.
-  OptionalSamplingPriority setSamplingPriorityFromSampler(uint64_t trace_id, const SampleResult& value);
-  OptionalSamplingPriority setSamplingPriorityFromExtractedContext(uint64_t trace_id, SamplingPriority value);
+  OptionalSamplingPriority setSamplingPriorityFromSampler(uint64_t trace_id,
+                                                          const SampleResult& value);
+  OptionalSamplingPriority setSamplingPriorityFromExtractedContext(uint64_t trace_id,
+                                                                   SamplingPriority value);
 
   OptionalSamplingPriority generateSamplingPriorityImpl(const SpanData* span);
 
   void setSamplerResult(uint64_t trace_id, const SampleResult& sample_result);
-  
+
   void lockSamplingPriorityImpl(uint64_t trace_id);
 
   std::shared_ptr<const Logger> logger_;

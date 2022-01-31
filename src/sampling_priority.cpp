@@ -11,7 +11,8 @@ OptionalSamplingPriority asSamplingPriority(int i) {
   return std::make_unique<SamplingPriority>(static_cast<SamplingPriority>(i));
 }
 
-OptionalSamplingPriority asSamplingPriority(const std::unique_ptr<UserSamplingPriority>& userPriority) {
+OptionalSamplingPriority asSamplingPriority(
+    const std::unique_ptr<UserSamplingPriority>& userPriority) {
   if (userPriority == nullptr) {
     return nullptr;
   } else {

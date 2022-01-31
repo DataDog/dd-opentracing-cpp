@@ -251,7 +251,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   buffer_ = std::make_shared<SpanBuffer>(
       logger_, writer, sampler,
       SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
-                               options.service, traceTagsPropagationMaxLength(options, *logger_)});
+                        options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,

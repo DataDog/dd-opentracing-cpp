@@ -418,9 +418,9 @@ const ot::SpanContext &Span::context() const noexcept {
   // ensure that users have every chance to apply their own SamplingPriority before one is decided.
   // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
   // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
-  // here, when the context is fetched before being serialized. The disadvantage of doing this here is that if
-  // anything else happens to want to get and/or serialize a SpanContext, doing
-  // so will have the side-effect of locking-in a sampling decision.
+  // here, when the context is fetched before being serialized. The disadvantage of doing this here
+  // is that if anything else happens to want to get and/or serialize a SpanContext, doing so will
+  // have the side-effect of locking-in a sampling decision.
   buffer_->generateSamplingPriority(span_.get());
   return context_;
 }

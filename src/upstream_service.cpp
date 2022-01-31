@@ -85,7 +85,7 @@ void appendUpstreamService(std::string& output, const UpstreamService& upstream_
   if (!output.empty()) {
     output += ';';
   }
-  
+
   appendBase64Unpadded(output, upstream_service.service_name);
 
   output += '|';
