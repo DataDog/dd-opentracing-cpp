@@ -12,7 +12,7 @@ TEST_CASE("unpadded base64 codec") {
     std::string encoded;
   };
 
-  // RFC 4648 base64 encoding, but without any trailing padding.
+  // RFC 4648 base64 encoding
   auto test_case = GENERATE(values<TestCase>({{"hello, world!", "aGVsbG8sIHdvcmxkIQ=="},
                                               {"h", "aA=="},
                                               {"he", "aGU="},
