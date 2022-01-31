@@ -3,7 +3,7 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng|2|3|1.0000",
+        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -27,7 +27,7 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng|2|3|1.0000",
+        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -51,7 +51,7 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng|2|3|1.0000",
+        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
