@@ -174,7 +174,7 @@ TEST_CASE("rules sampler") {
     REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 
-  SECTION("sampling based on rule yields a \"user\" sampling priority") {
+  SECTION("sampling based on rule yields a 'user' sampling priority") {
     // See the comments in `RulesSampler::sample` for an explanation of this
     // section.
 
@@ -254,7 +254,7 @@ TEST_CASE("rules sampler") {
     }
   }
 
-  SECTION("reports \"rule\" sampling mechanism") {
+  SECTION("reports 'rule' sampling mechanism") {
     TracerOptions tracer_options;
     tracer_options.service = "zappasvc";
     tracer_options.sampling_rules = R"([
