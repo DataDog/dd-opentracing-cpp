@@ -60,7 +60,6 @@ cc_library(
         "//:3rd_party_nlohmann",
         "@com_github_msgpack_msgpack_c//:msgpack",
         "@io_opentracing_cpp//:opentracing",
-        "//:3rd_party_cppcodec",
     ],
 )
 
@@ -74,13 +73,6 @@ cc_library(
 cc_library(
     name = "3rd_party_catch2",
     hdrs = ["3rd_party/include/catch2/catch.hpp"],
-    strip_include_prefix = "3rd_party/include",
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "3rd_party_cppcodec",
-    hdrs = glob(["3rd_party/include/cppcodec/**/*.hpp"]),
     strip_include_prefix = "3rd_party/include",
     visibility = ["//visibility:public"],
 )
