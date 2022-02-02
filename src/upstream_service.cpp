@@ -25,7 +25,7 @@ const ot::string_view upstream_services_tag = "_dd.p.upstream_services";
 //               sampling mechanism, "|",
 //               sampling rate, { "|", future field };
 //
-//     service name  =  ? unpadded base64 encoded UTF-8 bytes ?;
+//     service name  =  ? base64-encoded (with padding) UTF-8 bytes ?;
 //
 //     (* no plus signs, no exponential notation, etc. *)
 //     sampling priority  =  ? decimal integer ? ;

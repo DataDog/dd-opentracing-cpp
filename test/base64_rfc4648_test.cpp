@@ -6,7 +6,7 @@
 
 using namespace datadog::opentracing;
 
-TEST_CASE("unpadded base64 codec") {
+TEST_CASE("base64 codec") {
   struct TestCase {
     std::string decoded;
     std::string encoded;
