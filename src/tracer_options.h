@@ -4,30 +4,20 @@
 #include <datadog/opentracing.h>
 
 #include <opentracing/expected/expected.hpp>
+#include <set>
+#include <string>
+#include <vector>
 
 namespace ot = opentracing;
 
 namespace datadog {
 namespace opentracing {
 
-// TODO(cgilmour): clean this up, since it's not really used generically.
-template <class Iterable>
-ot::expected<std::set<PropagationStyle>> asPropagationStyle(Iterable styles) {
-  std::set<PropagationStyle> propagation_styles;
-  for (const std::string& style : styles) {
-    if (style == "Datadog") {
-      propagation_styles.insert(PropagationStyle::Datadog);
-    } else if (style == "B3") {
-      propagation_styles.insert(PropagationStyle::B3);
-    } else {
-      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-    }
-  }
-  if (propagation_styles.size() == 0) {
-    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
-  }
-  return propagation_styles;
-}
+// Return the set of `PropagationStyle`s indicated by `styles`, where `styles`
+// contains the names of one or more propagation styles.  Return an unexpected
+// value if an error occurs.
+ot::expected<std::set<PropagationStyle>> asPropagationStyle(
+    const std::vector<std::string>& styles);
 
 // TODO(cgilmour): refactor this so it returns a "finalized options" type.
 ot::expected<TracerOptions, const char*> applyTracerOptionsFromEnvironment(
