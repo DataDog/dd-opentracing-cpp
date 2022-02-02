@@ -25,7 +25,7 @@ RUN CODENAME=$(lsb_release -s -c) && \
   apt-key add nginx_signing.key && \
   echo deb https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
   echo deb-src https://nginx.org/packages/ubuntu/ ${CODENAME} nginx >> /etc/apt/sources.list && \
-  DEBIAN_FRONTEND=noninteractive apt-get update && \
+  apt-get update && \
   apt-get install nginx=${NGINX_VERSION}-1~${CODENAME}
 
 # Install nginx-opentracing
