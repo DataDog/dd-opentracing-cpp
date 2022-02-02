@@ -72,12 +72,12 @@ TEST_CASE("tag propagation codec expected values") {
 }
 
 TEST_CASE("tag propagation decoding duplicate tags") {
-  SECTION("chooses latests value when different") {
+  SECTION("chooses last value when different") {
     const std::unordered_map<std::string, std::string> expected{{"dupe", "bar"}};
     REQUIRE(deserializeTags("dupe=foo,dupe=bar") == expected);
   }
 
-  SECTION("chooses lastest value when the same") {
+  SECTION("chooses last value when the same") {
     const std::unordered_map<std::string, std::string> expected{{"dupe", "same"}};
     REQUIRE(deserializeTags("dupe=same,dupe=same") == expected);
   }
