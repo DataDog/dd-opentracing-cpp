@@ -9,6 +9,8 @@
 #include <unordered_map>
 
 #include "logger.h"
+#include "sampling_priority.h"
+#include "upstream_service.h"
 
 namespace ot = opentracing;
 
@@ -17,37 +19,16 @@ namespace opentracing {
 
 // Header name prefix for OpenTracing baggage. Should be "ot-baggage-" to support OpenTracing
 // interop.
-const ot::string_view baggage_prefix = "ot-baggage-";
+extern const ot::string_view baggage_prefix;
 
 // Returns a list of strings, where each string is a header that will be used for propagating
-// traces.
+// traces.  This function is exposed for use in unit tests.
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 
 class Tracer;
 class SpanBuffer;
 struct HeadersImpl;
-
-enum class SamplingPriority : int {
-  UserDrop = -1,
-  SamplerDrop = 0,
-  SamplerKeep = 1,
-  UserKeep = 2,
-
-  MinimumValue = UserDrop,
-  MaximumValue = UserKeep,
-};
-
-// A SamplingPriority that encompasses only values that may be directly set by users.
-enum class UserSamplingPriority : int {
-  UserDrop = static_cast<int>(SamplingPriority::UserDrop),
-  UserKeep = static_cast<int>(SamplingPriority::UserKeep),
-};
-
-// Move to std::optional in C++17 when it has better compiler support.
-using OptionalSamplingPriority = std::unique_ptr<SamplingPriority>;
-
-OptionalSamplingPriority asSamplingPriority(int i);
 
 class SpanContext : public ot::SpanContext {
  public:
@@ -103,6 +84,7 @@ class SpanContext : public ot::SpanContext {
   OptionalSamplingPriority getPropagatedSamplingPriority() const;
   // Returns the propagated "origin". It returns an empty string if no origin was provided.
   const std::string origin() const;
+  std::unordered_map<std::string, std::string> getExtractedTraceTags() const;
 
  private:
   static ot::expected<std::unique_ptr<ot::SpanContext>> deserialize(
@@ -136,9 +118,15 @@ class SpanContext : public ot::SpanContext {
   uint64_t trace_id_;
   OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
   std::string origin_;
+  std::unordered_map<std::string, std::string> baggage_;
+  // Trace tags are key/value pairs that are propagated along a trace.  If this
+  // `SpanContext` was extracted, then `extracted_trace_tags_` contains any
+  // trace tags parsed from the "x-datadog-trace-tags" header.  If this
+  // `SpanContext` is later injected, these trace tags will be included as the
+  // "x-datadog-trace-tags" header, possibly modified.
+  std::unordered_map<std::string, std::string> extracted_trace_tags_;
 
   mutable std::mutex mutex_;
-  std::unordered_map<std::string, std::string> baggage_;
 };
 
 }  // namespace opentracing

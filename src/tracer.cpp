@@ -16,6 +16,7 @@
 #include <sstream>
 
 #include "bool.h"
+#include "parse_util.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -140,6 +141,26 @@ void startupLog(TracerOptions &options) {
   options.log_func(LogLevel::info, message);
 }
 
+uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logger &logger) {
+  const char env_name[] = "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH";
+  const char *const env_value = std::getenv(env_name);
+  if (env_value == nullptr) {
+    return options.trace_tags_propagation_max_length;
+  }
+
+  try {
+    return parse_uint64(env_value, 10);
+  } catch (const std::logic_error &error) {
+    std::string message = error.what();
+    message += ": Unable to parse integer from ";
+    message += env_name;
+    message += " environment variable value: ";
+    message += env_value;
+    logger.Log(LogLevel::error, message);
+    return options.trace_tags_propagation_max_length;
+  }
+}
+
 }  // namespace
 
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept try {
@@ -210,8 +231,8 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id)
-    : logger_(std::make_shared<StandardLogger>(options.log_func)),
+               IdProvider get_id, std::shared_ptr<const Logger> logger)
+    : logger_(logger ? logger : std::make_shared<StandardLogger>(options.log_func)),
       opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
@@ -227,15 +248,16 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
       legacy_obfuscation_(legacyObfuscationEnabled()) {
   configureRulesSampler(sampler);
   startupLog(options);
-  buffer_ = std::make_shared<WritingSpanBuffer>(
+  buffer_ = std::make_shared<SpanBuffer>(
       logger_, writer, sampler,
-      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
+      SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
+                        options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  // Get a new span id.
+  // Generate a span ID for the new span to use.
   auto span_id = get_id_();
 
   SpanContext span_context = SpanContext{logger_, span_id, span_id, "", {}};

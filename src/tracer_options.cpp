@@ -87,6 +87,24 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
 
 }  // namespace
 
+ot::expected<std::set<PropagationStyle>> asPropagationStyle(
+    const std::vector<std::string> &styles) {
+  std::set<PropagationStyle> propagation_styles;
+  for (const std::string &style : styles) {
+    if (style == "Datadog") {
+      propagation_styles.insert(PropagationStyle::Datadog);
+    } else if (style == "B3") {
+      propagation_styles.insert(PropagationStyle::B3);
+    } else {
+      return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+    }
+  }
+  if (propagation_styles.size() == 0) {
+    return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
+  }
+  return propagation_styles;
+}
+
 ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     const TracerOptions &input) {
   TracerOptions opts = input;

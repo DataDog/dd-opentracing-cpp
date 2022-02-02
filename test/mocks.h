@@ -7,6 +7,7 @@
 #include <list>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -17,6 +18,32 @@
 #include "../src/tracer.h"
 #include "../src/transport.h"
 #include "../src/writer.h"
+
+using dict = std::unordered_map<std::string, std::string>;
+
+namespace std {
+
+// This printing operator is defined here for debugging purposes.
+// This way, `REQUIRE(some_dict == another_dict)` will print the values
+// when they're not equal.
+//
+// Doing this is technically [undefined behavior][1], but I can't find a
+// compiler that cares.
+// [1]: https://en.cppreference.com/w/cpp/language/extending_std
+inline std::ostream& operator<<(std::ostream& stream, const dict& map) {
+  stream << "unordered_map[";
+  auto iter = map.begin();
+  const auto end = map.end();
+  if (iter != end) {
+    stream << iter->first << " = " << iter->second;
+    for (++iter; iter != end; ++iter) {
+      stream << ", " << iter->first << " = " << iter->second;
+    }
+  }
+  return stream << ']';
+}
+
+}  // namespace std
 
 namespace datadog {
 namespace opentracing {
@@ -129,9 +156,7 @@ struct MockPrioritySampler : public PrioritySampler {
                       uint64_t /* trace_id */) const override {
     SampleResult result;
     result.priority_rate = sampling_rate;
-    if (sampling_priority != nullptr) {
-      result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
-    }
+    result.sampling_priority = clone(sampling_priority);
     return result;
   }
   void configure(json new_config) override { config = new_config.dump(); }
@@ -151,15 +176,21 @@ struct MockRulesSampler : public RulesSampler {
     if (sampling_priority != nullptr) {
       result.rule_rate = rule_rate;
       result.limiter_rate = limiter_rate;
+      result.priority_rate = priority_rate;
+      result.applied_rate = applied_rate;
       result.sampling_priority = std::make_unique<SamplingPriority>(*sampling_priority);
+      result.sampling_mechanism = sampling_mechanism;
     }
     return result;
   }
   void updatePrioritySampler(json new_config) override { config = new_config.dump(); }
 
   OptionalSamplingPriority sampling_priority = nullptr;
+  OptionalSamplingMechanism sampling_mechanism;
   double rule_rate = 1.0;
   double limiter_rate = 1.0;
+  double priority_rate = std::nan("");
+  double applied_rate = std::nan("");
   std::string config;
 };
 
@@ -185,13 +216,19 @@ struct MockWriter : public Writer {
   mutable std::mutex mutex_;
 };
 
-struct MockBuffer : public WritingSpanBuffer {
+struct MockBuffer : public SpanBuffer {
   MockBuffer()
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr,
-                          std::make_shared<RulesSampler>(), WritingSpanBufferOptions{}){};
-  MockBuffer(std::shared_ptr<RulesSampler> sampler)
-      : WritingSpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
-                          WritingSpanBufferOptions{}){};
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, std::make_shared<RulesSampler>(),
+                   SpanBufferOptions{}){};
+  explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, SpanBufferOptions{}){};
+  // This constructor overload is provided for tests where the service name is
+  // relevant, such as those involving `PendingTrace::upstream_services`.
+  MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service,
+             uint64_t trace_tags_propagation_max_length = 512)
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+                   SpanBufferOptions{true, "localhost", std::nan(""), service,
+                                     trace_tags_propagation_max_length}) {}
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.
@@ -333,8 +370,10 @@ struct MockHandle : public Handle {
   std::condition_variable perform_called;
 };
 
-// A Mock TextMapReader and TextMapWriter.
-// Not in mocks.h since we only need it here for now.
+// `MockTextMapCarrier` is a `TextMapReader` and a `TextMapWriting` implemented
+// in terms of an owned `std::unordered_map<std::string, std::string>`.
+// Additionally, it can simulate eventual failure of the `Set` member function
+// via the `set_fails_after` data member.
 struct MockTextMapCarrier : ot::TextMapReader, ot::TextMapWriter {
   MockTextMapCarrier() {}
 
