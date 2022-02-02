@@ -3,9 +3,6 @@
 #include <cassert>
 #include <cstddef>
 
-// This encoder is based on
-// https://raw.githubusercontent.com/DataDog/driveline/500474309e6150cd79fdf6504b27fd015edab1ce/src/common/base64.h
-
 namespace datadog {
 namespace opentracing {
 namespace {
