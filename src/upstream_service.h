@@ -4,10 +4,9 @@
 // This component provides a type, `UpstreamService`, that contains the
 // sampling decision made by a service that preceded us in the current trace.
 // A subset of the prefix of all upstream services for the current trace is
-// propagated from service to service along the trace.  The upstream services
-// are encoded to and decoded from their propagation format by the provided
-// functions `serializeUpstreamServices` and `deserializeUpstreamServices`,
-// respectively.
+// propagated from service to service along the trace.  An `UpstreamService`
+// object is added to an encoded list using the `appendUpstreamService`
+// function.
 //
 // In addition to being propagated along the trace, upstream services are also
 // sent to the agent as a span tag, "_dd.p.upstream_services", in the local
