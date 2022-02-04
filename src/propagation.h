@@ -26,7 +26,6 @@ extern const ot::string_view baggage_prefix;
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 
-class Tracer;
 class SpanBuffer;
 struct HeadersImpl;
 
