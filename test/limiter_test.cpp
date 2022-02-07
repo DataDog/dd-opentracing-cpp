@@ -90,11 +90,11 @@ TEST_CASE("limiter") {
 
   SECTION("updates tokens at multi-second intervals") {
     Limiter lim(get_time, 1, 0.25, 1);  // replace tokens @ 0.25 per second (i.e. every 4 seconds)
-    
+
     // 0 seconds (0s)
     auto result = lim.allow();
     REQUIRE(result.allowed);
-    
+
     for (int i = 0; i < 3; ++i) {
       // 1s, 2s, 3s... still haven't released a token
       advanceTime(time, std::chrono::seconds(1));
@@ -123,7 +123,7 @@ TEST_CASE("limiter") {
     auto result = lim.allow();
     REQUIRE(!result.allowed);
 
-    advanceTime(time, std::chrono::milliseconds(int(1/per_second * 1000) + 1));
+    advanceTime(time, std::chrono::milliseconds(int(1 / per_second * 1000) + 1));
     result = lim.allow();
     REQUIRE(result.allowed);
     result = lim.allow();

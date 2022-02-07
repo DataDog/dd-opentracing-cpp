@@ -72,15 +72,17 @@ struct TracerOptions {
   double sample_rate = std::nan("");
   // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
-  // Rules sampling is applied when initiating traces to determine the sampling rate.
-  // Traces that do not match any rules fall back to using priority sampling, where the rate is
-  // determined by a combination of user-assigned priorities and configuration from the agent.
-  // Configuration is specified as a JSON array of objects. Each object must have a "sample_rate",
-  // and the "name" and "service" fields are optional. The "sample_rate" value must be between 0.0
-  // and 1.0 (inclusive). Rules are applied in configured order, so a specific match should be
-  // specified before a wider match. If any rules are invalid, they are ignored. Can also be set by
-  // the environment variable DD_TRACE_SAMPLING_RULES.
-  std::string sampling_rules = R"([{"sample_rate": 1.0}])";
+  // Rules sampling is applied when initiating traces to determine the sampling
+  // rate.  Configuration is specified as a JSON array of objects. Each object
+  // must have a "sample_rate", while the "name" and "service" fields are
+  // optional. The "sample_rate" value must be between 0.0 and 1.0 (inclusive).
+  // Rules are applied in configured order, so a more specific match should be
+  // specified before a less specific match.  There is an implicit rule at the
+  // end of the list that matches any trace unmatched by other rules, and
+  // applies a sampling rate of 1.0.  If any rules are invalid, they are
+  // ignored. This option is also configurable as the environment variable
+  // DD_TRACE_SAMPLING_RULES.
+  std::string sampling_rules = "[]";
   // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
   // than 10s, so that is the upper bound.
   int64_t write_period_ms = 1000;
@@ -134,6 +136,11 @@ struct TracerOptions {
     }
     std::cerr << level_str + ": " + message.data() + "\n";
   };
+  // `sampling_limit_per_second` is the limit on the number of rule-controlled
+  // traces that may be sampled per second.  This includes traces that match
+  // the implicit "catch-all" rule appended to `sampling_rules`.  This option
+  // is also configurable as the environment variable DD_TRACE_RATE_LIMIT.
+  double sampling_limit_per_second = 100;
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

@@ -118,7 +118,7 @@ TEST_CASE("rules sampler") {
     }
   }
 
-  SECTION("falls back to priority sampling when no matching rule") {
+  SECTION("falls back to built-in catch-all rule when no matching user-specified rule") {
     TracerOptions tracer_options;
     tracer_options.service = "test.service";
     tracer_options.sampling_rules = R"([
@@ -131,9 +131,9 @@ TEST_CASE("rules sampler") {
     span->FinishWithOptions(finish_options);
 
     auto& metrics = mwriter->traces[0][0]->metrics;
-    REQUIRE(metrics.find("_dd.rule_psr") == metrics.end());
-    REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
-    REQUIRE(metrics.find("_dd.agent_psr") != metrics.end());
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics.find("_dd.limit_psr") != metrics.end());
+    REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 
   SECTION("rule matching applied to overridden name") {

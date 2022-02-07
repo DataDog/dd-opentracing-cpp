@@ -3,15 +3,31 @@
 #include <opentracing/ext/tags.h>
 
 #include <catch2/catch.hpp>
+#include <ostream>
 using namespace datadog::opentracing;
+using namespace std::string_literals;
 
-void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, const char *> &lhs,
-                                      const ot::expected<TracerOptions, const char *> &rhs) {
+namespace datadog {
+namespace opentracing {
+
+std::ostream &operator<<(std::ostream &stream,
+                         const ot::expected<TracerOptions, std::string> &result) {
+  if (result.has_value()) {
+    return stream << "TracerOptions{...}";
+  }
+  return stream << result.error();
+}
+
+}  // namespace opentracing
+}  // namespace datadog
+
+void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, std::string> &lhs,
+                                      const ot::expected<TracerOptions, std::string> &rhs) {
   // One is an error, the other not.
   REQUIRE((!!lhs) == (!!rhs));
   // They're both errors.
   if (!lhs) {
-    REQUIRE(std::string(lhs.error()) == std::string(rhs.error()));
+    REQUIRE(lhs.error() == rhs.error());
     return;
   }
   // Compare TracerOptions.
@@ -45,7 +61,7 @@ TEST_CASE("tracer options from environment variables") {
   TracerOptions input{};
   struct TestCase {
     std::map<std::string, std::string> environment_variables;
-    ot::expected<TracerOptions, const char *> expected;
+    ot::expected<TracerOptions, std::string> expected;
   };
 
   auto test_case = GENERATE(values<TestCase>({
@@ -87,19 +103,20 @@ TEST_CASE("tracer options from environment variables") {
            "test-version v0.0.1",
        }},
       {{{"DD_PROPAGATION_STYLE_EXTRACT", "Not even a real style"}},
-       ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid")},
+       ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid"s)},
       {{{"DD_PROPAGATION_STYLE_INJECT", "Not even a real style"}},
-       ot::make_unexpected("Value for DD_PROPAGATION_STYLE_INJECT is invalid")},
+       ot::make_unexpected("Value for DD_PROPAGATION_STYLE_INJECT is invalid"s)},
       {{{"DD_TRACE_AGENT_PORT", "sixty nine"}},
-       ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is invalid")},
+       ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is invalid"s)},
       {{{"DD_TRACE_AGENT_PORT", "9223372036854775807"}},
-       ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is out of range")},
+       ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is out of range"s)},
       {{{"DD_TRACE_REPORT_HOSTNAME", "yes please"}},
-       ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid")},
+       ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid"s)},
       {{{"DD_TRACE_ANALYTICS_ENABLED", "yes please"}},
-       ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid")},
+       ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid"s)},
       {{{"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1"}},
-       ot::make_unexpected("Value for DD_TRACE_ANALYTICS_SAMPLE_RATE is invalid")},
+       ot::make_unexpected(
+           "DD_TRACE_ANALYTICS_SAMPLE_RATE is not within the expected bounds [0, 1]: 1.1"s)},
   }));
 
   // Setup
