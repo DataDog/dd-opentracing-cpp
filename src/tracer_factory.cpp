@@ -85,6 +85,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("dd.trace.analytics-sample-rate") != config.end()) {
       config.at("dd.trace.analytics-sample-rate").get_to(options.analytics_rate);
     }
+    if (config.find("sampling_limit_per_second") != config.end()) {
+      config.at("sampling_limit_per_second").get_to(options.sampling_limit_per_second);
+    }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));
