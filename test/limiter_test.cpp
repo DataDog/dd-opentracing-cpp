@@ -111,4 +111,22 @@ TEST_CASE("limiter") {
     result = lim.allow();
     REQUIRE(!result.allowed);
   }
+
+  SECTION("dedicated constructor configures based on desired allowed-per-second") {
+    const double per_second = 23.887;
+    Limiter lim(get_time, per_second);
+    for (int i = 0; i < 24; ++i) {
+      auto result = lim.allow();
+      REQUIRE(result.allowed);
+    }
+
+    auto result = lim.allow();
+    REQUIRE(!result.allowed);
+
+    advanceTime(time, std::chrono::milliseconds(int(1/per_second * 1000) + 1));
+    result = lim.allow();
+    REQUIRE(result.allowed);
+    result = lim.allow();
+    REQUIRE(!result.allowed);
+  }
 }
