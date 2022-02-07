@@ -79,14 +79,15 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_ANALYTICS_ENABLED", "true"},
         {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"},
         {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"},
-        {"DD_TRACE_RATE_LIMIT", "200"}},
+        {"DD_TRACE_RATE_LIMIT", "200"},
+        {"DD_TRACE_SAMPLE_RATE", "0.7"}},
        TracerOptions{
            "host",                                             // agent_host
            420,                                                // agent_port
            "service",                                          // service
            "web",                                              // type
            "test-env",                                         // environment
-           std::nan(""),                                       // sample_rate
+           0.7,                                                // sample_rate
            true,                                               // priority_sampling
            "rules",                                            // sampling_rules
            1000,                                               // write_period_ms

@@ -123,6 +123,7 @@ void startupLog(TracerOptions &options) {
   }
   j["analytics_enabled"] = options.analytics_enabled;
   j["analytics_sample_rate"] = options.analytics_rate;
+  j["sample_rate"] = options.sample_rate;
   j["sampling_rules"] = options.sampling_rules;
   j["sampling_limit_per_second"] = options.sampling_limit_per_second;
   if (!options.tags.empty()) {
@@ -236,9 +237,11 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
     logger_->Log(LogLevel::error, message.str());
   }
 
-  // Add an automatic "catch all" rule to the end that samples at 100%.
+  // Add an automatic "catch all" rule to the end that samples at the default
+  // sample rate.
+  const double sample_rate = opts_.sample_rate;
   sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
-    return {true, 1.0};
+    return {true, sample_rate};
   });
 }
 

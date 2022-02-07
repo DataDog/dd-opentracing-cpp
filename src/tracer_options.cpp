@@ -264,6 +264,15 @@ ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
     opts.sampling_limit_per_second = maybe_value.value();
   }
 
+  auto sample_rate = std::getenv("DD_TRACE_SAMPLE_RATE");
+  if (sample_rate != nullptr) {
+    auto maybe_value = parseDouble(sample_rate, 0.0, 1.0, "DD_TRACE_SAMPLE_RATE");
+    if (!maybe_value) {
+      return ot::make_unexpected(maybe_value.error());
+    }
+    opts.sample_rate = maybe_value.value();
+  }
+
   return opts;
 }
 

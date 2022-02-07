@@ -66,10 +66,10 @@ struct TracerOptions {
   // The environment this trace belongs to. eg. "" (env:none), "staging", "prod". Can also be set
   // by the environment variable DD_ENV
   std::string environment = "";
-  // This option is deprecated and may be removed in future releases.
-  // It is equivalent to setting a sampling rule with only a "sample_rate".
-  // Values must be between 0.0 and 1.0 (inclusive)
-  double sample_rate = std::nan("");
+  // `sample_rate` is the default sampling rate for any trace unmatched by a
+  // sampling rule.  Setting `sample_rate` is equivalent to appending to
+  // `sampling_rules` a rule whose "sample_rate" is `sample_rate`.
+  double sample_rate = 1.0;
   // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
   // Rules sampling is applied when initiating traces to determine the sampling
@@ -79,7 +79,7 @@ struct TracerOptions {
   // Rules are applied in configured order, so a more specific match should be
   // specified before a less specific match.  There is an implicit rule at the
   // end of the list that matches any trace unmatched by other rules, and
-  // applies a sampling rate of 1.0.  If any rules are invalid, they are
+  // applies a sampling rate of `sample_rate`.  If any rules are invalid, they are
   // ignored. This option is also configurable as the environment variable
   // DD_TRACE_SAMPLING_RULES.
   std::string sampling_rules = "[]";
