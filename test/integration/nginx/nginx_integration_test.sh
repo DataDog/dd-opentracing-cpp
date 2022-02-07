@@ -137,59 +137,7 @@ then
 fi
 
 reset_test
-# Test 4: Check that priority sampling works.
-# Start the mock agent
-wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
-curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "{\"rate_by_service\":{\"service:nginx,env:prod\":0.5, \"service:nginx,env:\":0.2, \"service:wrong,env:\":0.1, \"service:nginx,env:wrong\":0.9}}" }}' http://localhost:8126/__admin/mappings/new
-# Start a HTTP server to receive distributed traces.
-wiremock --port 8080 >/dev/null 2>&1 & wait_for_port 8080
-curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "Hello World" }}' http://localhost:8080/__admin/mappings/new
-
-echo '{
-  "service": "nginx",
-  "operation_name_override": "nginx.handle",
-  "agent_host": "localhost",
-  "agent_port": 8126,
-  "sampling_rules": [],
-  "environment": "prod"
-}' > ${TRACER_CONF_PATH}
-
-run_nginx
-
-# Let the tracer make a first request with spans to the agent, this will allow the agent to return
-# the priority sampling config.
-curl -s localhost 1> /tmp/curl_log.txt
-get_n_traces 1 >/dev/null
-
-# Sample a bunch of requests.
-curl -s localhost/proxy/?[1-1000] 1> /tmp/curl_log.txt
-
-# Check the traces the agent got.
-GOT=$(get_n_traces 1000)
-RATE=$(echo $GOT | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
-if [ $(echo $RATE | jq '(. > 0.45) and (. < 0.55)') != "true" ]
-then
-  echo "Test 4 failed: Sample rate should be ~0.5 but was $RATE"
-  exit 1
-fi
-
-# Check the priority sampling was propagated for distributed traces.
-PROP_RATE=$(curl -s http://localhost:8080/__admin/requests | jq -r '[.requests[].request.headers."x-datadog-sampling-priority" | tonumber] | add/length')
-if [ $RATE != $PROP_RATE ]
-then
-  echo "Test 4 failed: propagated sample rate should be $RATE but was $PROP_RATE"
-  exit 1
-fi
-
-# Check that there were no errors.
-if ! [ "$(cat ${NGINX_ERROR_LOG} | wc -w)" = 0 ]
-then
-  echo "Test 4 failed: Unexpected error in nginx logs:"
-  cat ${NGINX_ERROR_LOG}
-fi
-
-reset_test
-# Test 5: Ensure that NGINX errors are reported to Datadog
+# Test 4: Ensure that NGINX errors are reported to Datadog
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
 wait_for_port 8126
@@ -213,7 +161,7 @@ fi
 
 reset_test
 
-# Test 6: Origin header is propagated and adds a tag
+# Test 5: Origin header is propagated and adds a tag
 wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8126/__admin/mappings/new
 wiremock --port 8080 >/dev/null 2>&1 & wait_for_port 8080
