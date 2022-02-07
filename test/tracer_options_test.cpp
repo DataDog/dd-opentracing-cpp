@@ -55,6 +55,7 @@ void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, std::str
     REQUIRE(lhs->analytics_rate == rhs->analytics_rate);
   }
   REQUIRE(lhs->tags == rhs->tags);
+  REQUIRE(lhs->sampling_limit_per_second == rhs->sampling_limit_per_second);
 }
 
 TEST_CASE("tracer options from environment variables") {
@@ -77,30 +78,35 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_REPORT_HOSTNAME", "true"},
         {"DD_TRACE_ANALYTICS_ENABLED", "true"},
         {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"},
-        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"}},
+        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"},
+        {"DD_TRACE_RATE_LIMIT", "200"}},
        TracerOptions{
-           "host",
-           420,
-           "service",
-           "web",
-           "test-env",
-           std::nan(""),
-           true,
-           "rules",
-           1000,
-           "",
-           {PropagationStyle::Datadog, PropagationStyle::B3},
-           {PropagationStyle::Datadog, PropagationStyle::B3},
-           true,
-           true,
-           0.5,
+           "host",                                             // agent_host
+           420,                                                // agent_port
+           "service",                                          // service
+           "web",                                              // type
+           "test-env",                                         // environment
+           std::nan(""),                                       // sample_rate
+           true,                                               // priority_sampling
+           "rules",                                            // sampling_rules
+           1000,                                               // write_period_ms
+           "",                                                 // operation_name_override
+           {PropagationStyle::Datadog, PropagationStyle::B3},  // extract
+           {PropagationStyle::Datadog, PropagationStyle::B3},  // inject
+           true,                                               // report_hostname
+           true,                                               // analytics_enabled
+           0.5,                                                // analytics_rate
            {
                {"host", "my-host-name"},
                {"region", "us-east-1"},
                {"datacenter", "us"},
                {"partition", "5"},
-           },
-           "test-version v0.0.1",
+           },                                 // tags
+           "test-version v0.0.1",             // version
+           "",                                // agent_url
+           [](LogLevel, ot::string_view) {},  // log_func (dummy)
+           512,                               // trace_tags_propagation_max_length
+           200                                // sampling_limit_per_second
        }},
       {{{"DD_PROPAGATION_STYLE_EXTRACT", "Not even a real style"}},
        ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid"s)},
