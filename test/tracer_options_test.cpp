@@ -124,6 +124,36 @@ TEST_CASE("tracer options from environment variables") {
       {{{"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1"}},
        ot::make_unexpected(
            "while parsing DD_TRACE_ANALYTICS_SAMPLE_RATE: not within the expected bounds [0, 1]: 1.1"s)},
+      // Each of DD_TRACE_SAMPLE_RATE and DD_TRACE_RATE_LIMIT can fail to parse
+      // for any of the following reasons:
+      // - not a floating point number
+      // - can't fit in a double
+      // - outside of the expected range (e.g. [0, 1] for DD_TRACE_SAMPLE_RATE)
+      // - has non-whitespace trailing characters
+      {{{"DD_TRACE_SAMPLE_RATE", "total nonsense"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_SAMPLE_RATE: does not look like a double: total nonsense"s)},
+      {{{"DD_TRACE_SAMPLE_RATE", "3.14e99999"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_SAMPLE_RATE: not within the range of a double: 3.14e99999"s)},
+      {{{"DD_TRACE_SAMPLE_RATE", "1.6"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_SAMPLE_RATE: not within the expected bounds [0, 1]: 1.6"s)},
+      {{{"DD_TRACE_SAMPLE_RATE", "0.5 BOOM"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_SAMPLE_RATE: contains trailing non-floating-point characters: 0.5 BOOM"s)},
+      {{{"DD_TRACE_RATE_LIMIT", "total nonsense"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_RATE_LIMIT: does not look like a double: total nonsense"s)},
+      {{{"DD_TRACE_RATE_LIMIT", "3.14e99999"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_RATE_LIMIT: not within the range of a double: 3.14e99999"s)},
+      {{{"DD_TRACE_RATE_LIMIT", "-8"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_RATE_LIMIT: not within the expected bounds [0, inf]: -8"s)},
+      {{{"DD_TRACE_RATE_LIMIT", "0.5 BOOM"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_RATE_LIMIT: contains trailing non-floating-point characters: 0.5 BOOM"s)},
   }));
 
   // Setup
