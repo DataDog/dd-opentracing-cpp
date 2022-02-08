@@ -139,6 +139,9 @@ TEST_CASE("tracer options from environment variables") {
       {{{"DD_TRACE_SAMPLE_RATE", "1.6"}},
        ot::make_unexpected(
            "while parsing DD_TRACE_SAMPLE_RATE: not within the expected bounds [0, 1]: 1.6"s)},
+      {{{"DD_TRACE_SAMPLE_RATE", "NaN"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_SAMPLE_RATE: not within the expected bounds [0, 1]: nan"s)},
       {{{"DD_TRACE_SAMPLE_RATE", "0.5 BOOM"}},
        ot::make_unexpected(
            "while parsing DD_TRACE_SAMPLE_RATE: contains trailing non-floating-point characters: 0.5 BOOM"s)},
@@ -151,6 +154,9 @@ TEST_CASE("tracer options from environment variables") {
       {{{"DD_TRACE_RATE_LIMIT", "-8"}},
        ot::make_unexpected(
            "while parsing DD_TRACE_RATE_LIMIT: not within the expected bounds [0, inf]: -8"s)},
+      {{{"DD_TRACE_RATE_LIMIT", "NaN"}},
+       ot::make_unexpected(
+           "while parsing DD_TRACE_RATE_LIMIT: not within the expected bounds [0, inf]: nan"s)},
       {{{"DD_TRACE_RATE_LIMIT", "0.5 BOOM"}},
        ot::make_unexpected(
            "while parsing DD_TRACE_RATE_LIMIT: contains trailing non-floating-point characters: 0.5 BOOM"s)},

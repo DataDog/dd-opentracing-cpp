@@ -97,7 +97,9 @@ ot::expected<double, std::string> parseDouble(const std::string &text, double mi
                   [](unsigned char ch) { return !std::isspace(ch); })) {
     return ot::make_unexpected("contains trailing non-floating-point characters: " + text);
   }
-  if (value < minimum || value > maximum) {
+  // Note: Check "not inside" instead of "outside" so that the error is
+  // triggered for NaN `value`.
+  if (!(value >= minimum && value <= maximum)) {
     std::ostringstream error;
     error << "not within the expected bounds [" << minimum << ", " << maximum << "]: " << value;
     return ot::make_unexpected(error.str());
