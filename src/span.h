@@ -5,7 +5,7 @@
 
 #include "clock.h"
 #include "logger.h"
-#include "propagation.h"
+#include "span_context.h"
 
 namespace ot = opentracing;
 

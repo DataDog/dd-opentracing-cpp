@@ -1,5 +1,3 @@
-#include "../src/propagation.h"
-
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
@@ -10,6 +8,7 @@
 #include <string>
 
 #include "../src/span.h"
+#include "../src/span_context.h"
 #include "../src/tag_propagation.h"
 #include "../src/tracer.h"
 #include "mocks.h"
