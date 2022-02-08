@@ -10,13 +10,13 @@
 
 #include "sample.h"
 #include "span.h"
+#include "trace_data.h"
 
 namespace datadog {
 namespace opentracing {
 
 class Writer;
 class SpanContext;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 // `PendingTrace` is an implementation detail of `SpanBuffer`.  A
 // `PendingTrace` contains all of the information associated with a trace as it
@@ -27,14 +27,14 @@ struct PendingTrace {
   PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id)
       : logger(logger),
         trace_id(trace_id),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
+        finished_spans(TraceData{new std::vector<std::unique_ptr<SpanData>>()}),
         all_spans() {}
   // This constructor is only used in propagation tests.
   PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id,
                std::unique_ptr<SamplingPriority> sampling_priority)
       : logger(logger),
         trace_id(trace_id),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
+        finished_spans(TraceData{new std::vector<std::unique_ptr<SpanData>>()}),
         all_spans(),
         sampling_priority(std::move(sampling_priority)) {}
 
@@ -47,7 +47,7 @@ struct PendingTrace {
 
   std::shared_ptr<const Logger> logger;
   uint64_t trace_id;
-  Trace finished_spans;
+  TraceData finished_spans;
   std::unordered_set<uint64_t> all_spans;
   OptionalSamplingPriority sampling_priority;
   bool sampling_priority_locked = false;

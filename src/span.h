@@ -16,7 +16,9 @@ class Tracer;
 class SpanBuffer;
 typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 
-// Contains data that describes a Span.
+// `SpanData` contains the data fields associated with a `Span`.  A `Span`
+// additionally contains handles to mechanisms it needs in order to implement
+// its methods (e.g. the logger, the tracer).  `SpanData` is just the data.
 struct SpanData {
   ~SpanData() = default;
 

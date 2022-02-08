@@ -55,7 +55,7 @@ const std::string AgentHttpEncoder::payload() {
   return buffer_.str();
 }
 
-void AgentHttpEncoder::addTrace(Trace trace) { traces_.push_back(std::move(trace)); }
+void AgentHttpEncoder::addTrace(TraceData trace) { traces_.push_back(std::move(trace)); }
 
 void AgentHttpEncoder::handleResponse(const std::string& response) {
   if (sampler_ != nullptr) {
