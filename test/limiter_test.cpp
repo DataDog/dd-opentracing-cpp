@@ -113,7 +113,7 @@ TEST_CASE("limiter") {
   }
 
   SECTION("dedicated constructor configures based on desired allowed-per-second") {
-    const double per_second = 23.887;
+    const double per_second = 23.97;
     Limiter lim(get_time, per_second);
     for (int i = 0; i < 24; ++i) {
       auto result = lim.allow();
