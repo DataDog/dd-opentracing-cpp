@@ -88,33 +88,25 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
 }
 
 ot::expected<double, std::string> parseDouble(const std::string &text, double minimum,
-                                              double maximum,
-                                              const char *name_for_diagnostic) try {
+                                              double maximum) try {
   std::size_t end_index;
   const double value = std::stod(text, &end_index);
   // If any of the remaining characters are not whitespace, then `text`
   // contains something other than a floating point number.
   if (std::any_of(text.begin() + end_index, text.end(),
                   [](unsigned char ch) { return !std::isspace(ch); })) {
-    std::ostringstream error;
-    error << name_for_diagnostic << " has trailing non-floating-point characters: " << text;
-    return ot::make_unexpected(error.str());
+    return ot::make_unexpected("contains trailing non-floating-point characters: " + text);
   }
   if (value < minimum || value > maximum) {
     std::ostringstream error;
-    error << name_for_diagnostic << " is not within the expected bounds [" << minimum << ", "
-          << maximum << "]: " << value;
+    error << "not within the expected bounds [" << minimum << ", " << maximum << "]: " << value;
     return ot::make_unexpected(error.str());
   }
   return value;
 } catch (const std::invalid_argument &) {
-  std::ostringstream error;
-  error << name_for_diagnostic << " does not look like a double: " << text;
-  return ot::make_unexpected(error.str());
+  return ot::make_unexpected("does not look like a double: " + text);
 } catch (const std::out_of_range &) {
-  std::ostringstream error;
-  error << name_for_diagnostic << " not within the range of a double: " << text;
-  return ot::make_unexpected(error.str());
+  return ot::make_unexpected("not within the range of a double: " + text);
 }
 
 }  // namespace
@@ -246,9 +238,10 @@ ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
 
   auto analytics_rate = std::getenv("DD_TRACE_ANALYTICS_SAMPLE_RATE");
   if (analytics_rate != nullptr) {
-    auto maybe_value = parseDouble(analytics_rate, 0.0, 1.0, "DD_TRACE_ANALYTICS_SAMPLE_RATE");
+    auto maybe_value = parseDouble(analytics_rate, 0.0, 1.0);
     if (!maybe_value) {
-      return ot::make_unexpected(maybe_value.error());
+      maybe_value.error().insert(0, "while parsing DD_TRACE_ANALYTICS_SAMPLE_RATE: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
     }
     opts.analytics_enabled = true;
     opts.analytics_rate = maybe_value.value();
@@ -256,19 +249,21 @@ ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
 
   auto sampling_limit_per_second = std::getenv("DD_TRACE_RATE_LIMIT");
   if (sampling_limit_per_second != nullptr) {
-    auto maybe_value = parseDouble(sampling_limit_per_second, 0.0,
-                                   std::numeric_limits<double>::infinity(), "DD_TRACE_RATE_LIMIT");
+    auto maybe_value =
+        parseDouble(sampling_limit_per_second, 0.0, std::numeric_limits<double>::infinity());
     if (!maybe_value) {
-      return ot::make_unexpected(maybe_value.error());
+      maybe_value.error().insert(0, "while parsing DD_TRACE_RATE_LIMIT: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
     }
     opts.sampling_limit_per_second = maybe_value.value();
   }
 
   auto sample_rate = std::getenv("DD_TRACE_SAMPLE_RATE");
   if (sample_rate != nullptr) {
-    auto maybe_value = parseDouble(sample_rate, 0.0, 1.0, "DD_TRACE_SAMPLE_RATE");
+    auto maybe_value = parseDouble(sample_rate, 0.0, 1.0);
     if (!maybe_value) {
-      return ot::make_unexpected(maybe_value.error());
+      maybe_value.error().insert(0, "while parsing DD_TRACE_SAMPLE_RATE: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
     }
     opts.sample_rate = maybe_value.value();
   }

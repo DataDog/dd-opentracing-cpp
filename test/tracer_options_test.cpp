@@ -123,7 +123,7 @@ TEST_CASE("tracer options from environment variables") {
        ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid"s)},
       {{{"DD_TRACE_ANALYTICS_SAMPLE_RATE", "1.1"}},
        ot::make_unexpected(
-           "DD_TRACE_ANALYTICS_SAMPLE_RATE is not within the expected bounds [0, 1]: 1.1"s)},
+           "while parsing DD_TRACE_ANALYTICS_SAMPLE_RATE: not within the expected bounds [0, 1]: 1.1"s)},
   }));
 
   // Setup
