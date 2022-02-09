@@ -142,7 +142,7 @@ TEST_CASE("rules sampler") {
   SECTION("falls back to catch-all rule if sample_rate is configured and no other rule matches") {
     TracerOptions tracer_options;
     tracer_options.service = "test.service";
-    tracer_options.sample_rate = 0.2;
+    tracer_options.sample_rate = 0.5;
     tracer_options.sampling_rules = R"([
     {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
 ])";
@@ -154,7 +154,7 @@ TEST_CASE("rules sampler") {
 
     auto& metrics = mwriter->traces[0][0]->metrics;
     REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
-    REQUIRE(metrics.find("_dd.limit_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.5);
     REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 
