@@ -61,7 +61,7 @@ RUN rm -rf dd-opentracing-cpp/.build
 RUN mkdir -p dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
 RUN cmake -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_TESTING=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
-RUN make
+RUN make "-j${MAKE_JOB_COUNT:-$(nproc)}"
 RUN make install
 WORKDIR ..
 
@@ -85,4 +85,5 @@ RUN go get github.com/jakm/msgpack-cli
 # Copy these last so that edits don't need as many image rebuild steps
 COPY ./test/integration/nginx/nginx_integration_test.sh ./
 COPY ./test/integration/nginx/expected_*.json ./
+# CMD [ "bash", "-x", "./nginx_integration_test.sh"]
 CMD [ "bash", "-x", "./nginx_integration_test.sh"]

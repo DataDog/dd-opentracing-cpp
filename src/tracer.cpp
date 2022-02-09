@@ -124,7 +124,9 @@ void startupLog(TracerOptions &options) {
   }
   j["analytics_enabled"] = options.analytics_enabled;
   j["analytics_sample_rate"] = options.analytics_rate;
-  j["sample_rate"] = options.sample_rate;
+  if (!std::isnan(options.sample_rate)) {
+    j["sample_rate"] = options.sample_rate;
+  }
   j["sampling_rules"] = options.sampling_rules;
   j["sampling_limit_per_second"] = options.sampling_limit_per_second;
   if (!options.tags.empty()) {
