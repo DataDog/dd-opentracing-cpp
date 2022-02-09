@@ -11,6 +11,7 @@
 #include <unistd.h>
 #endif
 
+#include <cmath>
 #include <fstream>
 #include <random>
 #include <sstream>
@@ -237,12 +238,15 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
     logger_->Log(LogLevel::error, message.str());
   }
 
-  // Add an automatic "catch all" rule to the end that samples at the default
-  // sample rate.
+  // If there is a configured overall sample rate, add an automatic "catch all"
+  // rule to the end that samples at that rate.  Otherwise, don't (unmatched
+  // traces will be subject to priority sampling).
   const double sample_rate = opts_.sample_rate;
-  sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
-    return {true, sample_rate};
-  });
+  if (!std::isnan(sample_rate)) {
+    sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
+      return {true, sample_rate};
+    });
+  }
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,

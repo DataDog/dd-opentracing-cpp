@@ -68,18 +68,25 @@ struct TracerOptions {
   std::string environment = "";
   // `sample_rate` is the default sampling rate for any trace unmatched by a
   // sampling rule.  Setting `sample_rate` is equivalent to appending to
-  // `sampling_rules` a rule whose "sample_rate" is `sample_rate`.
-  double sample_rate = 1.0;
+  // `sampling_rules` a rule whose "sample_rate" is `sample_rate`.  If
+  // `sample_rate` is NaN, then no default rule is added, and traces not
+  // matching any sampling rule are subject to "priority sampling," where the
+  // sampling rate is determined by the Datadog trace agent.  This option is
+  // also configurable as the environment variable DD_TRACE_SAMPLE_RATE.
+  double sample_rate = std::nan("");
   // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
   // Rules sampling is applied when initiating traces to determine the sampling
   // rate.  Configuration is specified as a JSON array of objects. Each object
   // must have a "sample_rate", while the "name" and "service" fields are
   // optional. The "sample_rate" value must be between 0.0 and 1.0 (inclusive).
-  // Rules are applied in configured order, so a more specific match should be
-  // specified before a less specific match.  There is an implicit rule at the
+  // Rules are checked in order, so a more specific rule should be specified
+  // before a less specific rule.  Note that if the `sample_rate` field of this
+  // `TracerOptions` has a non-NaN value, then there is an implicit rule at the
   // end of the list that matches any trace unmatched by other rules, and
-  // applies a sampling rate of `sample_rate`.  If any rules are invalid, they are
+  // applies a sampling rate of `sample_rate`.  If no rule matches a trace,
+  // then "priority sampling" is applied instead, where the sample rate is
+  // determined by the Datadog trace agent.  If any rules are invalid, they are
   // ignored. This option is also configurable as the environment variable
   // DD_TRACE_SAMPLING_RULES.
   std::string sampling_rules = "[]";
