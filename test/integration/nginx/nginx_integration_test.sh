@@ -73,7 +73,7 @@ function run_nginx() {
   wait_for_port 80
 }
 
-# TEST 1: Ensure the right traces sent to the agent.
+# Test 1: Ensure the right traces sent to the agent.
 # Start wiremock in background
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
@@ -105,7 +105,7 @@ then
 fi
 
 reset_test
-# TEST 2: Check that libcurl isn't writing to stdout
+# Test 2: Check that libcurl isn't writing to stdout
 run_nginx
 curl -s localhost?[1-10000] 1> /tmp/curl_log.txt
 
@@ -118,7 +118,7 @@ then
 fi
 
 reset_test
-# TEST 3: Check that creating a root span doesn't produce an error
+# Test 3: Check that creating a root span doesn't produce an error
 run_nginx
 curl -s localhost?[1-5] 1> /tmp/curl_log.txt
 
@@ -166,7 +166,7 @@ curl -s localhost/proxy/?[1-1000] 1> /tmp/curl_log.txt
 
 # Check the traces the agent got.
 GOT=$(get_n_traces 1000)
-RATE=$(echo $GOT | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
+RATE=$(echo "$GOT" | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
 if [ $(echo $RATE | jq '(. > 0.45) and (. < 0.55)') != "true" ]
 then
   echo "Test 4 failed: Sample rate should be ~0.5 but was $RATE"
@@ -203,7 +203,7 @@ run_nginx
 curl -s localhost/get_error/ 1> /tmp/curl_log.txt
 
 GOT=$(get_n_traces 1)
-ERROR=$(echo $GOT | jq '.[] | .[] | .error')
+ERROR=$(echo "$GOT" | jq '.[] | .[] | .error')
 
 if ! [ "$ERROR" = "1" ]
 then
