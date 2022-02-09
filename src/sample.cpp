@@ -26,7 +26,9 @@ uint64_t maxIdFromSampleRate(double rate) {
 
 SampleResult PrioritySampler::sample(const std::string& environment, const std::string& service,
                                      uint64_t trace_id) const {
+  SampleResult result;
   SamplingRate applied_rate = default_sample_rate_;
+  result.sampling_mechanism = SamplingMechanism::Default;
   std::ostringstream key;
   key << "service:" << service << ",env:" << environment;
   {
@@ -34,6 +36,7 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
     auto const rule = agent_sampling_rates_.find(key.str());
     if (rule != agent_sampling_rates_.end()) {
       applied_rate = rule->second;
+      result.sampling_mechanism = SamplingMechanism::AgentRate;
     }
   }
   // I don't know how voodoo it is to use the trace_id essentially as a source of randomness,
@@ -41,13 +44,14 @@ SampleResult PrioritySampler::sample(const std::string& environment, const std::
   // cargo-culted from the agent. However it does still seem too "clever", and makes testing a
   // bit awkward.
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
-  SampleResult result;
   result.priority_rate = applied_rate.rate;
   if (hashed_id >= applied_rate.max_hash) {
     result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
   } else {
     result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
   }
+
+  result.applied_rate = applied_rate.rate;
   return result;
 }
 
@@ -81,21 +85,36 @@ SampleResult RulesSampler::sample(const std::string& environment, const std::str
     return priority_sampler_.sample(environment, service, trace_id);
   }
 
+  // A sampling rule applies to (matches) the current span.
+  //
+  // Whatever sampling decision we make here (keep or drop) will be of "user"
+  // type, i.e. `SamplingPriority::UserKeep` or `SamplingPriority::UserDrop`.
+  //
+  // The matching rule's rate was configured by a user, and so we want to make
+  // sure that after sending the span to the agent, that the agent does not
+  // override our sampling decision as it might for "automated" sampling
+  // decisions, i.e. `SamplingPriority::SamplerKeep` or
+  // `SamplingPriority::SamplerDrop`.
+
   SampleResult result;
-  result.rule_rate = rule_result.rate;
+  result.applied_rate = result.rule_rate = rule_result.rate;
+  result.sampling_mechanism = SamplingMechanism::Rule;
   auto max_hash = maxIdFromSampleRate(rule_result.rate);
   uint64_t hashed_id = trace_id * constant_rate_hash_factor;
   if (hashed_id >= max_hash) {
-    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
     return result;
   }
 
+  // Even though the matching sampling rule, above, did not drop this span, we
+  // still might drop the span in order to satify the configured maximum
+  // sampling rate for spans selected by rule based sampling overall.
   auto limit_result = sampling_limiter_.allow();
-  result.limiter_rate = limit_result.effective_rate;
+  result.applied_rate = result.limiter_rate = limit_result.effective_rate;
   if (limit_result.allowed) {
-    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerKeep);
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
   } else {
-    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+    result.sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
   }
   return result;
 }

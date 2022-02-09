@@ -3,6 +3,8 @@ services:
   dd-opentracing-cpp-example:
     build:
       context: ./
+    environment:
+      - DD_AGENT_HOST=dd-agent
     depends_on:
       - dd-agent
   dd-agent:

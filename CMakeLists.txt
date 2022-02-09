@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.13)
 
 project(dd-opentracing-cpp)
 
@@ -14,6 +14,7 @@ option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
+option(BUILD_COVERAGE "Builds code with code coverage profiling instrumentation" OFF)
 
 if(BUILD_TESTING)
   set(BUILD_SHARED ON)
@@ -51,6 +52,9 @@ file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
   add_compile_options(-Wall -Wextra -Werror -pedantic -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+  if(BUILD_COVERAGE)
+      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/W3)
 else()
@@ -58,12 +62,18 @@ else()
 endif()
 
 # Outputs
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads)
+if(BUILD_COVERAGE)
+  set(COVERAGE_LIBRARIES gcov)
+endif()
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
 
 ## Shared lib
 if(BUILD_SHARED)
   add_library(dd_opentracing SHARED ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing)
+  if(BUILD_COVERAGE)
+    target_link_options(dd_opentracing PRIVATE -fprofile-arcs -ftest-coverage)
+  endif()
   target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
   target_compile_definitions(dd_opentracing PUBLIC DD_OPENTRACING_SHARED)
@@ -93,6 +103,9 @@ if(BUILD_PLUGIN)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/export.map
       "{ global: OpenTracingMakeTracerFactory; local: *; };")
   add_library(dd_opentracing_plugin MODULE ${DD_OPENTRACING_SOURCES})
+  if(BUILD_COVERAGE)
+    target_link_options(dd_opentracing_plugin PRIVATE -fprofile-arcs -ftest-coverage)
+  endif()
   target_link_libraries(dd_opentracing_plugin PUBLIC ${DATADOG_LINK_LIBRARIES}
                         -static-libstdc++
                         -static-libgcc

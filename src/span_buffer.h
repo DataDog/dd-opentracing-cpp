@@ -8,86 +8,103 @@
 #include <unordered_set>
 #include <vector>
 
+#include "pending_trace.h"
 #include "sample.h"
 #include "span.h"
+#include "trace_data.h"
 
 namespace datadog {
 namespace opentracing {
 
 class Writer;
 class SpanContext;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
-struct PendingTrace {
-  PendingTrace(std::shared_ptr<const Logger> logger)
-      : logger(logger),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
-        all_spans() {}
-  // This constructor is only used in propagation tests.
-  PendingTrace(std::shared_ptr<const Logger> logger,
-               std::unique_ptr<SamplingPriority> sampling_priority)
-      : logger(logger),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
-        all_spans(),
-        sampling_priority(std::move(sampling_priority)) {}
-
-  void finish();
-
-  std::shared_ptr<const Logger> logger;
-  Trace finished_spans;
-  std::unordered_set<uint64_t> all_spans;
-  OptionalSamplingPriority sampling_priority;
-  bool sampling_priority_locked = false;
-  std::string origin;
-  std::string hostname;
-  double analytics_rate;
-  SampleResult sample_result;
-};
-
-// Keeps track of Spans until there is a complete trace.
-class SpanBuffer {
- public:
-  SpanBuffer() {}
-  virtual ~SpanBuffer() {}
-  virtual void registerSpan(const SpanContext& context) = 0;
-  virtual void finishSpan(std::unique_ptr<SpanData> span) = 0;
-  virtual OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const = 0;
-  virtual OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
-                                                       OptionalSamplingPriority priority) = 0;
-  virtual OptionalSamplingPriority assignSamplingPriority(const SpanData* span) = 0;
-  virtual void flush(std::chrono::milliseconds timeout) = 0;
-};
-
-struct WritingSpanBufferOptions {
+struct SpanBufferOptions {
   bool enabled = true;
   std::string hostname;
   double analytics_rate = std::nan("");
+  std::string service;
+  // See the corresponding field in `TracerOptions`.
+  uint64_t trace_tags_propagation_max_length;
 };
 
-// A SpanBuffer that sends completed traces to a Writer.
-class WritingSpanBuffer : public SpanBuffer {
+// Keeps track of Spans until there is a complete trace, and sends completed
+// traces to a Writer.
+class SpanBuffer {
  public:
-  WritingSpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
-                    std::shared_ptr<RulesSampler> sampler, WritingSpanBufferOptions options);
+  SpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
+             std::shared_ptr<RulesSampler> sampler, SpanBufferOptions options);
+  virtual ~SpanBuffer() = default;
 
-  void registerSpan(const SpanContext& context) override;
-  void finishSpan(std::unique_ptr<SpanData> span) override;
+  void registerSpan(const SpanContext& context);
+  void finishSpan(std::unique_ptr<SpanData> span);
 
-  OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const override;
-  OptionalSamplingPriority setSamplingPriority(uint64_t trace_id,
-                                               OptionalSamplingPriority priority) override;
-  OptionalSamplingPriority assignSamplingPriority(const SpanData* span) override;
+  OptionalSamplingPriority getSamplingPriority(uint64_t trace_id) const;
+
+  // The following documentation applies to all of the functions
+  // `setSamplingPriorityFrom[...]`.
+  //
+  // If the sampling priority has not yet been set for the trace having the
+  // specified `trace_id`, set that trace's sampling priority to a value
+  // derived from the specified `value`.  Return a copy of the trace's
+  // resulting sampling priority, which might or not have been altered by this
+  // operation.
+  //
+  // The name of the function indicates in which context it is to be called.
+  // For example, `setSamplingPriorityFromUser` is called to set the
+  // sampling priority when it is decided by a method invoked on a `Span` by
+  // client code.
+  OptionalSamplingPriority setSamplingPriorityFromUser(
+      uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
+  // There is also the private `setSamplingPriorityFromSampler` and
+  // `setSamplingPriorityFromExtractedContext`.
+
+  // Make a sampling decision for the trace corresponding to the specified
+  // `span` if a sampling decision has not already been made. Return the
+  // resulting sampling decision.
+  OptionalSamplingPriority generateSamplingPriority(const SpanData* span);
+
+  // Return the serialization of the trace tags associated with the trace
+  // having the specified `trace_id`, or return an empty string if an error
+  // occurs.  Note that an empty string could mean either that there no tags or
+  // that an error occurred.  If an encoding error occurs, a corresponding
+  // `_dd.propagation_error` tag value will be added to the relevant trace's
+  // local root span.
+  std::string serializeTraceTags(uint64_t trace_id);
+
+  // Change the name of the service associated with the trace having the
+  // specified `trace_id` to the specified `service_name`.
+  void setServiceName(uint64_t trace_id, ot::string_view service_name);
+
+  // Do not permit any further changes to the sampling decision for the trace
+  // having the specified `trace_id`.
+  void lockSamplingPriority(uint64_t trace_id);
 
   // Causes the Writer to flush, but does not send any PendingTraces.
-  void flush(std::chrono::milliseconds timeout) override;
+  // This function is `virtual` so that it can be overridden in unit tests.
+  virtual void flush(std::chrono::milliseconds timeout);
 
  private:
-  // These xImpl methods exist so we can avoid using reentrant locks.
+  // Each method whose name ends with "Impl" is a non-mutex-locking version of
+  // the corresponding method without the "Impl".
+
   OptionalSamplingPriority getSamplingPriorityImpl(uint64_t trace_id) const;
-  OptionalSamplingPriority setSamplingPriorityImpl(uint64_t trace_id,
-                                                   OptionalSamplingPriority priority);
-  OptionalSamplingPriority assignSamplingPriorityImpl(const SpanData* span);
-  void setSamplerResult(uint64_t trace_id, SampleResult& sample_result);
+
+  OptionalSamplingPriority setSamplingPriorityFromUserImpl(
+      uint64_t trace_id, const std::unique_ptr<UserSamplingPriority>& value);
+  // `setSamplingPriorityFromSampler` and
+  // `setSamplingPriorityFromExtractedContext` are called internally, so they
+  // don't need mutex-locking versions.
+  OptionalSamplingPriority setSamplingPriorityFromSampler(uint64_t trace_id,
+                                                          const SampleResult& value);
+  OptionalSamplingPriority setSamplingPriorityFromExtractedContext(uint64_t trace_id,
+                                                                   SamplingPriority value);
+
+  OptionalSamplingPriority generateSamplingPriorityImpl(const SpanData* span);
+
+  void setSamplerResult(uint64_t trace_id, const SampleResult& sample_result);
+
+  void lockSamplingPriorityImpl(uint64_t trace_id);
 
   std::shared_ptr<const Logger> logger_;
   std::shared_ptr<Writer> writer_;
@@ -100,7 +117,7 @@ class WritingSpanBuffer : public SpanBuffer {
   virtual void unbufferAndWriteTrace(uint64_t trace_id);
 
   std::unordered_map<uint64_t, PendingTrace> traces_;
-  WritingSpanBufferOptions options_;
+  SpanBufferOptions options_;
 };
 
 }  // namespace opentracing

@@ -4,18 +4,21 @@
 #include <datadog/opentracing.h>
 
 #include <deque>
+#include <memory>
 #include <sstream>
+
+#include "logger.h"
+#include "trace_data.h"
 
 namespace datadog {
 namespace opentracing {
 
+class Logger;
 class RulesSampler;
-struct SpanData;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 class AgentHttpEncoder : public TraceEncoder {
  public:
-  AgentHttpEncoder(std::shared_ptr<RulesSampler> sampler);
+  AgentHttpEncoder(std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger);
   ~AgentHttpEncoder() override {}
 
   // Returns the path that is used to submit HTTP requests to the agent.
@@ -27,16 +30,19 @@ class AgentHttpEncoder : public TraceEncoder {
   // Returns the encoded payload from the collection of traces.
   const std::string payload() override;
   void handleResponse(const std::string& response) override;
-  void addTrace(Trace trace);
+  void addTrace(TraceData trace);
 
  private:
   // Holds the headers that are used for all HTTP requests.
   std::map<std::string, std::string> common_headers_;
-  std::deque<Trace> traces_;
+  std::deque<TraceData> traces_;
   std::stringstream buffer_;
   // Responses from the Agent may contain configuration for the sampler. May be nullptr if priority
   // sampling is not enabled.
   std::shared_ptr<RulesSampler> sampler_ = nullptr;
+  // The logger is used to print diagnostic messages.  The actual mechanism is
+  // determined by the `log_func` field of `TracerOptions`.
+  std::shared_ptr<const Logger> logger_;
 };
 
 }  // namespace opentracing

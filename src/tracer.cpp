@@ -13,8 +13,10 @@
 
 #include <fstream>
 #include <random>
+#include <sstream>
 
 #include "bool.h"
+#include "parse_util.h"
 #include "tracer.h"
 
 namespace ot = opentracing;
@@ -66,15 +68,6 @@ bool isEnabled() {
     return false;
   }
   return true;
-}
-
-bool isDebug() {
-  auto debug = std::getenv("DD_TRACE_DEBUG");
-  // defaults to false unless env var is set to "true"
-  if (debug != nullptr && stob(debug, false)) {
-    return true;
-  }
-  return false;
 }
 
 std::string reportingHostname(TracerOptions options) {
@@ -146,38 +139,26 @@ void startupLog(TracerOptions &options) {
   message += "DATADOG TRACER CONFIGURATION - ";
   message += j.dump();
   options.log_func(LogLevel::info, message);
-  /*
-  // C++17's filesystem api would be really nice to have right now..
-  std::string startup_log_path = "/var/tmp/dd-opentracing-cpp";
-  struct stat s;
-  if (stat(startup_log_path.c_str(), &s) == 0) {
-    if (!S_ISDIR(s.st_mode)) {
-      // Path exists but isn't a directory.
-      return;
-    }
-  } else {
-    if (errno != ENOENT) {
-      // Failed to stat directory, but reason was something other than
-      // not existing.
-      return;
-    }
-    if (mkdir(startup_log_path.c_str(), 01777) != 0) {
-      // Unable to create the log path.
-      return;
-    }
+}
+
+uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logger &logger) {
+  const char env_name[] = "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH";
+  const char *const env_value = std::getenv(env_name);
+  if (env_value == nullptr) {
+    return options.trace_tags_propagation_max_length;
   }
 
-  auto now = std::chrono::system_clock::now();
-  uint64_t timestamp =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-  std::ofstream log_file(startup_log_path + "/startup_options-" + std::to_string(timestamp) +
-                         ".json");
-  if (!log_file.good()) {
-    return;
+  try {
+    return parse_uint64(env_value, 10);
+  } catch (const std::logic_error &error) {
+    std::string message = error.what();
+    message += ": Unable to parse integer from ";
+    message += env_name;
+    message += " environment variable value: ";
+    message += env_value;
+    logger.Log(LogLevel::error, message);
+    return options.trace_tags_propagation_max_length;
   }
-  logTracerOptions(now, options, log_file);
-  log_file.close();
-  */
 }
 
 }  // namespace
@@ -244,45 +225,43 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
     }
   }
 } catch (const json::parse_error &error) {
-  logger_->Log(
-      LogLevel::error,
-      std::string("rules sampler: unable to parse JSON config for rules sampler: ", error.what()));
+  std::ostringstream message;
+  message << "rules sampler: unable to parse JSON config for rules sampler: " << error.what();
+  logger_->Log(LogLevel::error, message.str());
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-               IdProvider get_id)
-    : opts_(options),
+               IdProvider get_id, std::shared_ptr<const Logger> logger)
+    : logger_(logger ? logger : std::make_shared<StandardLogger>(options.log_func)),
+      opts_(options),
       buffer_(std::move(buffer)),
       get_time_(get_time),
       get_id_(get_id),
       legacy_obfuscation_(legacyObfuscationEnabled()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
-               std::shared_ptr<RulesSampler> sampler)
-    : opts_(options),
+               std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+    : logger_(logger),
+      opts_(options),
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
-  if (isDebug()) {
-    logger_ = std::make_shared<VerboseLogger>(opts_.log_func);
-  } else {
-    logger_ = std::make_shared<StandardLogger>(opts_.log_func);
-  }
   configureRulesSampler(sampler);
   startupLog(options);
-  buffer_ = std::make_shared<WritingSpanBuffer>(
+  buffer_ = std::make_shared<SpanBuffer>(
       logger_, writer, sampler,
-      WritingSpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options)});
+      SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
+                        options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
-  // Get a new span id.
+  // Generate a span ID for the new span to use.
   auto span_id = get_id_();
 
   SpanContext span_context = SpanContext{logger_, span_id, span_id, "", {}};
-  // See the comment in propagation.h on nginx_opentracing_compatibility_hack_.
+  // See the comment in span_context.h on nginx_opentracing_compatibility_hack_.
   if (operation_name == "dummySpan") {
     span_context =
         SpanContext::NginxOpenTracingCompatibilityHackSpanContext(logger_, span_id, span_id, {});

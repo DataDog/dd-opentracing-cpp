@@ -117,21 +117,31 @@ struct TracerOptions {
   // A logging function that is called by the tracer when noteworthy events occur.
   // The default value uses std::cerr, and applications can inject their own logging function.
   LogFunc log_func = [](LogLevel level, ot::string_view message) {
+    std::string level_str;
     switch (level) {
       case LogLevel::debug:
-        std::cerr << "debug: " << message << std::endl;
+        level_str = "debug";
         break;
       case LogLevel::info:
-        std::cerr << "info: " << message << std::endl;
+        level_str = "info";
         break;
       case LogLevel::error:
-        std::cerr << "error: " << message << std::endl;
+        level_str = "error";
         break;
       default:
-        std::cerr << "<unknown level>: " << message << std::endl;
+        level_str = "<unknown level>";
         break;
     }
+    std::cerr << level_str + ": " + message.data() + "\n";
   };
+  // Some tags are associated with an entire trace, rather than with a
+  // particular span in the trace.  Some of these trace-wide tags are
+  // propagated between services.  The tags are injected into a carrier (e.g.
+  // an HTTP header) in a particular format.
+  // `trace_tags_propagation_max_length` is the maximum length of the
+  // serialized tags allowed.  Trace-wide tags whose serialized length exceeds
+  // this limit are not propagated.
+  uint64_t trace_tags_propagation_max_length = 512;
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

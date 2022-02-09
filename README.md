@@ -62,6 +62,8 @@ Additional libraries are installed via a script.
 
 If you want [sanitizers](https://github.com/google/sanitizers) to be enabled, then add either the `-DSANITIZE_THREAD=ON -DSANITIZE_UNDEFINED=ON` or `-DSANITIZE_ADDRESS=ON` flags to cmake, running the tests will now also check with the sanitizers.
 
+You can enable code coverage instrumentation in the builds of the library and its unit tests by adding the `-DBUILD_COVERAGE=ON` flag to cmake. See [scripts/run_coverage.sh](scripts/run_coverage.sh).
+
 ### Build (Windows)
 
 **NOTE**: This is currently Early Access, and issues should be reported only via GitHub Issues. Installation steps are likely to change based on user feedback and becoming available via Vcpkg.
@@ -95,6 +97,9 @@ The commands below should be executed in an `x64 Native Tools Command Prompt` sh
     cmake --build . -- -p:Configuration=RelWithDebInfo
     ```
 
+Take care to update the `Configuration` value (e.g. to `Debug`) if you change
+the build mode in your IDE.  See this [related issue][1].
+
 ### Integration tests
 
 Integration tests require additional tools installed:
@@ -110,3 +115,5 @@ Run this command to run the integration tests directly.
 ```sh
 test/integration/run_integration_tests_local.sh
 ```
+
+[1]: https://github.com/DataDog/dd-opentracing-cpp/issues/170

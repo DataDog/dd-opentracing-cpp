@@ -1,0 +1,5 @@
+#!/bin/sh
+
+testdir=$(dirname "$(dirname "$(realpath "$0")")")
+
+docker-compose --file "$testdir/docker-compose.yaml" up --build --remove-orphans

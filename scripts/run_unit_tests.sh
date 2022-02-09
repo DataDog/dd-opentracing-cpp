@@ -1,7 +1,56 @@
-#!/bin/sh
+#!/bin/bash
+
+usage() {
+  cat <<'END_USAGE'
+Build and run the unit tests.
+
+Options:
+
+  --coverage
+    Build the code and tests with instrumentation for tracking source code
+    coverage.
+
+  --verbose
+    Emit verbose output.  Pass the VERBOSE=1 option to `make` when building,
+    and pass the `--verbose` flag to `ctest` when running the tests.
+  
+  --build-only
+    Don't run the tests, just build them.
+
+  --help
+  -h
+    Print this message.
+END_USAGE
+}
 
 # Exit if any non-conditional command returns a nonzero exit status.
 set -e
+
+cmake_flags=('-DBUILD_TESTING=ON' '-DCMAKE_BUILD_TYPE=Debug')
+make_flags=("--jobs=${MAKE_JOB_COUNT:-$(nproc)}")
+ctest_flags=('--output-on-failure')
+build_only=0
+
+# Parse command line options.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit ;;
+    --coverage)
+      cmake_flags+=('-DBUILD_COVERAGE=ON') ;;
+    --verbose)
+      make_flags+=('VERBOSE=1')
+      ctest_flags+=('--verbose') ;;
+    --build-only)
+      build_only=1 ;;
+    *)
+      >&2 usage 
+      >&2 printf "\nUnknown option: %s\n" "$1"
+      exit 1
+  esac
+  shift
+done
 
 # Get to the root of the repository.
 cd "$(dirname "$0")"
@@ -13,6 +62,8 @@ BUILD_DIR="${BUILD_DIR:-.build}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
-cmake -DBUILD_TESTING=ON ..
-make --jobs=$(nproc)
-ctest --output-on-failure
+cmake "${cmake_flags[@]}" ..
+make "${make_flags[@]}"
+if [ "$build_only" -ne 1 ]; then
+  ctest "${ctest_flags[@]}"
+fi
