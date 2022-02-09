@@ -200,7 +200,7 @@ struct MockWriter : public Writer {
       : Writer(sampler, std::make_shared<MockLogger>()) {}
   ~MockWriter() override {}
 
-  void write(Trace trace) override {
+  void write(TraceData trace) override {
     std::lock_guard<std::mutex> lock_guard{mutex_};
     traces.emplace_back();
     for (auto& span : *trace) {

@@ -8,8 +8,8 @@
 #include "mocks.h"
 using namespace datadog::opentracing;
 
-Trace make_trace(std::initializer_list<TestSpanData> spans) {
-  Trace trace{new std::vector<std::unique_ptr<SpanData>>{}};
+TraceData make_trace(std::initializer_list<TestSpanData> spans) {
+  TraceData trace{new std::vector<std::unique_ptr<SpanData>>{}};
   for (const TestSpanData& span : spans) {
     trace->emplace_back(std::unique_ptr<TestSpanData>{new TestSpanData{span}});
   }

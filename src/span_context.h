@@ -1,5 +1,5 @@
-#ifndef DD_OPENTRACING_PROPAGATION_H
-#define DD_OPENTRACING_PROPAGATION_H
+#ifndef DD_OPENTRACING_SPAN_CONTEXT_H
+#define DD_OPENTRACING_SPAN_CONTEXT_H
 
 #include <datadog/opentracing.h>
 #include <opentracing/tracer.h>
@@ -26,7 +26,6 @@ extern const ot::string_view baggage_prefix;
 std::vector<ot::string_view> getPropagationHeaderNames(const std::set<PropagationStyle> &styles,
                                                        bool prioritySamplingEnabled);
 
-class Tracer;
 class SpanBuffer;
 struct HeadersImpl;
 
@@ -132,4 +131,4 @@ class SpanContext : public ot::SpanContext {
 }  // namespace opentracing
 }  // namespace datadog
 
-#endif  // DD_OPENTRACING_PROPAGATION_H
+#endif  // DD_OPENTRACING_SPAN_CONTEXT_H

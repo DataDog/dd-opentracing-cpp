@@ -17,9 +17,9 @@
 #include <nlohmann/json.hpp>
 
 #include "limiter.h"
-#include "propagation.h"
 #include "sampling_mechanism.h"
 #include "sampling_priority.h"
+#include "span_context.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;

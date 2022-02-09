@@ -119,7 +119,7 @@ void AgentWriter::stop() {
   worker_->join();
 }
 
-void AgentWriter::write(Trace trace) {
+void AgentWriter::write(TraceData trace) {
   std::unique_lock<std::mutex> lock(mutex_);
   if (stop_writing_) {
     return;
