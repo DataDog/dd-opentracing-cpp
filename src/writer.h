@@ -10,14 +10,13 @@
 
 #include "encoder.h"
 #include "logger.h"
+#include "trace_data.h"
 
 namespace datadog {
 namespace opentracing {
 
 class AgentHttpEncoder;
 class TraceEncoder;
-struct SpanData;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
 
 // A Writer is used to submit completed traces to the Datadog agent.
 class Writer {
@@ -26,8 +25,8 @@ class Writer {
 
   virtual ~Writer() {}
 
-  // Writes the given Trace.
-  virtual void write(Trace trace) = 0;
+  // Writes the given trace.
+  virtual void write(TraceData trace) = 0;
 
   // Send any buffered Traces to the destination now. Will block until sending is complete, or
   // timeout passes.
@@ -46,7 +45,7 @@ class ExternalWriter : public Writer {
   ~ExternalWriter() override {}
 
   // Implements Writer methods.
-  void write(Trace trace) override;
+  void write(TraceData trace) override;
 
   // No flush implementation, since ExternalWriter is not in charge of its own writing schedule.
   void flush(std::chrono::milliseconds /* timeout (unused) */) override{};

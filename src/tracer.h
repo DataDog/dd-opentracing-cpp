@@ -11,10 +11,10 @@
 #include "clock.h"
 #include "encoder.h"
 #include "logger.h"
-#include "propagation.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
+#include "span_context.h"
 #include "writer.h"
 
 namespace ot = opentracing;

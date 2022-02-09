@@ -8,80 +8,16 @@
 #include <unordered_set>
 #include <vector>
 
+#include "pending_trace.h"
 #include "sample.h"
 #include "span.h"
+#include "trace_data.h"
 
 namespace datadog {
 namespace opentracing {
 
 class Writer;
 class SpanContext;
-using Trace = std::unique_ptr<std::vector<std::unique_ptr<SpanData>>>;
-
-// `PendingTrace` is an implementation detail of `SpanBuffer`.  A
-// `PendingTrace` contains all of the information associated with a trace as it
-// is happening.  When all of the spans in a `PendingTrace` have finished,
-// `SpanBuffer` finalizes the spans and writes them (e.g. to the agent)
-// together as a trace.
-struct PendingTrace {
-  PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id)
-      : logger(logger),
-        trace_id(trace_id),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
-        all_spans() {}
-  // This constructor is only used in propagation tests.
-  PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id,
-               std::unique_ptr<SamplingPriority> sampling_priority)
-      : logger(logger),
-        trace_id(trace_id),
-        finished_spans(Trace{new std::vector<std::unique_ptr<SpanData>>()}),
-        all_spans(),
-        sampling_priority(std::move(sampling_priority)) {}
-
-  void finish();
-  // If this tracer did not inherit a sampling decision from an upstream
-  // service, but instead made a sampling decision, then append an
-  // `UpstreamService` record to the "_dd.p.upstream_services" member of
-  // `trace_tags`.  Note that this function is idempotent.
-  void applySamplingDecisionToUpstreamServices();
-
-  std::shared_ptr<const Logger> logger;
-  uint64_t trace_id;
-  Trace finished_spans;
-  std::unordered_set<uint64_t> all_spans;
-  OptionalSamplingPriority sampling_priority;
-  bool sampling_priority_locked = false;
-  std::string origin;
-  std::string hostname;
-  double analytics_rate;
-  SampleResult sample_result;
-  // `trace_tags` are tags that are associated with the entire local trace,
-  // rather than with a single span.  Some other tags are added to the local
-  // root span when the trace chunk is sent to the agent (see
-  // `finish_root_span` in `span_buffer.cpp`).  In addition to those tags,
-  // `trace_tags` are similarly added.
-  // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
-  // trace tags require special handling, e.g. "_dd.p.upstream_services".
-  std::unordered_map<std::string, std::string> trace_tags;
-  // `service` is the name of the service associated with this trace.  If the
-  // service name changes (such as by calling `Span::setServiceName`), then
-  // this is the most recent value.
-  std::string service;
-  // If an error occurs while propagating trace tags (see
-  // `SpanBuffer::serializeTraceTags`), then the "_dd.propagation_error"
-  // tag will be set on the local root span to the value of
-  // `propagation_error`.  If no error occurs, then `propagation_error` will be
-  // empty and the "_dd.propagation_error" tag will not be added.
-  std::string propagation_error;
-  // `sampling_decision_extracted` is whether `sampling_priority` was
-  // determined by a decision within this tracer (`true`), or inherited from an
-  // upstream service when span context was extracted (`false`), or has not yet
-  // been decided (`false`).
-  bool sampling_decision_extracted = false;
-  // `applied_sampling_decision_to_upstream_services` is whether the function
-  // `applySamplingDecisionToUpstreamServices` has done its work.
-  bool applied_sampling_decision_to_upstream_services = false;
-};
 
 struct SpanBufferOptions {
   bool enabled = true;
