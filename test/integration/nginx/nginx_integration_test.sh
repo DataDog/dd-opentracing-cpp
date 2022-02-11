@@ -5,6 +5,9 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
+# Disable tracer startup logs (these tests consider any nginx output an error).
+export DD_TRACE_STARTUP_LOGS=false
+
 NGINX_CONF_PATH=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
 NGINX_CONF=$(cat ${NGINX_CONF_PATH})
 TRACER_CONF_PATH=/etc/dd-config.json
@@ -125,15 +128,13 @@ then
   cat ${NGINX_ERROR_LOG}
   echo ""
   exit 1
-# TODO: jeez...
+elif [ "$(cat ${NGINX_ERROR_LOG})" != "" ]
+then
+  echo "Other errors in nginx log file:"
+  cat ${NGINX_ERROR_LOG}
+  echo ""
+  exit 1
 fi
-# elif [ "$(cat ${NGINX_ERROR_LOG})" != "" ]
-# then
-#   echo "Other errors in nginx log file:"
-#   cat ${NGINX_ERROR_LOG}
-#   echo ""
-#   exit 1
-# fi
 
 reset_test
 echo "Test 4: Check that priority sampling works."
