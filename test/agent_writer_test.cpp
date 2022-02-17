@@ -8,8 +8,8 @@
 #include "mocks.h"
 using namespace datadog::opentracing;
 
-Trace make_trace(std::initializer_list<TestSpanData> spans) {
-  Trace trace{new std::vector<std::unique_ptr<SpanData>>{}};
+TraceData make_trace(std::initializer_list<TestSpanData> spans) {
+  TraceData trace{new std::vector<std::unique_ptr<SpanData>>{}};
   for (const TestSpanData& span : spans) {
     trace->emplace_back(std::unique_ptr<TestSpanData>{new TestSpanData{span}});
   }
@@ -86,7 +86,7 @@ TEST_CASE("writer") {
   size_t max_queued_traces = 25;
   std::vector<std::chrono::milliseconds> disable_retry;
 
-  auto logger = std::make_shared<const Journal>();
+  auto logger = std::make_shared<const MockLogger>();
 
   AgentWriter writer{std::move(handle_ptr),
                      only_send_traces_when_we_flush,

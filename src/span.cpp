@@ -373,6 +373,8 @@ void Span::SetTag(ot::string_view key, const ot::Value &value) noexcept {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserKeep));
   } else if (k == tags::manual_drop) {
     setSamplingPriority(std::make_unique<UserSamplingPriority>(UserSamplingPriority::UserDrop));
+  } else if (k == tags::service_name) {
+    setServiceName(result);
   }
 }
 
@@ -397,16 +399,17 @@ void Span::Log(ot::SystemTime /* timestamp */,
 OptionalSamplingPriority Span::setSamplingPriority(
     std::unique_ptr<UserSamplingPriority> user_priority) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
-  OptionalSamplingPriority priority(nullptr);
-  if (user_priority != nullptr) {
-    priority = asSamplingPriority(static_cast<int>(*user_priority));
-  }
-  return buffer_->setSamplingPriority(context_.traceId(), std::move(priority));
+  return buffer_->setSamplingPriorityFromUser(context_.traceId(), user_priority);
 }
 
 OptionalSamplingPriority Span::getSamplingPriority() const {
   std::lock_guard<std::mutex> lock_guard{mutex_};
   return buffer_->getSamplingPriority(context_.traceId());
+}
+
+void Span::setServiceName(ot::string_view service_name) {
+  span_->service = service_name;
+  buffer_->setServiceName(traceId(), service_name);
 }
 
 const ot::SpanContext &Span::context() const noexcept {
@@ -415,10 +418,10 @@ const ot::SpanContext &Span::context() const noexcept {
   // ensure that users have every chance to apply their own SamplingPriority before one is decided.
   // However, OpenTracing serializes the SpanContext from a Span *before* finishing that Span. So
   // on-Span-finishing is too late to work out whether to sample or not. Therefore, we must do it
-  // here, when the context is fetched before being serialized. The negative side-effect is that if
-  // anything else happens to want to get and/or serialize a SpanContext, that will end up having
-  // this spooky action at a distance of assigning a SamplingPriority.
-  buffer_->assignSamplingPriority(span_.get() /* Doesn't take ownership */);
+  // here, when the context is fetched before being serialized. The disadvantage of doing this here
+  // is that if anything else happens to want to get and/or serialize a SpanContext, doing so will
+  // have the side-effect of locking-in a sampling decision.
+  buffer_->generateSamplingPriority(span_.get());
   return context_;
 }
 

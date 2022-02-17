@@ -13,8 +13,8 @@ services:
   service1:
     image: 'nginx'
 
-  envoy-634c931:
-    image: envoyproxy/envoy-dev:634c931e338b70f2a2a707dc7abecd7e3dcdff31
+  envoy-19511b1:
+    image: envoyproxy/envoy-dev:19511b1428cf0f601e3e9d8d237c1df2de74f6eb
     depends_on:
       - dd-agent
       - service1
@@ -26,10 +26,40 @@ services:
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
-      - './envoy-634c931.yaml:/etc/envoy/envoy.yaml:ro'
+      - './envoy-19511b1.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.19:
+    image: envoyproxy/envoy:v1.19.1
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.19.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.18:
+    image: envoyproxy/envoy:v1.18.4
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      - -l
+      - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.18.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.17:
-    image: envoyproxy/envoy:v1.17.0
+    image: envoyproxy/envoy:v1.17.4
     depends_on:
       - dd-agent
       - service1
@@ -44,7 +74,7 @@ services:
       - './envoy-v1.17.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.16:
-    image: envoyproxy/envoy:v1.16.1
+    image: envoyproxy/envoy:v1.16.5
     depends_on:
       - dd-agent
       - service1

@@ -11,10 +11,10 @@
 #include "clock.h"
 #include "encoder.h"
 #include "logger.h"
-#include "propagation.h"
 #include "sample.h"
 #include "span.h"
 #include "span_buffer.h"
+#include "span_context.h"
 #include "writer.h"
 
 namespace ot = opentracing;
@@ -34,7 +34,7 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
   // Creates a Tracer by copying the given options and injecting the given dependencies.
   // This overload is for use in unit tests.
   Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,
-         IdProvider get_id);
+         IdProvider get_id, std::shared_ptr<const Logger> logger = nullptr);
 
   // Creates a Tracer by copying the given options and using the preconfigured writer.
   // The writer is either an AgentWriter that sends trace data directly to the Datadog Agent, or

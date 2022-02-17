@@ -17,7 +17,9 @@
 #include <nlohmann/json.hpp>
 
 #include "limiter.h"
-#include "propagation.h"
+#include "sampling_mechanism.h"
+#include "sampling_priority.h"
+#include "span_context.h"
 
 namespace ot = opentracing;
 using json = nlohmann::json;
@@ -29,7 +31,12 @@ struct SampleResult {
   double rule_rate = std::nan("");
   double limiter_rate = std::nan("");
   double priority_rate = std::nan("");
+  // `applied_rate` is whichever of `rule_rate`, `limiter_rate`, or
+  // `priority_rate` was relevant to this sampling decision, as indicated by
+  // `sampling_mechanism`.
+  double applied_rate = std::nan("");
   OptionalSamplingPriority sampling_priority = nullptr;
+  OptionalSamplingMechanism sampling_mechanism;
 };
 
 struct SamplingRate {
@@ -63,6 +70,8 @@ class RulesSampler {
  public:
   RulesSampler();
   RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
+  // Some of the member functions of this class are declared `virtual` so that
+  // they can be overridden by `MockRulesSampler` for use in unit tests.
   virtual ~RulesSampler() {}
   void addRule(RuleFunc f);
   virtual SampleResult sample(const std::string& environment, const std::string& service,

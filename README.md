@@ -97,6 +97,9 @@ The commands below should be executed in an `x64 Native Tools Command Prompt` sh
     cmake --build . -- -p:Configuration=RelWithDebInfo
     ```
 
+Take care to update the `Configuration` value (e.g. to `Debug`) if you change
+the build mode in your IDE.  See this [related issue][1].
+
 ### Integration tests
 
 Integration tests require additional tools installed:
@@ -112,3 +115,5 @@ Run this command to run the integration tests directly.
 ```sh
 test/integration/run_integration_tests_local.sh
 ```
+
+[1]: https://github.com/DataDog/dd-opentracing-cpp/issues/170

@@ -1,0 +1,23 @@
+version: "3.2"
+services:
+  dd-opentracing-cpp-example-unix-domain-socket:
+    build:
+      context: ./
+    volumes:
+      - './datadog-sockets:/var/run/datadog-sockets:rw'
+    environment:
+      - DD_TRACE_AGENT_URL=/var/run/datadog-sockets/datadog-agent.sock
+      - DD_SERVICE=dd-opentracing-cpp-example-unix-domain-socket
+    depends_on:
+      - dd-agent
+  dd-agent:
+    volumes:
+      - './datadog-sockets:/var/run/datadog-sockets:rw'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/proc/:/host/proc/:ro'
+      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+    environment:
+      - DD_APM_ENABLED=true
+      - DD_API_KEY
+      - DD_APM_RECEIVER_SOCKET=/var/run/datadog-sockets/datadog-agent.sock
+    image: 'datadog/agent'
