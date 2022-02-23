@@ -19,7 +19,7 @@ defaults: &defaults
   working_directory: ~/dd-opentracing-cpp
   docker:
     - image: datadog/docker-library:dd_opentracing_cpp_build_0_3_7
-  resource_class: medium
+  resource_class: arm.medium
   environment: *default_environment
 
 jobs:
