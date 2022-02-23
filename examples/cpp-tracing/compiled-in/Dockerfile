@@ -24,4 +24,12 @@ RUN g++ -std=c++14 -o tracer_example tracer_example.cpp -I/dd-opentracing-cpp/de
 # Add /usr/local/lib to LD_LIBRARY_PATH
 RUN ldconfig
 
+ENV DD_SERVICE cpp-service
+ENV DD_VERSION 1.0.0
+ENV DD_ENV production
+
+LABEL com.datadoghq.tags.service="cpp-service"
+LABEL com.datadoghq.tags.version="1.0.0"
+LABEL com.datadoghq.tags.env="production"
+
 CMD sleep 5 && ./tracer_example && sleep 25
