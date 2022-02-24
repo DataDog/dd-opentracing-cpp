@@ -68,7 +68,7 @@ if [ "$BUILD_MSGPACK" -eq "1" ]; then
   tar zxf msgpack.tar.gz
   mkdir -p "msgpack-${MSGPACK_VERSION}/.build"
   cd "msgpack-${MSGPACK_VERSION}/.build"
-  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF ..
+  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF -DMSGPACK_CXX11=ON ..
   make --jobs="$MAKE_JOB_COUNT"
   make install
   cd ../..
