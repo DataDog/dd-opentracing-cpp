@@ -145,7 +145,6 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
       headers.push_back(propagation_headers[style].sampling_priority_header);
       headers.push_back(propagation_headers[style].origin_header);
     }
-    headers.push_back(propagation_headers[style].tags_header);
   }
   return headers;
 }
@@ -325,10 +324,6 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
       j[json_origin_key] = origin_;
     }
   }
-  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
-  if (!tags.empty()) {
-    j[json_tags_key] = tags;
-  }
   j[json_baggage_key] = baggage_;
 
   writer << j.dump();
@@ -395,14 +390,6 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
         return result;
       }
     }
-  }
-
-  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
-  if (!tags.empty()) {
-    result = writer.Set(headers_impl.tags_header, tags);
-  }
-  if (!result) {
-    return result;
   }
 
   for (auto baggage_item : baggage_) {
