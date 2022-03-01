@@ -70,6 +70,7 @@ class SpanBuffer {
   // that an error occurred.  If an encoding error occurs, a corresponding
   // `_dd.propagation_error` tag value will be added to the relevant trace's
   // local root span.
+  // Note that this function is not currently used.
   std::string serializeTraceTags(uint64_t trace_id);
 
   // Change the name of the service associated with the trace having the
