@@ -24,7 +24,8 @@ struct SpanBufferOptions {
   std::string hostname;
   double analytics_rate = std::nan("");
   std::string service;
-  // See the corresponding field in `TracerOptions`.
+  // The corresponding field in `TracerOptions` has been removed along with the
+  // corresponding feature.
   uint64_t trace_tags_propagation_max_length;
 };
 
