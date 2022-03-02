@@ -62,11 +62,6 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
   if (!std::isnan(trace.sample_result.priority_rate)) {
     span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
   }
-  trace.applySamplingDecisionToUpstreamServices();
-  span.meta.insert(trace.trace_tags.begin(), trace.trace_tags.end());
-  if (!trace.propagation_error.empty()) {
-    span.meta[datadog_propagation_error_tag] = trace.propagation_error;
-  }
   // Forward to the finisher that applies to all spans (not just root spans).
   finish_span(trace, span);
 }
