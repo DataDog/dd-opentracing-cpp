@@ -47,7 +47,6 @@ jobs:
 
     - name: Build dd-opentracing-cpp
       run: |
-        cd dd-opentracing-cpp
         sh scripts/install_dependencies.sh
         mkdir .build
         cd .build
