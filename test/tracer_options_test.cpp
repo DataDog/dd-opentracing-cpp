@@ -106,7 +106,6 @@ TEST_CASE("tracer options from environment variables") {
            "test-version v0.0.1",             // version
            "",                                // agent_url
            [](LogLevel, ot::string_view) {},  // log_func (dummy)
-           512,                               // trace_tags_propagation_max_length
            200                                // sampling_limit_per_second
        }},
       {{{"DD_PROPAGATION_STYLE_EXTRACT", "Not even a real style"}},
