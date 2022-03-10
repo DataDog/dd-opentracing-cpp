@@ -85,5 +85,4 @@ RUN go get github.com/jakm/msgpack-cli
 # Copy these last so that edits don't need as many image rebuild steps
 COPY ./test/integration/nginx/nginx_integration_test.sh ./
 COPY ./test/integration/nginx/expected_*.json ./
-# CMD [ "bash", "-x", "./nginx_integration_test.sh"]
 CMD [ "bash", "-x", "./nginx_integration_test.sh"]
