@@ -3,7 +3,9 @@
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
+#include <limits>
 #include <regex>
+#include <sstream>
 
 #include "bool.h"
 
@@ -85,6 +87,30 @@ std::vector<std::string> tokenize_propagation_style(const std::string &input) {
   return result;
 }
 
+ot::expected<double, std::string> parseDouble(const std::string &text, double minimum,
+                                              double maximum) try {
+  std::size_t end_index;
+  const double value = std::stod(text, &end_index);
+  // If any of the remaining characters are not whitespace, then `text`
+  // contains something other than a floating point number.
+  if (std::any_of(text.begin() + end_index, text.end(),
+                  [](unsigned char ch) { return !std::isspace(ch); })) {
+    return ot::make_unexpected("contains trailing non-floating-point characters: " + text);
+  }
+  // Note: Check "not inside" instead of "outside" so that the error is
+  // triggered for NaN `value`.
+  if (!(value >= minimum && value <= maximum)) {
+    std::ostringstream error;
+    error << "not within the expected bounds [" << minimum << ", " << maximum << "]: " << value;
+    return ot::make_unexpected(error.str());
+  }
+  return value;
+} catch (const std::invalid_argument &) {
+  return ot::make_unexpected("does not look like a double: " + text);
+} catch (const std::out_of_range &) {
+  return ot::make_unexpected("not within the range of a double: " + text);
+}
+
 }  // namespace
 
 ot::expected<std::set<PropagationStyle>> asPropagationStyle(
@@ -105,8 +131,10 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(
   return propagation_styles;
 }
 
-ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
+ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
     const TracerOptions &input) {
+  using namespace std::string_literals;
+
   TracerOptions opts = input;
 
   auto environment = std::getenv("DD_ENV");
@@ -151,9 +179,9 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     try {
       opts.agent_port = std::stoi(trace_agent_port);
     } catch (const std::invalid_argument &ia) {
-      return ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is invalid");
+      return ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is invalid"s);
     } catch (const std::out_of_range &oor) {
-      return ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is out of range");
+      return ot::make_unexpected("Value for DD_TRACE_AGENT_PORT is out of range"s);
     }
   }
 
@@ -171,7 +199,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
   if (extract != nullptr && std::strlen(extract) > 0) {
     auto style_maybe = asPropagationStyle(tokenize_propagation_style(extract));
     if (!style_maybe) {
-      return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid");
+      return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_EXTRACT is invalid"s);
     }
     opts.extract = style_maybe.value();
   }
@@ -180,7 +208,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
   if (inject != nullptr && std::strlen(inject) > 0) {
     auto style_maybe = asPropagationStyle(tokenize_propagation_style(inject));
     if (!style_maybe) {
-      return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_INJECT is invalid");
+      return ot::make_unexpected("Value for DD_PROPAGATION_STYLE_INJECT is invalid"s);
     }
     opts.inject = style_maybe.value();
   }
@@ -191,7 +219,7 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     if (value.empty() || isbool(value)) {
       opts.report_hostname = stob(value, false);
     } else {
-      return ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid");
+      return ot::make_unexpected("Value for DD_TRACE_REPORT_HOSTNAME is invalid"s);
     }
   }
 
@@ -206,26 +234,42 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
         opts.analytics_rate = std::nan("");
       }
     } else {
-      return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid");
+      return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_ENABLED is invalid"s);
     }
   }
 
   auto analytics_rate = std::getenv("DD_TRACE_ANALYTICS_SAMPLE_RATE");
   if (analytics_rate != nullptr) {
-    try {
-      double value = std::stod(analytics_rate);
-      if (value >= 0.0 && value <= 1.0) {
-        opts.analytics_enabled = true;
-        opts.analytics_rate = value;
-      } else {
-        return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_SAMPLE_RATE is invalid");
-      }
-    } catch (const std::invalid_argument &ia) {
-      return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_SAMPLE_RATE is invalid");
-    } catch (const std::out_of_range &oor) {
-      return ot::make_unexpected("Value for DD_TRACE_ANALYTICS_SAMPLE_RATE is invalid");
+    auto maybe_value = parseDouble(analytics_rate, 0.0, 1.0);
+    if (!maybe_value) {
+      maybe_value.error().insert(0, "while parsing DD_TRACE_ANALYTICS_SAMPLE_RATE: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
     }
+    opts.analytics_enabled = true;
+    opts.analytics_rate = maybe_value.value();
   }
+
+  auto sampling_limit_per_second = std::getenv("DD_TRACE_RATE_LIMIT");
+  if (sampling_limit_per_second != nullptr) {
+    auto maybe_value =
+        parseDouble(sampling_limit_per_second, 0.0, std::numeric_limits<double>::infinity());
+    if (!maybe_value) {
+      maybe_value.error().insert(0, "while parsing DD_TRACE_RATE_LIMIT: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
+    }
+    opts.sampling_limit_per_second = maybe_value.value();
+  }
+
+  auto sample_rate = std::getenv("DD_TRACE_SAMPLE_RATE");
+  if (sample_rate != nullptr) {
+    auto maybe_value = parseDouble(sample_rate, 0.0, 1.0);
+    if (!maybe_value) {
+      maybe_value.error().insert(0, "while parsing DD_TRACE_SAMPLE_RATE: ");
+      return ot::make_unexpected(std::move(maybe_value.error()));
+    }
+    opts.sample_rate = maybe_value.value();
+  }
+
   return opts;
 }
 

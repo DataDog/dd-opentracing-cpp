@@ -1,6 +1,7 @@
 #include "limiter.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <numeric>
 
@@ -26,6 +27,9 @@ Limiter::Limiter(TimeProvider now_func, long max_tokens, double refresh_rate,
   current_period_ = std::chrono::time_point_cast<std::chrono::seconds>(now);
   previous_rates_sum_ = std::accumulate(previous_rates_.begin(), previous_rates_.end(), 0.0);
 }
+
+Limiter::Limiter(TimeProvider now_func, double allowed_per_second)
+    : Limiter(now_func, long(std::ceil(allowed_per_second)), allowed_per_second, 1) {}
 
 LimitResult Limiter::allow() { return allow(1); }
 

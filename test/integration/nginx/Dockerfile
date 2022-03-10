@@ -61,7 +61,7 @@ RUN rm -rf dd-opentracing-cpp/.build
 RUN mkdir -p dd-opentracing-cpp/.build
 WORKDIR dd-opentracing-cpp/.build
 RUN cmake -DBUILD_PLUGIN=ON -DBUILD_STATIC=OFF -DBUILD_TESTING=OFF -DBUILD_SHARED=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
-RUN make
+RUN make "-j${MAKE_JOB_COUNT:-$(nproc)}"
 RUN make install
 WORKDIR ..
 

@@ -5,7 +5,7 @@
 #  * Java, Golang 
 # Run this test from the Docker container or CircleCI.
 
-# Disable tracer startup logs for test purposes
+# Disable tracer startup logs (these tests consider any nginx output an error).
 export DD_TRACE_STARTUP_LOGS=false
 
 NGINX_CONF_PATH=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--conf-path=\([^ ]*\).*/\1/p')
@@ -73,7 +73,7 @@ function run_nginx() {
   wait_for_port 80
 }
 
-# TEST 1: Ensure the right traces sent to the agent.
+echo "Test 1: Ensure the right traces sent to the agent."
 # Start wiremock in background
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
@@ -105,7 +105,7 @@ then
 fi
 
 reset_test
-# TEST 2: Check that libcurl isn't writing to stdout
+echo "Test 2: Check that libcurl isn't writing to stdout"
 run_nginx
 curl -s localhost?[1-10000] 1> /tmp/curl_log.txt
 
@@ -118,7 +118,7 @@ then
 fi
 
 reset_test
-# TEST 3: Check that creating a root span doesn't produce an error
+echo "Test 3: Check that creating a root span doesn't produce an error"
 run_nginx
 curl -s localhost?[1-5] 1> /tmp/curl_log.txt
 
@@ -137,7 +137,7 @@ then
 fi
 
 reset_test
-# Test 4: Check that priority sampling works.
+echo "Test 4: Check that priority sampling works."
 # Start the mock agent
 wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "{\"rate_by_service\":{\"service:nginx,env:prod\":0.5, \"service:nginx,env:\":0.2, \"service:wrong,env:\":0.1, \"service:nginx,env:wrong\":0.9}}" }}' http://localhost:8126/__admin/mappings/new
@@ -166,7 +166,7 @@ curl -s localhost/proxy/?[1-1000] 1> /tmp/curl_log.txt
 
 # Check the traces the agent got.
 GOT=$(get_n_traces 1000)
-RATE=$(echo $GOT | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
+RATE=$(echo "$GOT" | jq '[.[] | .[] | .metrics._sampling_priority_v1] | add/length')
 if [ $(echo $RATE | jq '(. > 0.45) and (. < 0.55)') != "true" ]
 then
   echo "Test 4 failed: Sample rate should be ~0.5 but was $RATE"
@@ -189,7 +189,7 @@ then
 fi
 
 reset_test
-# Test 5: Ensure that NGINX errors are reported to Datadog
+echo "Test 5: Ensure that NGINX errors are reported to Datadog"
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
 wait_for_port 8126
@@ -203,7 +203,7 @@ run_nginx
 curl -s localhost/get_error/ 1> /tmp/curl_log.txt
 
 GOT=$(get_n_traces 1)
-ERROR=$(echo $GOT | jq '.[] | .[] | .error')
+ERROR=$(echo "$GOT" | jq '.[] | .[] | .error')
 
 if ! [ "$ERROR" = "1" ]
 then
@@ -213,7 +213,7 @@ fi
 
 reset_test
 
-# Test 6: Origin header is propagated and adds a tag
+echo "Test 6: Origin header is propagated and adds a tag"
 wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8126/__admin/mappings/new
 wiremock --port 8080 >/dev/null 2>&1 & wait_for_port 8080

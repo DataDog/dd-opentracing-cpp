@@ -63,7 +63,7 @@ TEST_CASE("limiter") {
   }
 
   SECTION("updates tokens at sub-second intervals") {
-    Limiter lim(get_time, 5, 5.0, 1);  // replace tokens @ 5.0 per second (ie: every 0.2s)
+    Limiter lim(get_time, 5, 5.0, 1);  // replace tokens @ 5.0 per second (i.e. every 0.2 seconds)
     // consume all the tokens first
     for (auto i = 0; i < 5; i++) {
       auto result = lim.allow();
@@ -86,5 +86,47 @@ TEST_CASE("limiter") {
     }
     all_consumed = lim.allow();
     REQUIRE(!all_consumed.allowed);
+  }
+
+  SECTION("updates tokens at multi-second intervals") {
+    Limiter lim(get_time, 1, 0.25, 1);  // replace tokens @ 0.25 per second (i.e. every 4 seconds)
+
+    // 0 seconds (0s)
+    auto result = lim.allow();
+    REQUIRE(result.allowed);
+
+    for (int i = 0; i < 3; ++i) {
+      // 1s, 2s, 3s... still haven't released a token
+      advanceTime(time, std::chrono::seconds(1));
+      result = lim.allow();
+      REQUIRE(!result.allowed);
+    }
+
+    // 4s... one token was just released
+    advanceTime(time, std::chrono::seconds(1));
+    result = lim.allow();
+    REQUIRE(result.allowed);
+
+    // still 4s... and we used that token already
+    result = lim.allow();
+    REQUIRE(!result.allowed);
+  }
+
+  SECTION("dedicated constructor configures based on desired allowed-per-second") {
+    const double per_second = 23.97;
+    Limiter lim(get_time, per_second);
+    for (int i = 0; i < 24; ++i) {
+      auto result = lim.allow();
+      REQUIRE(result.allowed);
+    }
+
+    auto result = lim.allow();
+    REQUIRE(!result.allowed);
+
+    advanceTime(time, std::chrono::milliseconds(int(1 / per_second * 1000) + 1));
+    result = lim.allow();
+    REQUIRE(result.allowed);
+    result = lim.allow();
+    REQUIRE(!result.allowed);
   }
 }

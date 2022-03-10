@@ -39,7 +39,7 @@ std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTrace
   }
   TracerOptions opts = maybe_options.value();
 
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(opts.sampling_limit_per_second);
   auto writer = std::make_shared<ExternalWriter>(sampler, logger);
   auto encoder = writer->encoder();
   return std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>>{

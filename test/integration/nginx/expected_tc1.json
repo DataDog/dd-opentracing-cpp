@@ -12,9 +12,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -35,9 +34,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -58,9 +56,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",
