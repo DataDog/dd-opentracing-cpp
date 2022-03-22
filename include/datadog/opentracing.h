@@ -173,6 +173,17 @@ DD_OPENTRACING_API std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions& o
 std::tuple<std::shared_ptr<ot::Tracer>, std::shared_ptr<TraceEncoder>> makeTracerAndEncoder(
     const TracerOptions& options);
 
+// Return a JSON representation of the specified `options`.  If the specified
+// `with_timestamp` is `true`, then include a "date" field whose value is the
+// current date and time.
+// This function is defined in `tracer_options.cpp`.
+std::string toJSON(const TracerOptions& options, bool with_timestamp);
+
+// Return a reference to the options used to configure the specified `tracer`.
+// The behavior is undefined unless `tracer` is a Datadog tracer.
+// This function is defined in `tracer.cpp`.
+const TracerOptions& getOptions(const ot::Tracer& tracer);
+
 }  // namespace opentracing
 }  // namespace datadog
 

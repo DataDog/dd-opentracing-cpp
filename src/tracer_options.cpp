@@ -1,8 +1,11 @@
 #include "tracer_options.h"
 
 #include <datadog/tags.h>
+#include <datadog/version.h>
 #include <opentracing/ext/tags.h>
 
+#include <iomanip>
+#include <nlohmann/json.hpp>
 #include <regex>
 
 #include "bool.h"
@@ -227,6 +230,43 @@ ot::expected<TracerOptions, const char *> applyTracerOptionsFromEnvironment(
     }
   }
   return opts;
+}
+
+std::string toJSON(const TracerOptions &options, bool with_timestamp) {
+  nlohmann::json j;
+  if (with_timestamp) {
+    std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&t), "%FT%T%z");
+    j["date"] = ss.str();
+  }
+  j["version"] = datadog::version::tracer_version;
+  j["lang"] = "cpp";
+  j["lang_version"] = datadog::version::cpp_version;
+  j["env"] = options.environment;
+  j["enabled"] = true;
+  j["service"] = options.service;
+  if (!options.agent_url.empty()) {
+    j["agent_url"] = options.agent_url;
+  } else {
+    j["agent_url"] =
+        std::string("http://") + options.agent_host + ":" + std::to_string(options.agent_port);
+  }
+  j["analytics_enabled"] = options.analytics_enabled;
+  j["analytics_sample_rate"] = options.analytics_rate;
+  j["sampling_rules"] = options.sampling_rules;
+  if (!options.tags.empty()) {
+    j["tags"] = options.tags;
+  }
+  if (!options.version.empty()) {
+    j["dd_version"] = options.version;
+  }
+  j["report_hostname"] = options.report_hostname;
+  if (!options.operation_name_override.empty()) {
+    j["operation_name_override"] = options.operation_name_override;
+  }
+
+  return j.dump();
 }
 
 }  // namespace opentracing

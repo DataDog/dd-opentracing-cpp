@@ -5,7 +5,7 @@
 
 using json = nlohmann::json;
 
-extern "C" char** environ;
+extern "C" char **environ;
 
 namespace datadog {
 namespace opentracing {
