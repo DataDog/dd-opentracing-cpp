@@ -3,7 +3,6 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -13,9 +12,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -27,7 +25,6 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -37,9 +34,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",
@@ -51,7 +47,6 @@
     {
       "error": 0,
       "meta": {
-        "_dd.p.upstream_services": "bmdpbng=|2|3|1.0000",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -61,9 +56,8 @@
         "upstream.address": ""
       },
       "metrics": {
-        "_dd.limit_psr": 1,
-        "_dd.rule_psr": 1,
-        "_sampling_priority_v1": 2
+        "_dd.agent_psr": 1,
+        "_sampling_priority_v1": 1
       },
       "name": "nginx.handle",
       "resource": "/",

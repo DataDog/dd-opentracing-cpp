@@ -20,7 +20,7 @@ ot::expected<std::set<PropagationStyle>> asPropagationStyle(
     const std::vector<std::string>& styles);
 
 // TODO(cgilmour): refactor this so it returns a "finalized options" type.
-ot::expected<TracerOptions, const char*> applyTracerOptionsFromEnvironment(
+ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
     const TracerOptions& input);
 
 }  // namespace opentracing

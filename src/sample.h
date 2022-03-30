@@ -69,6 +69,7 @@ using RuleFunc = std::function<RuleResult(const std::string&, const std::string&
 class RulesSampler {
  public:
   RulesSampler();
+  explicit RulesSampler(double limit_per_second);
   RulesSampler(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
   // Some of the member functions of this class are declared `virtual` so that
   // they can be overridden by `MockRulesSampler` for use in unit tests.

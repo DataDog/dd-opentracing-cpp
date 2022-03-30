@@ -121,6 +121,9 @@ TEST_CASE("rules sampler") {
   SECTION("falls back to priority sampling when no matching rule") {
     TracerOptions tracer_options;
     tracer_options.service = "test.service";
+    // In addition to `tracer_options.sampling_rules`, there would be an
+    // implicit rule added if `tracer_options.sample_rate` were not NaN.  That
+    // case is handled in the next section (not this one).
     tracer_options.sampling_rules = R"([
     {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
 ])";
@@ -134,6 +137,25 @@ TEST_CASE("rules sampler") {
     REQUIRE(metrics.find("_dd.rule_psr") == metrics.end());
     REQUIRE(metrics.find("_dd.limit_psr") == metrics.end());
     REQUIRE(metrics.find("_dd.agent_psr") != metrics.end());
+  }
+
+  SECTION("falls back to catch-all rule if sample_rate is configured and no other rule matches") {
+    TracerOptions tracer_options;
+    tracer_options.service = "test.service";
+    tracer_options.sample_rate = 0.5;
+    tracer_options.sampling_rules = R"([
+    {"name": "unmatched.name", "service": "unmatched.service", "sample_rate": 0.1}
+])";
+    auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
+
+    auto span = tracer->StartSpanWithOptions("operation.name", span_options);
+    span->FinishWithOptions(finish_options);
+
+    auto& metrics = mwriter->traces[0][0]->metrics;
+    REQUIRE(metrics.find("_dd.rule_psr") != metrics.end());
+    REQUIRE(metrics["_dd.rule_psr"] == 0.5);
+    REQUIRE(metrics.find("_dd.agent_psr") == metrics.end());
   }
 
   SECTION("rule matching applied to overridden name") {
@@ -252,39 +274,5 @@ TEST_CASE("rules sampler") {
                 static_cast<double>(SamplingPriority::UserDrop));
       }
     }
-  }
-
-  SECTION("reports 'rule' sampling mechanism") {
-    TracerOptions tracer_options;
-    tracer_options.service = "zappasvc";
-    tracer_options.sampling_rules = R"([
-    {"sample_rate": 1.0}
-])";
-    const auto tracer =
-        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
-
-    const auto span = tracer->StartSpanWithOptions("OperationMoonUnit", span_options);
-    span->FinishWithOptions(finish_options);
-
-    // The `SpanBuffer` will have made a sampling decision based on the
-    // matching rule, and the resulting `SamplingMechanism` will be visible in
-    // the `UpstreamService` record serialized in the local root span's
-    // "_dd.p.upstream_services" tag.
-    //
-    // The expectation is that, since sampling was performed on account of a
-    // sampling rule, the sampling mechanism will be
-    // `SamplingMechanism::Rule`.
-
-    REQUIRE(mwriter->traces.size() == 1);
-    REQUIRE(mwriter->traces[0].size() == 1);
-    const auto& maybe_span = mwriter->traces[0][0];
-    REQUIRE(maybe_span);
-    const auto& span_data = *maybe_span;
-
-    const auto tag_found = span_data.meta.find("_dd.p.upstream_services");
-    REQUIRE(tag_found != span_data.meta.end());
-    const std::string& upstream_services = tag_found->second;
-    // One service, with the expected sampling mechanism (`SamplingMechanism::Rule == 3`).
-    REQUIRE(upstream_services == "emFwcGFzdmM=|2|3|1.0000");
   }
 }

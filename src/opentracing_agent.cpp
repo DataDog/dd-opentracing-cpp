@@ -30,7 +30,7 @@ std::shared_ptr<ot::Tracer> makeTracer(const TracerOptions &options) {
   TracerOptions opts = maybe_options.value();
 
   auto logger = makeLogger(opts);
-  auto sampler = std::make_shared<RulesSampler>();
+  auto sampler = std::make_shared<RulesSampler>(opts.sampling_limit_per_second);
   auto writer = std::shared_ptr<Writer>{
       new AgentWriter(opts.agent_host, opts.agent_port, opts.agent_url,
                       std::chrono::milliseconds(llabs(opts.write_period_ms)), sampler, logger)};

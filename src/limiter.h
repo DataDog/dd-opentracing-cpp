@@ -17,6 +17,7 @@ struct LimitResult {
 class Limiter {
  public:
   Limiter(TimeProvider clock, long max_tokens, double refresh_rate, long tokens_per_refresh);
+  Limiter(TimeProvider clock, double allowed_per_second);
 
   LimitResult allow();
   LimitResult allow(long tokens);

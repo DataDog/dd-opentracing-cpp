@@ -11,6 +11,7 @@
 #include <unistd.h>
 #endif
 
+#include <cmath>
 #include <fstream>
 #include <random>
 #include <sstream>
@@ -111,11 +112,13 @@ void startupLog(TracerOptions &options) {
   options.log_func(LogLevel::info, message);
 }
 
-uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logger &logger) {
+uint64_t traceTagsPropagationMaxLength(const TracerOptions & /*options*/, const Logger &logger) {
   const char env_name[] = "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH";
   const char *const env_value = std::getenv(env_name);
   if (env_value == nullptr) {
-    return options.trace_tags_propagation_max_length;
+    // The option has been removed with the corresponding feature.
+    // return options.trace_tags_propagation_max_length;
+    return 512;
   }
 
   try {
@@ -127,77 +130,91 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
     message += " environment variable value: ";
     message += env_value;
     logger.Log(LogLevel::error, message);
-    return options.trace_tags_propagation_max_length;
+    // The option has been removed with the corresponding feature.
+    // return options.trace_tags_propagation_max_length;
+    return 512;
   }
 }
 
 }  // namespace
 
-void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept try {
-  auto log_invalid_json = [&](const std::string &description, json &object) {
-    logger_->Log(LogLevel::info, description + ": " + object.get<std::string>());
-  };
-  json config = json::parse(opts_.sampling_rules);
-  for (auto &item : config.items()) {
-    auto rule = item.value();
-    if (!rule.is_object()) {
-      log_invalid_json("rules sampler: unexpected item in sampling rules", rule);
-      continue;
-    }
-    // "sample_rate" is mandatory
-    if (!rule.contains("sample_rate")) {
-      log_invalid_json("rules sampler: rule is missing 'sample_rate'", rule);
-      continue;
-    }
-    if (!rule.at("sample_rate").is_number()) {
-      log_invalid_json("rules sampler: invalid type for 'sample_rate' (expected number)", rule);
-      continue;
-    }
-    auto sample_rate = rule.at("sample_rate").get<json::number_float_t>();
-    if (!(sample_rate >= 0.0 && sample_rate <= 1.0)) {
-      log_invalid_json(
-          "rules sampler: invalid value for sample rate (expected value between 0.0 and 1.0)",
-          rule);
-    }
-    // "service" and "name" are optional
-    bool has_service = rule.contains("service") && rule.at("service").is_string();
-    bool has_name = rule.contains("name") && rule.at("name").is_string();
-    auto nan = std::nan("");
-    if (has_service && has_name) {
-      auto svc = rule.at("service").get<std::string>();
-      auto nm = rule.at("name").get<std::string>();
-      sampler->addRule([=](const std::string &service, const std::string &name) -> RuleResult {
-        if (service == svc && name == nm) {
+void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept {
+  try {
+    auto log_invalid_json = [&](const std::string &description, json &object) {
+      logger_->Log(LogLevel::info, description + ": " + object.get<std::string>());
+    };
+    json config = json::parse(opts_.sampling_rules);
+    for (auto &item : config.items()) {
+      auto rule = item.value();
+      if (!rule.is_object()) {
+        log_invalid_json("rules sampler: unexpected item in sampling rules", rule);
+        continue;
+      }
+      // "sample_rate" is mandatory
+      if (!rule.contains("sample_rate")) {
+        log_invalid_json("rules sampler: rule is missing 'sample_rate'", rule);
+        continue;
+      }
+      if (!rule.at("sample_rate").is_number()) {
+        log_invalid_json("rules sampler: invalid type for 'sample_rate' (expected number)", rule);
+        continue;
+      }
+      auto sample_rate = rule.at("sample_rate").get<json::number_float_t>();
+      if (!(sample_rate >= 0.0 && sample_rate <= 1.0)) {
+        log_invalid_json(
+            "rules sampler: invalid value for sample rate (expected value between 0.0 and 1.0)",
+            rule);
+      }
+      // "service" and "name" are optional
+      bool has_service = rule.contains("service") && rule.at("service").is_string();
+      bool has_name = rule.contains("name") && rule.at("name").is_string();
+      auto nan = std::nan("");
+      if (has_service && has_name) {
+        auto svc = rule.at("service").get<std::string>();
+        auto nm = rule.at("name").get<std::string>();
+        sampler->addRule([=](const std::string &service, const std::string &name) -> RuleResult {
+          if (service == svc && name == nm) {
+            return {true, sample_rate};
+          }
+          return {false, nan};
+        });
+      } else if (has_service) {
+        auto svc = rule.at("service").get<std::string>();
+        sampler->addRule([=](const std::string &service, const std::string &) -> RuleResult {
+          if (service == svc) {
+            return {true, sample_rate};
+          }
+          return {false, nan};
+        });
+      } else if (has_name) {
+        auto nm = rule.at("name").get<std::string>();
+        sampler->addRule([=](const std::string &, const std::string &name) -> RuleResult {
+          if (name == nm) {
+            return {true, sample_rate};
+          }
+          return {false, nan};
+        });
+      } else {
+        sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
           return {true, sample_rate};
-        }
-        return {false, nan};
-      });
-    } else if (has_service) {
-      auto svc = rule.at("service").get<std::string>();
-      sampler->addRule([=](const std::string &service, const std::string &) -> RuleResult {
-        if (service == svc) {
-          return {true, sample_rate};
-        }
-        return {false, nan};
-      });
-    } else if (has_name) {
-      auto nm = rule.at("name").get<std::string>();
-      sampler->addRule([=](const std::string &, const std::string &name) -> RuleResult {
-        if (name == nm) {
-          return {true, sample_rate};
-        }
-        return {false, nan};
-      });
-    } else {
-      sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
-        return {true, sample_rate};
-      });
+        });
+      }
     }
+  } catch (const json::parse_error &error) {
+    std::ostringstream message;
+    message << "rules sampler: unable to parse JSON config for rules sampler: " << error.what();
+    logger_->Log(LogLevel::error, message.str());
   }
-} catch (const json::parse_error &error) {
-  std::ostringstream message;
-  message << "rules sampler: unable to parse JSON config for rules sampler: " << error.what();
-  logger_->Log(LogLevel::error, message.str());
+
+  // If there is a configured overall sample rate, add an automatic "catch all"
+  // rule to the end that samples at that rate.  Otherwise, don't (unmatched
+  // traces will be subject to priority sampling).
+  const double sample_rate = opts_.sample_rate;
+  if (!std::isnan(sample_rate)) {
+    sampler->addRule([=](const std::string &, const std::string &) -> RuleResult {
+      return {true, sample_rate};
+    });
+  }
 }
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimeProvider get_time,

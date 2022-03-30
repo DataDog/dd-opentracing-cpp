@@ -199,7 +199,7 @@ TEST_CASE("env overrides") {
     ::setenv(env_test.env.c_str(), env_test.val.c_str(), 0);
     auto maybe_options = applyTracerOptionsFromEnvironment(tracer_options);
     if (env_test.error) {
-      REQUIRE(maybe_options.error());
+      REQUIRE(!maybe_options);
       return;
     }
     REQUIRE(maybe_options);
