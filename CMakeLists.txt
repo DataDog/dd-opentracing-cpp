@@ -12,6 +12,7 @@ include(GNUInstallDirs)
 
 option(BUILD_SHARED "Builds shared library" ON)
 option(BUILD_STATIC "Builds static library" OFF)
+option(BUILD_OBJECT "Builds objects for use in another project" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
 option(BUILD_COVERAGE "Builds code with code coverage profiling instrumentation" OFF)
@@ -27,7 +28,6 @@ endif()
 set(CMAKE_CXX_STANDARD 14)
 
 # Includes
-set(CMAKE_INCLUDE_PATH 3rd_party/include deps/include)
 include_directories(SYSTEM 3rd_party/include deps/include)
 include_directories(include)
 
@@ -37,7 +37,6 @@ set(CMAKE_LIBRARY_PATH deps/lib)
 # Dependencies
 find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
 find_library(OPENTRACING_LIB opentracing)
-find_package(ZLIB REQUIRED)
 find_library(MSGPACK_LIB msgpack)
 find_package(CURL)
 find_package(Threads REQUIRED)
@@ -65,7 +64,7 @@ endif()
 if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
+set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
 
 ## Shared lib
 if(BUILD_SHARED)
@@ -92,6 +91,15 @@ if(BUILD_STATIC)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+## Object lib
+if(BUILD_OBJECT)
+  add_library(dd_opentracing-object OBJECT ${DD_OPENTRACING_SOURCES})
+  add_sanitizers(dd_opentracing-object)
+  target_link_libraries(dd_opentracing-object ${CURL_LIBRARIES} Threads::Threads)
+  set_property(TARGET dd_opentracing-object PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_compile_definitions(dd_opentracing-object PUBLIC DD_OPENTRACING_OBJECT)
 endif()
 
 ## Plugin
