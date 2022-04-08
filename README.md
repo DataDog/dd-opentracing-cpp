@@ -13,6 +13,8 @@ Usage docs are on the main Datadog website:
 
 For some quick-start examples, see the [examples](examples/) folder.
 
+For detailed information about this library's configuration, see [configuration.md][2].
+
 ## Contributing
 
 Before considering contributions to the project, please take a moment to read our brief [contribution guidelines](CONTRIBUTING.md).
@@ -117,3 +119,4 @@ test/integration/run_integration_tests_local.sh
 ```
 
 [1]: https://github.com/DataDog/dd-opentracing-cpp/issues/170
+[2]: configuration.md
