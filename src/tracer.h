@@ -72,6 +72,8 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
 
   void Close() noexcept override;
 
+  const TracerOptions &options() const noexcept;
+
  private:
   void configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept;
 
