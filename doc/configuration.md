@@ -177,7 +177,7 @@ header.
 - **Default value**: `["Datadog"]`
 
 ### Host Name Reporting
-If `true`, the tracer will look up its host's network name using the
+If `true`, the tracer will look up its host's name on the network using the
 [gethostname][8] function and send it to the Datadog backend in a hidden span
 tag.
 
