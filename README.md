@@ -119,4 +119,4 @@ test/integration/run_integration_tests_local.sh
 ```
 
 [1]: https://github.com/DataDog/dd-opentracing-cpp/issues/170
-[2]: configuration.md
+[2]: doc/configuration.md
