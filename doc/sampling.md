@@ -21,7 +21,7 @@ follow whichever decision was made by the root service.
 The root service may define rules that assign different sampling rates to
 different kinds of traces.  In these rules, traces are distinguished by the
 "service" and "operation name" associated with the root span.  Typically, the
-root span of a service is always assocated with the same "service" and
+root span of a service is always associated with the same "service" and
 "operation name."  However, services acting as hosts to multiple services may
 produce different "service" spans for different requests.
 
@@ -96,7 +96,7 @@ sampled by the tracer on account of sampling rules or `DD_TRACE_SAMPLE_RATE`.
 The limit applies globally across all applicable traces, i.e. there is not a
 separate limit for each sampling rule.
 
-`DD_TRACE_RATE_LIMIT` is a floating point number, but is ususally specified as an integer, e.g.
+`DD_TRACE_RATE_LIMIT` is a floating point number, but is usually specified as an integer, e.g.
 ```shell
 export DD_TRACE_RATE_LIMIT=200
 ```

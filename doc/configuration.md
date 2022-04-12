@@ -149,7 +149,7 @@ style, `B3`, is also supported.  The `B3` style decodes trace information from
 multiple `X-B3-*` request headers.
 
 The trace context extraction styles setting indicates which styles the tracer
-will consider when extracing trace context from a request.  At least one style
+will consider when extracting trace context from a request.  At least one style
 must be specified, but multiple may be specified.  If multiple styles are
 specified, then trace context must be successfully extractable in at least one
 of the styles, and if trace context can be extracted in both styles, the two
