@@ -37,7 +37,7 @@ For example, consider the following array of rules:
 These rules stipulate the following trace sampling behavior:
 
 - `usersvc` requests whose operation name is `healthcheck` are never sampled.
-- Other `usersvc` are sampled 50% of the time.
+- Other `usersvc` requests are sampled 50% of the time.
 - `authsvc` requests are sampling 100% of the time.
 - All other requests are sampled 10% of the time.
 

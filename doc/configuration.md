@@ -167,7 +167,7 @@ context encoding are supported when _extracting_ trace context, trace context
 injection styles indicate which trace context encoding(s) will be used when
 _injecting_ context into a request to the next service along a trace.
 
-Note that even if the `B3` inject style is used, the tracer still may inject
+Note that even if the `B3` injection style is used, the tracer still may inject
 Datadog-specific trace context, such as in the `X-Datadog-Origin` request
 header.
 
