@@ -237,7 +237,7 @@ For more information about the configuration of trace sampling, see
 - **Environment variable**: `DD_TRACE_RATE_LIMIT`
 - **Default value**: `100`
 
-[1]: include/datadog/opentracing.h
+[1]: /include/datadog/opentracing.h
 [2]: https://docs.datadoghq.com/tracing/setup_overview/proxy_setup/?tab=nginx#nginx-configuration
 [3]: https://docs.datadoghq.com/tracing/setup_overview/setup/cpp/?tab=containers#dynamic-loading
 [4]: https://docs.datadoghq.com/tracing/setup_overview/setup/cpp/?tab=containers#environment-variables
