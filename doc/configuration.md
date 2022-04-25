@@ -16,7 +16,8 @@ Environment variables override any corresponding configuration in
 Options
 -------
 ### Agent Host
-The name of the host at which the Datadog Agent can be contacted.
+The name of the host at which the Datadog Agent can be contacted, or the host's
+IP address.
 
 - **TracerOptions member**: `std::string agent_host`
 - **JSON property**: `"agent_host"` _string_
@@ -37,12 +38,15 @@ specified indicating where the Datadog Agent can be contacted.  Both TCP
 and Unix domain sockets are supported.  For more information about using a
 Unix domain socket, see the [relevant example][5].
 
+If the Agent URL is specified, then it overrides the Agent host and Agent port
+settings.
+
 The following forms are supported:
 
 - `http://host` (TCP)
 - `http://host:port` (TCP)
-- `https://host` (TCP; TLS is not used)
-- `https://host:port` (TCP; TLS is not used)
+- `https://host` (TCP)
+- `https://host:port` (TCP)
 - `unix://path` (Unix domain socket)
 - `path` (Unix domain socket)
 
@@ -53,8 +57,8 @@ The following forms are supported:
 
 ### Service Name
 The default service name to associate with spans produced by the tracer.
-Service name can be overridden programmatically on a per-span basis via the
-`datadog::opentracing::Span::setServiceName` member function.
+Service name can be overridden programmatically on a per-span basis by setting
+a value for the `datadog::tags::service_name` tag.
 
 - **TracerOptions member**: `std::string service`
 - **JSON property**: `"service"` _(string)_
@@ -78,16 +82,19 @@ Example values for service type are `web`, `db`, and `lambda`.
 - **Default value**: `"web"`
 
 ### Environment
-The default release environment in which the service is running, e.g. "staging"
-or "prod".
+The default release environment in which the service is running, e.g. "prod,"
+"dev," or "staging."
+
+Environment is one of the core properties associated with a service, together
+with its name and version.  See [Unified Service Tagging][9].
 
 - **TracerOptions member**: `std::string environment`
 - **JSON property**: `"environment"` _(string)_
 - **Environment variable**: `DD_ENV`
 - **Default value**: `""`
 
-### Sampling Rate
-The default probability that a trace beginning with this tracer will be sampled
+### Sample Rate
+The default probability that a trace beginning at this tracer will be sampled
 for ingestion.
   
 For more information about the configuration of trace sampling, see
@@ -125,8 +132,8 @@ which of a service's functions the span represents.
 Operation name is often fixed for a given service, e.g. the "nginx" service
 entry spans might always have operation name "handle.request".
 
-Operation name is not to be confused with "resource," also known as endpoint,
-which is a trace tag.  Resource (endpoint) contains information about the
+Operation name is not to be confused with a span's associated resource, also
+known as endpoint.  Resource (endpoint) contains information about the
 particular request, whereas operation name is more like a subcategory of the
 service name.
 
@@ -178,7 +185,7 @@ header.
 
 ### Host Name Reporting
 If `true`, the tracer will look up its host's name on the network using the
-[gethostname][8] function and send it to the Datadog backend in a hidden span
+[gethostname][8] function and send it to the Datadog backend in a reserved span
 tag.
 
 - **TracerOptions member**: `bool report_hostname`
@@ -245,3 +252,4 @@ For more information about the configuration of trace sampling, see
 [6]: sampling.md
 [7]: https://github.com/openzipkin/b3-propagation
 [8]: https://pubs.opengroup.org/onlinepubs/9699919799/
+[9]: https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging
