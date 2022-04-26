@@ -11,7 +11,7 @@ VERSION="$1"
 case "$VERSION" in
   v*.*.*) ;;
   *) echo "Version parameter \"$VERSION\" is not in the expected format vM.m.p"
-  exit 1;;
+  exit 1 ;;
 esac
 
 if [[ -z $CIRCLE_CI_TOKEN ]]; then
