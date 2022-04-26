@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 if [[ $# != 1 ]]; then
   echo "Missing parameter for version number"
@@ -111,7 +112,7 @@ for f in ./*; do
 done
 
 # Create a github release
-"$GOPATH/bin/hub" release create --draft \
+hub release create --draft \
   "${assets[@]}" \
   -m "Release $VERSION" "$VERSION"
 cd ..
