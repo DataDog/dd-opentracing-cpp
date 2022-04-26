@@ -17,17 +17,23 @@ if [[ -z $GITHUB_TOKEN ]]; then
   exit 1
 fi
 
-if [[ -z $GOPATH ]]; then
-  echo "Please install Golang"
-  exit 1
-fi
+for tool in git curl jq gzip gpg; do
+  if ! command -v "$tool" >/dev/null; then
+    echo "Please install the required tool '$tool'"
+    exit 1
+  fi
+done
 
-if ! [[ -f "$GOPATH/bin/hub" ]]; then
+if ! command -v hub >/dev/null; then
   echo "Installing required tool Github 'hub'"
-  go get github.com/github/hub
+  if ! command -v go >/dev/null; then
+    echo "Please install the Go language toolchain 'go' (needed to build 'hub')"
+    exit 1
+  fi
+  go install github.com/github/hub@latest
 fi
 
-echo "Note: Make sure that you can sign commits on this machine with your GPG key: "
+echo "Note: Make sure that you can sign git commits on this machine with your GPG key: "
 echo "https://help.github.com/articles/signing-commits/"
 echo ""
 
