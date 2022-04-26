@@ -3,10 +3,16 @@ set -e
 set -x
 
 if [[ $# != 1 ]]; then
-  echo "Missing parameter for version number"
+  echo "Missing parameter for version tag (vM.m.p)"
   exit 1
 fi
 VERSION="$1"
+
+case "$VERSION" in
+  v*.*.*) ;;
+  *) echo "Version parameter \"$VERSION\" is not in the expected format vM.m.p"
+  exit 1;;
+esac
 
 if [[ -z $CIRCLE_CI_TOKEN ]]; then
   echo "Please provide a CircleCI API token in \$CIRCLE_CI_TOKEN"
