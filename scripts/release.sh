@@ -1,11 +1,18 @@
 #!/bin/bash
 set -e
+set -x
 
 if [[ $# != 1 ]]; then
-  echo "Missing parameter for version number"
+  echo "Missing parameter for version tag (vM.m.p)"
   exit 1
 fi
 VERSION="$1"
+
+case "$VERSION" in
+  v*.*.*) ;;
+  *) echo "Version parameter \"$VERSION\" is not in the expected format vM.m.p"
+  exit 1 ;;
+esac
 
 if [[ -z $CIRCLE_CI_TOKEN ]]; then
   echo "Please provide a CircleCI API token in \$CIRCLE_CI_TOKEN"
@@ -17,17 +24,23 @@ if [[ -z $GITHUB_TOKEN ]]; then
   exit 1
 fi
 
-if [[ -z $GOPATH ]]; then
-  echo "Please install Golang"
-  exit 1
-fi
+for tool in git curl jq gzip gpg; do
+  if ! command -v "$tool" >/dev/null; then
+    echo "Please install the required tool '$tool'"
+    exit 1
+  fi
+done
 
-if ! [[ -f "$GOPATH/bin/hub" ]]; then
+if ! command -v hub >/dev/null; then
   echo "Installing required tool Github 'hub'"
-  go get github.com/github/hub
+  if ! command -v go >/dev/null; then
+    echo "Please install the Go language toolchain 'go' (needed to build 'hub')"
+    exit 1
+  fi
+  go install github.com/github/hub@latest
 fi
 
-echo "Note: Make sure that you can sign commits on this machine with your GPG key: "
+echo "Note: Make sure that you can sign git commits on this machine with your GPG key: "
 echo "https://help.github.com/articles/signing-commits/"
 echo ""
 
@@ -86,7 +99,7 @@ ARTIFACT_URLS=$(curl -s "https://circleci.com/api/v1.1/project/github/DataDog/dd
 rm -rf .bin
 mkdir .bin
 cd .bin
-while read ARTIFACT_URL; do
+while read -r ARTIFACT_URL; do
   echo "Downloading artifact: ${ARTIFACT_URL}"
   curl -s -L -O "${ARTIFACT_URL}"
 done <<<"$ARTIFACT_URLS"
@@ -105,7 +118,7 @@ for f in ./*; do
 done
 
 # Create a github release
-"$GOPATH/bin/hub" release create --draft \
+hub release create --draft \
   "${assets[@]}" \
   -m "Release $VERSION" "$VERSION"
 cd ..
