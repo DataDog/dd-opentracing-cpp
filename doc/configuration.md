@@ -164,7 +164,7 @@ extracted contexts must agree.
 
 - **TracerOptions member**: `std::set<PropagationStyle> extract`
 - **JSON property**: `"propagation_style_extract"` _(array of string)_
-- **Environment variable**: `DD_PROPAGATION_STYLE_EXTRACT` _(JSON)_
+- **Environment variable**: `DD_PROPAGATION_STYLE_EXTRACT` _(space or comma separated symbols)_
 - **Default value**: `["Datadog"]`
 
 ### Trace Context Injection Styles
@@ -180,7 +180,7 @@ header.
 
 - **TracerOptions member**: `std::set<PropagationStyle> inject`
 - **JSON property**: `"propagation_style_inject"` _(array of string)_
-- **Environment variable**: `DD_PROPAGATION_STYLE_INJECT` _(JSON)_
+- **Environment variable**: `DD_PROPAGATION_STYLE_INJECT` _(space or comma separated symbols)_
 - **Default value**: `["Datadog"]`
 
 ### Host Name Reporting
