@@ -148,6 +148,14 @@ struct TracerOptions {
   // the implicit "catch-all" rule appended to `sampling_rules`.  This option
   // is also configurable as the environment variable DD_TRACE_RATE_LIMIT.
   double sampling_limit_per_second = 100;
+  // Some tags are associated with an entire trace, rather than with a
+  // particular span in the trace.  Some of these trace-wide tags are
+  // propagated between services.  The tags are injected into a carrier (e.g.
+  // an HTTP header) in a particular format.
+  // `trace_tags_propagation_max_length` is the maximum length of the
+  // serialized tags allowed.  Trace-wide tags whose serialized length exceeds
+  // this limit are not propagated.
+  uint64_t trace_tags_propagation_max_length = 512;
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the
