@@ -115,7 +115,7 @@ void PendingTrace::applySamplingDecisionToTraceTags() {
   // then the sampling priority was determined by this tracer, and so we will
   // have set a corresponding sampling mechanism.
   assert(sample_result.sampling_mechanism != nullptr);
-
+  
   // The "decision maker" is formatted as:
   //
   //     <maybe someday service name hashed> "-" <sampling mechanism>
