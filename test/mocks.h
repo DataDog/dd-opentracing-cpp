@@ -223,7 +223,7 @@ struct MockBuffer : public SpanBuffer {
   explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
       : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, SpanBufferOptions{}){};
   // This constructor overload is provided for tests where the service name is
-  // relevant, such as those involving `PendingTrace::upstream_services`.
+  // relevant.
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service,
              uint64_t trace_tags_propagation_max_length = 512)
       : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,

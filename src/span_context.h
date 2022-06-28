@@ -10,7 +10,6 @@
 
 #include "logger.h"
 #include "sampling_priority.h"
-#include "upstream_service.h"
 
 namespace ot = opentracing;
 

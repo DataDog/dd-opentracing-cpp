@@ -190,7 +190,7 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
 
   auto& trace = trace_found->second;
 
-  trace.applySamplingDecisionToUpstreamServices();
+  trace.applySamplingDecisionToTraceTags();
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
   }

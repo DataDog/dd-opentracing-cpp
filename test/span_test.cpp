@@ -12,7 +12,6 @@
 
 #include "../src/sample.h"
 #include "../src/tag_propagation.h"
-#include "../src/upstream_service.h"
 #include "mocks.h"
 
 using namespace datadog::opentracing;
