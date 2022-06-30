@@ -244,6 +244,20 @@ For more information about the configuration of trace sampling, see
 - **Environment variable**: `DD_TRACE_RATE_LIMIT`
 - **Default value**: `100`
 
+### Trace Tags Propagation Max Length
+Certain information, such as the _reason_ for a sampling decision having been
+made, is propagated between services along the trace in the form of the
+`X-Datadog-Tags` HTTP request header.
+
+`X-Datadog-Tags`'s length is limited to a certain maximum number of bytes in
+order to prevent rejection by peers or other HTTP header policies.  This
+configuration option is that limit, in bytes.
+
+- **TracerOptions member**: `uint64_t trace_tags_propagation_max_length`
+- **JSON property**: `trace_tags_propagation_max_length` _(number)_
+- **Environment variable**: `DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH`
+- **Default value**: `512`
+
 [1]: /include/datadog/opentracing.h
 [2]: https://docs.datadoghq.com/tracing/setup_overview/proxy_setup/?tab=nginx#nginx-configuration
 [3]: https://docs.datadoghq.com/tracing/setup_overview/setup/cpp/?tab=containers#dynamic-loading
