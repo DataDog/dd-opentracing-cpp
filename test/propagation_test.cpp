@@ -788,7 +788,6 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
         std::cerr << "Exception thrown in test: " << error.what() << '\n';
       }
     }
-
     SECTION("including a 'decision maker' for us, if we make the sampling decision") {
       const std::string serialized_tags = "_dd.p.hello=world";
       // Our sampler will make a decision.
