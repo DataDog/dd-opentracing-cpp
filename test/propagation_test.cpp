@@ -755,8 +755,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   SECTION("is injected") {
     SECTION("as it was extracted, if we did not make a sampling decision") {
       try {
-        const std::string serialized_tags =
-            "_dd.p.hello=world,_dd.p.dm=-4";
+        const std::string serialized_tags = "_dd.p.hello=world,_dd.p.dm=-4";
         // The sampler's sampling priority won't matter, because we're going to
         // inherit the sampling priority from extracted context.
         sampler->sampling_priority =
@@ -790,7 +789,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
         std::cerr << "Exception thrown in test: " << error.what() << '\n';
       }
     }
-    
+
     SECTION("including a 'decision maker' for us, if we make the sampling decision") {
       const std::string serialized_tags = "_dd.p.hello=world";
       // Our sampler will make a decision.
@@ -823,8 +822,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       // additional "_dd.p.dm" describing our sampling decision.
       assert(sampler->sampling_priority != nullptr);
       assert(sampler->sampling_mechanism != nullptr);
-      const int mechanism =
-          int(sampler->sampling_mechanism.get<SamplingMechanism>());
+      const int mechanism = int(sampler->sampling_mechanism.get<SamplingMechanism>());
 
       auto expected_tags = deserializeTags(serialized_tags);
       expected_tags["_dd.p.dm"] = "-" + std::to_string(mechanism);

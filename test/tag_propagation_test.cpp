@@ -41,8 +41,7 @@ TEST_CASE("tag propagation codec expected values") {
     std::unordered_map<std::string, std::string> decoded;
   };
 
-  auto test_case = GENERATE(values<TestCase>(
-      {// clang-format off
+  auto test_case = GENERATE(values<TestCase>({// clang-format off
       {"example from RFC",
        "_dd.p.dm=-4,_dd.p.hello=world",
        {

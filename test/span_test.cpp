@@ -624,7 +624,8 @@ TEST_CASE("span") {
       REQUIRE(found_decision_maker != span_data.meta.end());
       const std::string& decision_maker = found_decision_maker->second;
 
-      const std::string expected_decision_maker = "-" + std::to_string(int(sampler->sampling_mechanism.get<SamplingMechanism>()));
+      const std::string expected_decision_maker =
+          "-" + std::to_string(int(sampler->sampling_mechanism.get<SamplingMechanism>()));
       REQUIRE(decision_maker == expected_decision_maker);
     }
   }
