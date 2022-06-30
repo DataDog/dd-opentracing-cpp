@@ -1,6 +1,14 @@
 #include "sample.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <sstream>
+
+#include "clock.h"
+#include "glob.h"
+#include "logger.h"
+#include "span.h"
 
 namespace datadog {
 namespace opentracing {
@@ -134,6 +142,123 @@ RuleResult RulesSampler::match(const std::string& service, const std::string& na
 }
 
 void RulesSampler::updatePrioritySampler(json config) { priority_sampler_.configure(config); }
+
+SpanSampler::Rule::Config::Config()
+    : service_pattern("*"),
+      operation_name_pattern("*"),
+      sample_rate(1.0),
+      max_per_second(std::nan("")),
+      text() {}
+
+SpanSampler::Rule::Rule(const SpanSampler::Rule::Config& config, TimeProvider clock)
+    : config_(config) {
+  if (!std::isnan(config.max_per_second)) {
+    limiter_ = std::make_unique<Limiter>(clock, config.max_per_second);
+  }
+}
+
+bool SpanSampler::Rule::match(const SpanData& span) const {
+  return glob_match(config_.service_pattern, span.service) &&
+         glob_match(config_.operation_name_pattern, span.name);
+}
+
+bool SpanSampler::Rule::allow() {
+  if (!limiter_) {
+    return true;
+  }
+
+  return limiter_->allow().allowed;
+}
+
+const SpanSampler::Rule::Config& SpanSampler::Rule::config() const { return config_; }
+
+void SpanSampler::configure(ot::string_view json, Logger& logger) {
+  configure(json, logger, getRealTime);
+}
+
+void SpanSampler::configure(ot::string_view raw_json, Logger& logger, TimeProvider clock) {
+  rules_.clear();
+
+  // `raw_json` is expected to be a JSON array of objects, where each object
+  // configures a `SpanSampler::Rule`.
+  try {
+    const auto log_invalid_json = [&](const std::string& description, json& object) {
+      logger.Log(LogLevel::error, description + ": " + object.get<std::string>());
+    };
+
+    const json config_json = json::parse(raw_json);
+
+    for (auto& item : config_json.items()) {
+      auto rule_json = item.value();
+
+      if (!rule_json.is_object()) {
+        log_invalid_json("span sampler: unexpected element type in rules array", rule_json);
+        continue;
+      }
+
+      // Default values are enforced by the `Rule::Config` constructor.
+      Rule::Config config;
+
+      if (rule_json.contains("service")) {
+        config.service_pattern = rule_json.at("service").get<std::string>();
+      }
+
+      if (rule_json.contains("name")) {
+        config.operation_name_pattern = rule_json.at("name").get<std::string>();
+      }
+
+      if (rule_json.contains("sample_rate")) {
+        if (!rule_json.at("sample_rate").is_number()) {
+          log_invalid_json("span sampler: invalid type for 'sample_rate' (expected number)",
+                           rule_json);
+          continue;
+        }
+        const double sample_rate = rule_json.at("sample_rate").get<json::number_float_t>();
+        if (!(sample_rate >= 0.0 && sample_rate <= 1.0)) {
+          log_invalid_json(
+              "span sampler: invalid value for 'sample_rate' (expected value between 0.0 and 1.0)",
+              rule_json);
+          continue;
+        }
+        config.sample_rate = sample_rate;
+      }
+
+      if (rule_json.contains("max_per_second")) {
+        if (!rule_json.at("max_per_second").is_number()) {
+          log_invalid_json("span sampler: invalid type for 'max_per_second' (expected number)",
+                           rule_json);
+        }
+        const double max_per_second = rule_json.at("max_per_second").get<json::number_float_t>();
+        if (!(max_per_second >= 0)) {
+          log_invalid_json(
+              "span sampler: invalid value for 'max_per_second' (expected non-negative value)",
+              rule_json);
+          continue;
+        }
+        config.max_per_second = max_per_second;
+      }
+
+      config.text = rule_json.dump();
+      rules_.emplace_back(config, clock);
+    }
+  } catch (const json::parse_error& error) {
+    std::string message;
+    message += "span sampler: unable to parse JSON config: ";
+    message += error.what();
+    logger.Log(LogLevel::error, message);
+  }
+}
+
+SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
+  const auto found = std::find_if(rules_.begin(), rules_.end(),
+                                  [&](const Rule& rule) { return rule.match(span); });
+  if (found == rules_.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+const std::vector<SpanSampler::Rule>& SpanSampler::rules() const { return rules_; }
 
 }  // namespace opentracing
 }  // namespace datadog

@@ -137,7 +137,7 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept {
   try {
     auto log_invalid_json = [&](const std::string &description, json &object) {
-      logger_->Log(LogLevel::info, description + ": " + object.get<std::string>());
+      logger_->Log(LogLevel::error, description + ": " + object.get<std::string>());
     };
     json config = json::parse(opts_.sampling_rules);
     for (auto &item : config.items()) {
@@ -160,6 +160,7 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
         log_invalid_json(
             "rules sampler: invalid value for sample rate (expected value between 0.0 and 1.0)",
             rule);
+        continue;
       }
       // "service" and "name" are optional
       bool has_service = rule.contains("service") && rule.at("service").is_string();
