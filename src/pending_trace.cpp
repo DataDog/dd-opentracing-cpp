@@ -130,7 +130,7 @@ void PendingTrace::applySamplingDecisionToTraceTags() {
   //
   // That's a separating hyphen, not a minus sign.
   const int mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
-  trace_tags[datadog_decision_maker_tag] = std::to_string(mechanism);
+  trace_tags[datadog_decision_maker_tag] = "-" + std::to_string(mechanism);
 }
 
 }  // namespace opentracing
