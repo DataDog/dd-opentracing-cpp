@@ -158,8 +158,13 @@ SpanSampler::Rule::Rule(const SpanSampler::Rule::Config& config, TimeProvider cl
 }
 
 bool SpanSampler::Rule::match(const SpanData& span) const {
-  return glob_match(config_.service_pattern, span.service) &&
-         glob_match(config_.operation_name_pattern, span.name);
+  const auto is_match = [](const std::string& pattern, const std::string& subject) {
+    // Since "*" is the default pattern, optimize for that case.
+    return pattern == "*" || glob_match(pattern, subject);
+  };
+
+  return is_match(config_.service_pattern, span.service) &&
+         is_match(config_.operation_name_pattern, span.name);
 }
 
 bool SpanSampler::Rule::allow() {
