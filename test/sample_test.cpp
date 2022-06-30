@@ -305,7 +305,6 @@ TEST_CASE("rules sampler") {
     const auto tag_found = span_data.meta.find("_dd.p.dm");
     REQUIRE(tag_found != span_data.meta.end());
     const std::string& decision_maker = tag_found->second;
-
     const std::string expected = "-" + std::to_string(int(SamplingMechanism::Rule));
     REQUIRE(decision_maker == expected);
   }
