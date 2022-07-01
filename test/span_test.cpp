@@ -681,7 +681,7 @@ TEST_CASE("span") {
         // Here's the behavior we're testing for.
         const auto found_error_tag = span_data.meta.find("_dd.propagation_error");
         REQUIRE(found_error_tag != span_data.meta.end());
-        REQUIRE(found_error_tag->second == "max_size");
+        REQUIRE(found_error_tag->second == "inject_max_size");
       }
     }
   }

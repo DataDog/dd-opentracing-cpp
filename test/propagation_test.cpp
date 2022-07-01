@@ -917,7 +917,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       const auto& finished_span = *maybe_finished_span;
       const auto found = finished_span.meta.find("_dd.propagation_error");
       REQUIRE(found != finished_span.meta.end());
-      REQUIRE(found->second == "max_size");
+      REQUIRE(found->second == "inject_max_size");
     }
   }
 

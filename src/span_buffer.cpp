@@ -197,7 +197,7 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
 
   const auto configured_max = options_.trace_tags_propagation_max_length;
   if (result.size() > configured_max) {
-    trace.propagation_error = "max_size";
+    trace.propagation_error = "inject_max_size";
     std::ostringstream message;
     message
         << "Serialized trace tags are too large for propagation.  Configured maximum length is "
