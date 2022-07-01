@@ -11,6 +11,7 @@
 #include <unistd.h>
 #endif
 
+#include <cassert>
 #include <cmath>
 #include <fstream>
 #include <random>
@@ -132,6 +133,19 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
   }
 }
 
+std::string spanSamplingRules(const TracerOptions &options, const Logger &logger) {
+  const char *const span_rules = std::getenv("DD_SPAN_SAMPLING_RULES");
+  const char *const span_rules_file = std::getenv("DD_SPAN_SAMPLING_RULES_FILE");
+  if (span_rules) {
+    if (span_rules_file) {
+      logger.Log(LogLevel::error, "Both DD_SPAN_SAMPLING_RULES and DD_SPAN_SAMPLING_RULES_FILE have values in the environment.  DD_SPAN_SAMPLING_RULES will be used, and DD_SPAN_SAMPLING_RULES_FILE will be ignored.");
+    }
+    return span_rules;
+  }
+
+  // TODO
+}
+
 }  // namespace
 
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept {
@@ -224,16 +238,19 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimePr
       legacy_obfuscation_(legacyObfuscationEnabled()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
-               std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+               std::shared_ptr<RulesSampler> trace_sampler, std::shared_ptr<const Logger> logger)
     : logger_(logger),
       opts_(options),
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
-  configureRulesSampler(sampler);
+  assert(logger_);
+  configureRulesSampler(trace_sampler);
+  auto span_sampler = std::make_shared<SpanSampler>();
+  span_sampler->configure(TODO, *logger_, get_time_);  // TODO
   startupLog(options);
   buffer_ = std::make_shared<SpanBuffer>(
-      logger_, writer, sampler,
+      logger_, writer, trace_sampler,
       SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
                         options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
