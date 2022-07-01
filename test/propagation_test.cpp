@@ -831,7 +831,7 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
     }
 
     SECTION(
-        "including an UpstreamService for us, if we are the first to make a sampling decision") {
+        "including a 'decision maker' for us, if we are the first to make a sampling decision") {
       // Let's omit "tags" ("x-datadog-tags") entirely from the extracted context.
 
       sampler->sampling_priority =
