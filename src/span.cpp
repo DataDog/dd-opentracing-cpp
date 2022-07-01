@@ -37,8 +37,6 @@ SpanData::SpanData(std::string type, std::string service, ot::string_view resour
       duration(duration),
       error(error) {}
 
-SpanData::SpanData() {}
-
 uint64_t SpanData::traceId() const { return trace_id; }
 uint64_t SpanData::spanId() const { return span_id; }
 

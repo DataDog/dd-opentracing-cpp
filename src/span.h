@@ -20,26 +20,11 @@ typedef std::function<uint64_t()> IdProvider;  // See tracer.h
 // additionally contains handles to mechanisms it needs in order to implement
 // its methods (e.g. the logger, the tracer).  `SpanData` is just the data.
 struct SpanData {
-  ~SpanData() = default;
-
-  friend std::unique_ptr<SpanData> makeSpanData(std::string type, std::string service,
-                                                ot::string_view resource, std::string name,
-                                                uint64_t trace_id, uint64_t span_id,
-                                                uint64_t parent_id, int64_t start);
-
-  friend std::unique_ptr<SpanData> stubSpanData();
-
- protected:  // Can only be created in a unique_ptr (or in a subclassed test class).
   SpanData(std::string type, std::string service, ot::string_view resource, std::string name,
            uint64_t trace_id, uint64_t span_id, uint64_t parent_id, int64_t start,
            int64_t duration, int32_t error);
-  SpanData();
-  SpanData(const SpanData &) = default;
-  SpanData &operator=(const SpanData &) = delete;
-  SpanData(const SpanData &&) = delete;
-  SpanData &operator=(const SpanData &&) = delete;
+  SpanData() = default;
 
- public:
   std::string type;
   std::string service;
   std::string resource;
