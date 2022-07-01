@@ -194,7 +194,7 @@ void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, Time
   // configures a `SpanSampler::Rule`.
   try {
     const auto log_invalid_json = [&](const std::string& description, json& object) {
-      logger.Log(LogLevel::error, description + ": " + object.get<std::string>());
+      logger.Log(LogLevel::error, description + ": " + object.dump());
     };
 
     const json config_json = json::parse(raw_json);
@@ -211,10 +211,19 @@ void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, Time
       Rule::Config config;
 
       if (rule_json.contains("service")) {
+        if (!rule_json.at("service").is_string()) {
+          log_invalid_json("span sampler: invalid type for 'service' (expected string)",
+                           rule_json);
+          continue;
+        }
         config.service_pattern = rule_json.at("service").get<std::string>();
       }
 
       if (rule_json.contains("name")) {
+        if (!rule_json.at("name").is_string()) {
+          log_invalid_json("span sampler: invalid type for 'name' (expected string)", rule_json);
+          continue;
+        }
         config.operation_name_pattern = rule_json.at("name").get<std::string>();
       }
 
@@ -238,6 +247,7 @@ void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, Time
         if (!rule_json.at("max_per_second").is_number()) {
           log_invalid_json("span sampler: invalid type for 'max_per_second' (expected number)",
                            rule_json);
+          continue;
         }
         const double max_per_second = rule_json.at("max_per_second").get<json::number_float_t>();
         if (max_per_second <= 0) {

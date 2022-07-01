@@ -186,7 +186,7 @@ std::string spanSamplingRules(const TracerOptions &options, const Logger &logger
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept {
   try {
     auto log_invalid_json = [&](const std::string &description, json &object) {
-      logger_->Log(LogLevel::error, description + ": " + object.get<std::string>());
+      logger_->Log(LogLevel::error, description + ": " + object.dump());
     };
     json config = json::parse(opts_.sampling_rules);
     for (auto &item : config.items()) {

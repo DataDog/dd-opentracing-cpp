@@ -1,3 +1,6 @@
+// This test covers the glob-style string pattern matching function,
+// `glob_match`, defined in `glob.h`.
+
 #include "../src/glob.h"
 
 #include <catch2/catch.hpp>

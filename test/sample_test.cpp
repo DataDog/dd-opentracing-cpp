@@ -1,13 +1,16 @@
 #include "../src/sample.h"
 
+#include <algorithm>
 #include <catch2/catch.hpp>
 #include <ctime>
+#include <nlohmann/json.hpp>
 
 #include "../src/agent_writer.h"
 #include "../src/span.h"
 #include "../src/tracer.h"
 #include "mocks.h"
 using namespace datadog::opentracing;
+using json = nlohmann::json;
 
 TEST_CASE("priority sampler unit test") {
   PrioritySampler sampler;
@@ -307,5 +310,99 @@ TEST_CASE("rules sampler") {
     const std::string& decision_maker = tag_found->second;
     const std::string expected = "-" + std::to_string(int(SamplingMechanism::Rule));
     REQUIRE(decision_maker == expected);
+  }
+}
+
+TEST_CASE("SpanSampler rule parsing") {
+  MockLogger logger;
+  const auto dummy_clock = []() { return TimePoint(); };
+  SpanSampler sampler;
+
+  SECTION("empty array means no rules") {
+    sampler.configure("[]", logger, dummy_clock);
+    REQUIRE(sampler.rules().size() == 0);
+    REQUIRE(logger.records.size() == 0);
+  }
+
+  SECTION("default values for rule properties") {
+    sampler.configure("[{}]", logger, dummy_clock);
+    REQUIRE(sampler.rules().size() == 1);
+    REQUIRE(logger.records.size() == 0);
+
+    const SpanSampler::Rule::Config& config = sampler.rules().front().config();
+    CAPTURE(config.max_per_second);
+    REQUIRE(std::isnan(config.max_per_second));
+    REQUIRE(config.operation_name_pattern == "*");
+    REQUIRE(config.sample_rate == 1.0);
+    REQUIRE(config.service_pattern == "*");
+    REQUIRE(config.text == "{}");
+  }
+
+  SECTION("valid values for rule properties") {
+    const std::string rule_json = R"json({
+      "service": "foosvc",
+      "name": "handle.thing",
+      "sample_rate": 0.1,
+      "max_per_second": 1000
+    })json";
+    sampler.configure("[" + rule_json + "]", logger, dummy_clock);
+    REQUIRE(sampler.rules().size() == 1);
+    REQUIRE(logger.records.size() == 0);
+
+    const SpanSampler::Rule::Config& config = sampler.rules().front().config();
+    REQUIRE(config.max_per_second == 1000);
+    REQUIRE(config.operation_name_pattern == "handle.thing");
+    REQUIRE(config.sample_rate == 0.1);
+    REQUIRE(config.service_pattern == "foosvc");
+    REQUIRE(json::parse(config.text) == json::parse(rule_json));
+  }
+
+  SECTION("invalid JSON yields no rules and logs error") {
+    auto bad_json = GENERATE(as<ot::string_view>{}, "this is not json", "[{'neither': 'is this'}]",
+                             "[{}, {4}, {}]");
+
+    CAPTURE(bad_json);
+    sampler.configure(bad_json, logger, dummy_clock);
+    REQUIRE(sampler.rules().size() == 0);
+    REQUIRE(logger.records.size() == 1);
+    const auto& log_record = logger.records.front();
+    REQUIRE(log_record.level == LogLevel::error);
+    CAPTURE(log_record.message);
+    REQUIRE(log_record.message.find("JSON") != std::string::npos);
+  }
+
+  SECTION("invalid rules are skipped and log error") {
+    struct TestCase {
+      ot::string_view rules_json;
+      unsigned expected_rule_count;
+      ot::string_view expected_error_excerpt;
+    };
+
+    auto test_case = GENERATE(values<TestCase>(
+        {// "sample_rate" has the wrong type
+         {R"json([{"sample_rate": "foo"}, {}, {}, {}])json", 3, "sample_rate"},
+         // "sample_rate" is out of range
+         {R"json([{"sample_rate": 1.2}, {}, {}, {}])json", 3, "sample_rate"},
+         // "max_per_second" has the wrong type
+         {R"json([{}, {"max_per_second": null}, {}, {}])json", 3, "max_per_second"},
+         // "max_per_second" is out of range
+         {R"json([{}, {"max_per_second": 0}, {}, {}])json", 3, "max_per_second"},
+         // "service" has the wrong type
+         {R"json([{}, {}, {"service": 10}, {}])json", 3, "service"},
+         // "name" has the wrong type
+         {R"json([{}, {}, {}, {"name": false}])json", 3, "name"}}));
+
+    CAPTURE(test_case.rules_json);
+    sampler.configure(test_case.rules_json, logger, dummy_clock);
+
+    REQUIRE(sampler.rules().size() == test_case.expected_rule_count);
+
+    REQUIRE(logger.records.size() == 1);
+    const auto& log_record = logger.records.front();
+    CAPTURE(log_record.message);
+    REQUIRE(log_record.level == LogLevel::error);
+
+    CAPTURE(test_case.expected_error_excerpt);
+    REQUIRE(log_record.message.find(test_case.expected_error_excerpt) != std::string::npos);
   }
 }
