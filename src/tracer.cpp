@@ -285,7 +285,7 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   span_sampler->configure(spanSamplingRules(opts_, *logger_), *logger_, get_time_);
   startupLog(options);
   buffer_ = std::make_shared<SpanBuffer>(
-      logger_, writer, trace_sampler,  // TODO: span_sampler
+      logger_, writer, trace_sampler, span_sampler,
       SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
                         options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }

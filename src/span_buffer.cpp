@@ -9,8 +9,13 @@ namespace datadog {
 namespace opentracing {
 
 SpanBuffer::SpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
-                       std::shared_ptr<RulesSampler> trace_sampler, SpanBufferOptions options)
-    : logger_(logger), writer_(writer), trace_sampler_(trace_sampler), options_(options) {}
+                       std::shared_ptr<RulesSampler> trace_sampler,
+                       std::shared_ptr<SpanSampler> span_sampler, SpanBufferOptions options)
+    : logger_(logger),
+      writer_(writer),
+      trace_sampler_(trace_sampler),
+      span_sampler_(span_sampler),
+      options_(options) {}
 
 void SpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};

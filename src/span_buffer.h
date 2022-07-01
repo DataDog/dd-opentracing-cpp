@@ -18,6 +18,7 @@ namespace opentracing {
 
 class Writer;
 class SpanContext;
+class SpanSampler;
 
 struct SpanBufferOptions {
   bool enabled = true;
@@ -32,8 +33,20 @@ struct SpanBufferOptions {
 // traces to a Writer.
 class SpanBuffer {
  public:
+  // Create a span buffer that:
+  //
+  // - uses the specified `logger` to log diagnostics,
+  // - uses the specified `writer` to output completed trace segments,
+  // - uses the specified `trace_sampler` to make decisions about whether to keep traces,
+  // - uses the specified `span_sampler` to make decisions about whether to keep spans when a trace
+  //   is dropped,
+  // - is configured using the specified `options`.
+  //
+  // If `span_sampler` is `nullptr`, then span sampling is disabled (but
+  // `trace_sampler` is still consulted for trace sampling decisions).
   SpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
-             std::shared_ptr<RulesSampler> trace_sampler, SpanBufferOptions options);
+             std::shared_ptr<RulesSampler> trace_sampler,
+             std::shared_ptr<SpanSampler> span_sampler, SpanBufferOptions options);
   virtual ~SpanBuffer() = default;
 
   void registerSpan(const SpanContext& context);
@@ -110,6 +123,7 @@ class SpanBuffer {
   std::shared_ptr<Writer> writer_;
   mutable std::mutex mutex_;
   std::shared_ptr<RulesSampler> trace_sampler_;
+  std::shared_ptr<SpanSampler> span_sampler_;
 
  protected:
   // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish

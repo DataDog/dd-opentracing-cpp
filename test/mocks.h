@@ -219,14 +219,15 @@ struct MockWriter : public Writer {
 struct MockBuffer : public SpanBuffer {
   MockBuffer()
       : SpanBuffer(std::make_shared<MockLogger>(), nullptr, std::make_shared<RulesSampler>(),
-                   SpanBufferOptions{}){};
+                   nullptr, SpanBufferOptions{}){};
   explicit MockBuffer(std::shared_ptr<RulesSampler> sampler)
-      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, SpanBufferOptions{}){};
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, nullptr,
+                   SpanBufferOptions{}){};
   // This constructor overload is provided for tests where the service name is
   // relevant.
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service,
              uint64_t tags_header_size = 512)
-      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
+      : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler, nullptr,
                    SpanBufferOptions{true, "localhost", std::nan(""), service, tags_header_size}) {
   }
 

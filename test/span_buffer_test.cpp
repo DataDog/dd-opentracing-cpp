@@ -10,7 +10,8 @@ TEST_CASE("span buffer") {
   auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<RulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
+  auto buffer =
+      std::make_shared<SpanBuffer>(logger, writer, sampler, nullptr, SpanBufferOptions{});
 
   auto context_from_span = [](const TestSpanData& span) -> SpanContext {
     auto logger = std::make_shared<const MockLogger>();
