@@ -406,3 +406,97 @@ TEST_CASE("SpanSampler rule parsing") {
     REQUIRE(log_record.message.find(test_case.expected_error_excerpt) != std::string::npos);
   }
 }
+
+namespace {
+
+// `join({"x", "y", "z"}, " -> ") == "x -> y -> z"`
+std::string join(const std::vector<std::string>& pieces, ot::string_view separator) {
+  std::string result;
+  auto iter = pieces.begin();
+  const auto end = pieces.end();
+  if (iter != end) {
+    result += *iter;
+    for (++iter; iter != end; ++iter) {
+      result.append(separator.data(), separator.size());
+      result += *iter;
+    }
+  }
+  return result;
+}
+
+}  // namespace
+
+TEST_CASE("SpanSampler matching") {
+  MockLogger logger;
+  const auto dummy_clock = []() { return TimePoint(); };
+  SpanSampler sampler;
+
+  const std::vector<std::string> json_rules = {
+      R"json({"service": "mysql", "name": "exec.*", "sample_rate": 1.0})json",
+      R"json({"service": "mysql*", "sample_rate": 0.1})json",
+      R"json({"name": "super.auth", "sample_rate": 1.0})json",
+      R"json({"name": "super.auth??", "sample_rate": 1.0})json",
+  };
+
+  sampler.configure("[" + join(json_rules, ", ") + "]", logger, dummy_clock);
+  REQUIRE(logger.records.size() == 0);
+  REQUIRE(sampler.rules().size() == json_rules.size());
+
+  SECTION("span can match multiple rules, but the first matching rule is chosen") {
+    SpanData span;
+    span.service = "mysql";
+    span.name = "exec.query";
+    // `span` matches both `json_rules[0]` and `json_rules[1]`, but the earlier
+    // rule will be chosen (`json_rules[0]`).
+
+    // First check that two rules could match.
+    const unsigned match_count =
+        std::count_if(sampler.rules().begin(), sampler.rules().end(),
+                      [&](const SpanSampler::Rule& rule) { return rule.match(span); });
+    REQUIRE(match_count == 2);
+
+    // Then check that the first one is chosen.
+    SpanSampler::Rule* rule = sampler.match(span);
+    REQUIRE(rule == &sampler.rules()[0]);
+  }
+
+  SECTION("no match") {
+    SpanData span;
+    span.service = "table";
+    span.name = "check.please";
+    REQUIRE(sampler.match(span) == nullptr);
+  }
+
+  SECTION("match by service name") {
+    SpanData span;
+    span.service = "mysql123";
+    span.name = "cache.lookup";
+    // matches `json_rules[1]`
+    REQUIRE(sampler.match(span) == &sampler.rules()[1]);
+  }
+
+  SECTION("match by operation name") {
+    SpanData span;
+    span.service = "langley";
+    span.name = "super.auth";
+    // matches `json_rules[2]`
+    REQUIRE(sampler.match(span) == &sampler.rules()[2]);
+  }
+
+  SECTION("match by service name and operation name") {
+    SpanData span;
+    span.service = "mysql";
+    span.name = "exec.query";
+    // matches `json_rules[0]` (as before)
+    SpanSampler::Rule* rule = sampler.match(span);
+    REQUIRE(rule == &sampler.rules()[0]);
+  }
+
+  SECTION("match involving question marks") {
+    SpanData span;
+    span.service = "roswell";
+    span.name = "super.auth51";
+    // matches `json_rules[3]` (not `json_rules[2]`)
+    REQUIRE(sampler.match(span) == &sampler.rules()[3]);
+  }
+}
