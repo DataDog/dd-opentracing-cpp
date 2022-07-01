@@ -90,9 +90,8 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("sampling_limit_per_second") != config.end()) {
       config.at("sampling_limit_per_second").get_to(options.sampling_limit_per_second);
     }
-    if (config.find("trace_tags_propagation_max_length") != config.end()) {
-      config.at("trace_tags_propagation_max_length")
-          .get_to(options.trace_tags_propagation_max_length);
+    if (config.find("tags_header_size") != config.end()) {
+      config.at("tags_header_size").get_to(options.tags_header_size);
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";

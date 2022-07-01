@@ -633,10 +633,10 @@ TEST_CASE("span") {
   SECTION("_dd.propagation_error tag") {
     const auto sampler = std::make_shared<MockRulesSampler>();
     TracerOptions options;
-    options.service = "supersvc";                     // doesn't matter
-    options.trace_tags_propagation_max_length = 512;  // this matters
-    const auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
-                                                     options.trace_tags_propagation_max_length);
+    options.service = "supersvc";    // doesn't matter
+    options.tags_header_size = 512;  // this matters
+    const auto buffer =
+        std::make_shared<MockBuffer>(sampler, options.service, options.tags_header_size);
     const auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
 
     SECTION("is included in root span when x-datadog-tags propagation failed") {

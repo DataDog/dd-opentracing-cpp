@@ -116,7 +116,7 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
   const char env_name[] = "DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH";
   const char *const env_value = std::getenv(env_name);
   if (env_value == nullptr) {
-    return options.trace_tags_propagation_max_length;
+    return options.tags_header_size;
   }
 
   try {
@@ -128,7 +128,7 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
     message += " environment variable value: ";
     message += env_value;
     logger.Log(LogLevel::error, message);
-    return options.trace_tags_propagation_max_length;
+    return options.tags_header_size;
   }
 }
 

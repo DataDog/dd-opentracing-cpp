@@ -152,10 +152,10 @@ struct TracerOptions {
   // particular span in the trace.  Some of these trace-wide tags are
   // propagated between services.  The tags are injected into a carrier (e.g.
   // an HTTP header) in a particular format.
-  // `trace_tags_propagation_max_length` is the maximum length of the
+  // `tags_header_size` is the maximum length of the
   // serialized tags allowed.  Trace-wide tags whose serialized length exceeds
   // this limit are not propagated.
-  uint64_t trace_tags_propagation_max_length = 512;
+  uint64_t tags_header_size = 512;
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

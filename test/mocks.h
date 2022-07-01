@@ -225,10 +225,10 @@ struct MockBuffer : public SpanBuffer {
   // This constructor overload is provided for tests where the service name is
   // relevant.
   MockBuffer(std::shared_ptr<RulesSampler> sampler, std::string service,
-             uint64_t trace_tags_propagation_max_length = 512)
+             uint64_t tags_header_size = 512)
       : SpanBuffer(std::make_shared<MockLogger>(), nullptr, sampler,
-                   SpanBufferOptions{true, "localhost", std::nan(""), service,
-                                     trace_tags_propagation_max_length}) {}
+                   SpanBufferOptions{true, "localhost", std::nan(""), service, tags_header_size}) {
+  }
 
   void unbufferAndWriteTrace(uint64_t /* trace_id */) override{
       // Haha NOPE.

@@ -253,8 +253,8 @@ made, is propagated between services along the trace in the form of the
 order to prevent rejection by peers or other HTTP header policies.  This
 configuration option is that limit, in bytes.
 
-- **TracerOptions member**: `uint64_t trace_tags_propagation_max_length`
-- **JSON property**: `trace_tags_propagation_max_length` _(number)_
+- **TracerOptions member**: `uint64_t tags_header_size`
+- **JSON property**: `tags_header_size` _(number)_
 - **Environment variable**: `DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH`
 - **Default value**: `512`
 

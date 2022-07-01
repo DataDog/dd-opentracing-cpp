@@ -743,12 +743,11 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
   TracerOptions options;
   options.service = "zappasvc";
   options.environment = "staging";
-  options.trace_tags_propagation_max_length = 512;
+  options.tags_header_size = 512;
 
   auto logger = std::make_shared<const MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
-  auto buffer = std::make_shared<MockBuffer>(sampler, options.service,
-                                             options.trace_tags_propagation_max_length);
+  auto buffer = std::make_shared<MockBuffer>(sampler, options.service, options.tags_header_size);
 
   auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId, logger);
 

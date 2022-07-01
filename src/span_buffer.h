@@ -25,7 +25,7 @@ struct SpanBufferOptions {
   double analytics_rate = std::nan("");
   std::string service;
   // See the corresponding field in `TracerOptions`.
-  uint64_t trace_tags_propagation_max_length;
+  uint64_t tags_header_size;
 };
 
 // Keeps track of Spans until there is a complete trace, and sends completed

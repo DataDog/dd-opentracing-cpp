@@ -195,7 +195,7 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
     appendTag(result, entry.first, entry.second);
   }
 
-  const auto configured_max = options_.trace_tags_propagation_max_length;
+  const auto configured_max = options_.tags_header_size;
   if (result.size() > configured_max) {
     trace.propagation_error = "inject_max_size";
     std::ostringstream message;
