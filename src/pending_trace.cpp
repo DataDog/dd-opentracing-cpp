@@ -17,6 +17,9 @@ const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
 const std::string rules_sampler_limiter_rate = "_dd.limit_psr";
 const std::string priority_sampler_applied_rate = "_dd.agent_psr";
+const std::string span_sampling_mechanism = "_dd.span_sampling.mechanism";
+const std::string span_sampling_rule_rate = "_dd.span_sampling.rule_rate";
+const std::string span_sampling_limit = "_dd.span_sampling.max_per_second";
 
 // Return whether the specified `span` is without a parent among the specified
 // `all_spans_in_trace`.
@@ -71,6 +74,25 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
   finish_span(trace, span);
 }
 
+// Determine whether the specified `span` matches a rule in the specified
+// `span_sampler` and the sampling decision of that rule is to keep the `span`.
+// If so, then add appropriate tags to `span`.
+void apply_span_sampling(SpanSampler& span_sampler, SpanData& span) {
+  SpanSampler::Rule* const rule = span_sampler.match(span);
+  if (!rule || !rule->sample(span)) {
+    return;
+  }
+
+  // The span matched a span rule, and the rule decided to keep the span.
+  // Add span-sampling-specific tags to the span.
+  span.metrics[span_sampling_mechanism] = int(SamplingMechanism::SpanRule);
+  span.metrics[span_sampling_rule_rate] = rule->config().sample_rate;
+  const double limit = rule->config().max_per_second;
+  if (!std::isnan(limit)) {
+    span.metrics[span_sampling_limit] = limit;
+  }
+}
+
 }  // namespace
 
 PendingTrace::PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id)
@@ -87,7 +109,7 @@ PendingTrace::PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_
       all_spans(),
       sampling_priority(std::move(sampling_priority)) {}
 
-void PendingTrace::finish() {
+void PendingTrace::finish(SpanSampler* span_sampler) {
   // Apply changes to spans, in particular treating the root / local-root
   // span as special.
   for (const auto& span : *finished_spans) {
@@ -95,6 +117,15 @@ void PendingTrace::finish() {
       finish_root_span(*this, *span);
     } else {
       finish_span(*this, *span);
+    }
+  }
+
+  // If we have span sampling rules and are dropping the trace, see if any
+  // span sampling tags need to be added.
+  if (span_sampler && !span_sampler->rules().empty() && sampling_priority &&
+      int(*sampling_priority) <= 0) {
+    for (const auto& span : *finished_spans) {
+      apply_span_sampling(*span_sampler, *span);
     }
   }
 }

@@ -98,8 +98,8 @@ class SpanData;
 // Configure `SpanSampling` by calling the `configure` member function.  Then,
 // see if a span matches one of the configured rules by calling the `match`
 // member function.  If the span matched a rule, then a pointer the rule is
-// returned.  Then it is possible to consult the rule's rate limiter and
-// inspect its configuration.
+// returned.  The rule's `sample` member function then determines whether the
+// span is kept on account of the rule.
 class SpanSampler {
  public:
   // `Rule` contains the configuration parsed from a span sampling rule, as
@@ -132,13 +132,23 @@ class SpanSampler {
     // Return whether the specified `span` matches this rule.
     bool match(const SpanData& span) const;
 
+    // Without checking whether the specified `span` matches this rule, return
+    // whether `span` is kept by the rule.
+    bool sample(const SpanData& span);
+
+    // Return this rule's configuration.
+    const Config& config() const;
+
+   private:
+    // Without checking whether the specified `span` matches this rule, and
+    // without consulting the limiter, return whether `span` is kept on account
+    // of this rule.
+    bool roll(const SpanData& span) const;
+
     // Return whether another span is permitted past this rule's rate limiter.
     // If there is no rate limiter associated with this rule, then this
     // function always returns `true`.
     bool allow();
-
-    // Return this rule's configuration.
-    const Config& config() const;
   };
 
  private:
@@ -146,10 +156,9 @@ class SpanSampler {
 
  public:
   // Overwrite this sampler's rules with those parsed from the specified
-  // `raw_json` configuration text.  Optionally specify a `clock` to use in
-  // rate limiting.  If an error occurs, skip the offending rule and emit a
+  // `raw_json` configuration text.  Use the specified `clock` for rate
+  // limiting.  If an error occurs, skip the offending rule and emit a
   // diagnostic using the specified `logger`.
-  void configure(ot::string_view raw_json, const Logger& logger);
   void configure(ot::string_view raw_json, const Logger& logger, TimeProvider clock);
 
   // Return a pointer to the first rule that the specified `span` matches, or

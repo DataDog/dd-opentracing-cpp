@@ -57,7 +57,7 @@ void SpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
     generateSamplingPriorityImpl(trace.finished_spans->back().get());
-    trace.finish();
+    trace.finish(span_sampler_.get());
     unbufferAndWriteTrace(trace_id);
   }
 }

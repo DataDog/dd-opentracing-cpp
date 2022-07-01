@@ -167,6 +167,16 @@ bool SpanSampler::Rule::match(const SpanData& span) const {
          is_match(config_.operation_name_pattern, span.name);
 }
 
+bool SpanSampler::Rule::sample(const SpanData& span) { return roll(span) && allow(); }
+
+bool SpanSampler::Rule::roll(const SpanData& span) const {
+  const uint64_t max_hash = maxIdFromSampleRate(config_.sample_rate);
+  // Use the span ID (not the trace ID), so that rolls can differ among spans
+  // within the same trace (given the same sample rate).
+  const uint64_t hashed_id = span.span_id * constant_rate_hash_factor;
+  return hashed_id < max_hash;
+}
+
 bool SpanSampler::Rule::allow() {
   if (!limiter_) {
     return true;
@@ -176,10 +186,6 @@ bool SpanSampler::Rule::allow() {
 }
 
 const SpanSampler::Rule::Config& SpanSampler::Rule::config() const { return config_; }
-
-void SpanSampler::configure(ot::string_view json, const Logger& logger) {
-  configure(json, logger, getRealTime);
-}
 
 void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, TimeProvider clock) {
   rules_.clear();

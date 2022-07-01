@@ -25,7 +25,12 @@ struct PendingTrace {
   PendingTrace(std::shared_ptr<const Logger> logger, uint64_t trace_id,
                std::unique_ptr<SamplingPriority> sampling_priority);
 
-  void finish();
+  // Modify span tags in order to prepare this trace for serialization.  Use
+  // the optionally specified `span_sampler` to identify spans to keep should
+  // this trace be dropped.  If `span_sampler` is `nullptr`, then no span
+  // sampling is performed.
+  void finish(SpanSampler *span_sampler = nullptr);
+
   // If this tracer did not inherit a sampling decision from an upstream
   // service, but instead made a sampling decision, then record that decision
   // in the "_dd.p.dm" member of `trace_tags`.
