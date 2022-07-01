@@ -11,7 +11,7 @@ namespace {
 const std::string sampling_priority_metric = "_sampling_priority_v1";
 const std::string datadog_origin_tag = "_dd.origin";
 const std::string datadog_hostname_tag = "_dd.hostname";
-const std::string datadog_upstream_services_tag = "_dd.p.upstream_services";
+const std::string datadog_decision_maker_tag = "_dd.p.dm";
 const std::string datadog_propagation_error_tag = "_dd.propagation_error";
 const std::string event_sample_rate_metric = "_dd1.sr.eausr";
 const std::string rules_sampler_applied_rate = "_dd.rule_psr";
@@ -62,6 +62,11 @@ void finish_root_span(PendingTrace& trace, SpanData& span) {
   if (!std::isnan(trace.sample_result.priority_rate)) {
     span.metrics[priority_sampler_applied_rate] = trace.sample_result.priority_rate;
   }
+  trace.applySamplingDecisionToTraceTags();
+  span.meta.insert(trace.trace_tags.begin(), trace.trace_tags.end());
+  if (!trace.propagation_error.empty()) {
+    span.meta[datadog_propagation_error_tag] = trace.propagation_error;
+  }
   // Forward to the finisher that applies to all spans (not just root spans).
   finish_span(trace, span);
 }
@@ -94,16 +99,14 @@ void PendingTrace::finish() {
   }
 }
 
-void PendingTrace::applySamplingDecisionToUpstreamServices() {
-  if (applied_sampling_decision_to_upstream_services || sampling_decision_extracted ||
-      sampling_priority == nullptr) {
-    // We did not make the sampling decision, or we've already done this.
+void PendingTrace::applySamplingDecisionToTraceTags() {
+  if (sampling_decision_extracted || sampling_priority == nullptr) {
+    // We did not make the sampling decision.
     return;
   }
 
   // In unit tests, we sometimes don't have a service name.  In those cases,
-  // omit our `UpstreamService` entry (those tests are not looking for the
-  // corresponding tag).
+  // omit the tag (those tests are not looking for the corresponding tag).
   if (service.empty()) {
     return;
   }
@@ -113,14 +116,21 @@ void PendingTrace::applySamplingDecisionToUpstreamServices() {
   // have set a corresponding sampling mechanism.
   assert(sample_result.sampling_mechanism != nullptr);
 
-  UpstreamService this_service;
-  this_service.service_name = service;
-  this_service.sampling_priority = *sampling_priority;
-  this_service.sampling_mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
-  this_service.sampling_rate = sample_result.applied_rate;
-
-  appendUpstreamService(trace_tags[upstream_services_tag], this_service);
-  applied_sampling_decision_to_upstream_services = true;
+  // The "decision maker" is formatted as:
+  //
+  //     <maybe someday service name hashed> "-" <sampling mechanism>
+  //
+  // So for now it's just
+  //
+  //     "-" <sampling mechanism>
+  //
+  // e.g.
+  //
+  //     -4
+  //
+  // That's a separating hyphen, not a minus sign.
+  const int mechanism = int(sample_result.sampling_mechanism.get<SamplingMechanism>());
+  trace_tags[datadog_decision_maker_tag] = "-" + std::to_string(mechanism);
 }
 
 }  // namespace opentracing

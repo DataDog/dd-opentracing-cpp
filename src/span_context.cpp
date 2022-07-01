@@ -24,6 +24,9 @@ struct HeadersImpl {
   const char *span_id_header;
   const char *sampling_priority_header;
   const char *origin_header;
+  // Certain tags that are associated with the entire trace are propagated.
+  // See `tag_propagation.h`.
+  const char *tags_header;
   const int base;
   std::string (*encode_id)(uint64_t);
   std::string (*encode_sampling_priority)(SamplingPriority);
@@ -54,6 +57,7 @@ constexpr struct {
                       "x-datadog-parent-id",
                       "x-datadog-sampling-priority",
                       "x-datadog-origin",
+                      "x-datadog-tags",
                       10,
                       std::to_string,
                       to_string};
@@ -62,6 +66,7 @@ constexpr struct {
                  "X-B3-SpanId",
                  "X-B3-Sampled",
                  "x-datadog-origin",
+                 "x-datadog-tags",
                  16,
                  asHex,
                  clampB3SamplingPriorityValue};
@@ -140,6 +145,7 @@ std::vector<ot::string_view> getPropagationHeaderNames(const std::set<Propagatio
       headers.push_back(propagation_headers[style].sampling_priority_header);
       headers.push_back(propagation_headers[style].origin_header);
     }
+    headers.push_back(propagation_headers[style].tags_header);
   }
   return headers;
 }
@@ -319,6 +325,10 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
       j[json_origin_key] = origin_;
     }
   }
+  std::string tags = pending_traces->serializeTraceTags(trace_id_);
+  if (!tags.empty()) {
+    j[json_tags_key] = std::move(tags);
+  }
   j[json_baggage_key] = baggage_;
 
   writer << j.dump();
@@ -385,6 +395,14 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
         return result;
       }
     }
+  }
+
+  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
+  if (!tags.empty()) {
+    result = writer.Set(headers_impl.tags_header, tags);
+  }
+  if (!result) {
+    return result;
   }
 
   for (auto baggage_item : baggage_) {
@@ -549,13 +567,19 @@ ot::expected<std::unique_ptr<ot::SpanContext>> SpanContext::deserialize(
           } else if (has_prefix(key, baggage_prefix)) {
             baggage.emplace(std::string{std::begin(key) + baggage_prefix.size(), std::end(key)},
                             value);
+          } else if (equals_ignore_case(key, headers_impl.tags_header)) {
+            trace_tags = deserializeTags(value);
           }
         } catch (const std::logic_error &error) {
           std::ostringstream message;
           message << "Error decoding context key " << json_quote(key) << " with value "
                   << json_quote(value) << ": " << error.what();
           logger->Log(LogLevel::error, message.str());
-          return ot::make_unexpected(ot::span_context_corrupted_error);
+          // Tolerate failure to parse `tags_header`, but not e.g.
+          // `trace_id_header`.
+          if (!equals_ignore_case(key, headers_impl.tags_header)) {
+            return ot::make_unexpected(ot::span_context_corrupted_error);
+          }
         }
         return {};
       });

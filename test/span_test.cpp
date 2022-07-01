@@ -12,7 +12,6 @@
 
 #include "../src/sample.h"
 #include "../src/tag_propagation.h"
-#include "../src/upstream_service.h"
 #include "mocks.h"
 
 using namespace datadog::opentracing;
@@ -545,6 +544,145 @@ TEST_CASE("span") {
       REQUIRE(result->metrics.find("_dd.limit_psr") != result->metrics.end());
       REQUIRE(result->metrics["_dd.rule_psr"] == 0.42);
       REQUIRE(result->metrics["_dd.limit_psr"] == 0.99);
+    }
+  }
+
+  // Sampling decision maker
+  SECTION("_dd.p.dm tag") {
+    const auto sampler = std::make_shared<MockRulesSampler>();
+    sampler->priority_rate = 1.0;
+    TracerOptions options;
+    options.service = "supersvc";
+    const auto buffer = std::make_shared<MockBuffer>(sampler, options.service);
+    const auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+
+    SECTION("is included in root span when extracted from context") {
+      sampler->sampling_priority = nullptr;
+
+      const std::string expected_decision_maker = "-" + std::to_string(4);
+      std::string tags;
+      appendTag(tags, "_dd.p.dm", expected_decision_maker);
+
+      MockTextMapCarrier carrier;
+      carrier.Set("x-datadog-tags", tags);
+      carrier.Set("x-datadog-trace-id", "123");
+      carrier.Set("x-datadog-parent-id", "456");
+
+      const auto maybe_context = tracer->Extract(carrier);
+      REQUIRE(maybe_context);
+      const auto& context = *maybe_context;
+      REQUIRE(context);
+
+      const auto span =
+          tracer->StartSpan("OperationMoonUnit", {opentracing::ChildOf(context.get())});
+      REQUIRE(span);
+      span->FinishWithOptions(finish_options);
+
+      REQUIRE(buffer->traces().size() == 1);
+      const auto& entry = *buffer->traces().begin();
+      REQUIRE(entry.first == 123);
+
+      const auto& trace = entry.second;
+      REQUIRE(trace.finished_spans);
+      REQUIRE(trace.finished_spans->size() == 1);
+
+      const auto& maybe_span_data = *trace.finished_spans->begin();
+      REQUIRE(maybe_span_data);
+      const auto& span_data = *maybe_span_data;
+
+      const auto found_decision_maker = span_data.meta.find("_dd.p.dm");
+      REQUIRE(found_decision_maker != span_data.meta.end());
+
+      REQUIRE(found_decision_maker->second == expected_decision_maker);
+    }
+
+    SECTION("is included in root span when a sampling decision is made") {
+      // We won't extract any context this time, but will make a sampling
+      // decision, and so expect a corresponding "_dd.p.dm" tag on the root
+      // span.
+      sampler->sampling_priority =
+          std::make_unique<SamplingPriority>(SamplingPriority::SamplerDrop);
+      sampler->sampling_mechanism = SamplingMechanism::Default;
+      sampler->applied_rate = sampler->priority_rate;
+
+      const auto span = tracer->StartSpan("OperationMoonUnit");
+      REQUIRE(span);
+      span->FinishWithOptions(finish_options);
+
+      REQUIRE(buffer->traces().size() == 1);
+      const auto& entry = *buffer->traces().begin();
+
+      const auto& trace = entry.second;
+      REQUIRE(trace.finished_spans);
+      REQUIRE(trace.finished_spans->size() == 1);
+
+      const auto& maybe_span_data = *trace.finished_spans->begin();
+      REQUIRE(maybe_span_data);
+      const auto& span_data = *maybe_span_data;
+
+      const auto found_decision_maker = span_data.meta.find("_dd.p.dm");
+      REQUIRE(found_decision_maker != span_data.meta.end());
+      const std::string& decision_maker = found_decision_maker->second;
+
+      const std::string expected_decision_maker =
+          "-" + std::to_string(int(sampler->sampling_mechanism.get<SamplingMechanism>()));
+      REQUIRE(decision_maker == expected_decision_maker);
+    }
+  }
+
+  SECTION("_dd.propagation_error tag") {
+    const auto sampler = std::make_shared<MockRulesSampler>();
+    TracerOptions options;
+    options.service = "supersvc";    // doesn't matter
+    options.tags_header_size = 512;  // this matters
+    const auto buffer =
+        std::make_shared<MockBuffer>(sampler, options.service, options.tags_header_size);
+    const auto tracer = std::make_shared<Tracer>(options, buffer, getRealTime, getId);
+
+    SECTION("is included in root span when x-datadog-tags propagation failed") {
+      SECTION("due to the serialized value being too large") {
+        const std::string tags = "_dd.p.foo=" + std::string(1024, 'x');
+
+        MockTextMapCarrier carrier;
+        carrier.Set("x-datadog-tags", tags);
+        carrier.Set("x-datadog-trace-id", "123");
+        carrier.Set("x-datadog-parent-id", "456");
+
+        const auto maybe_context = tracer->Extract(carrier);
+        REQUIRE(maybe_context);
+        const auto& context = *maybe_context;
+        REQUIRE(context);
+
+        const auto span =
+            tracer->StartSpan("OperationMoonUnit", {opentracing::ChildOf(context.get())});
+        REQUIRE(span);
+
+        // Now inject the context.  x-datadog-tags will fail to serialize, due
+        // to being oversized, and so when the trace is finished there will be
+        // a corresponding error tag.
+        std::ostringstream dummy;
+        const auto rcode = tracer->Inject(span->context(), dummy);
+        REQUIRE(rcode);
+
+        span->FinishWithOptions(finish_options);
+
+        REQUIRE(buffer->traces().size() == 1);
+        const auto& entry = *buffer->traces().begin();
+        REQUIRE(entry.first == 123);
+
+        const auto& trace = entry.second;
+        REQUIRE(trace.finished_spans);
+        REQUIRE(trace.finished_spans->size() == 1);
+
+        const auto& maybe_span_data = *trace.finished_spans->begin();
+        REQUIRE(maybe_span_data);
+        const auto& span_data = *maybe_span_data;
+
+        // Here's the behavior we're testing for.
+        const auto found_error_tag = span_data.meta.find("_dd.propagation_error");
+        REQUIRE(found_error_tag != span_data.meta.end());
+        REQUIRE(found_error_tag->second == "inject_max_size");
+      }
     }
   }
 }

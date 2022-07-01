@@ -3,6 +3,7 @@
     {
       "error": 0,
       "meta": {
+        "_dd.p.dm": "-0",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -25,6 +26,7 @@
     {
       "error": 0,
       "meta": {
+        "_dd.p.dm": "-0",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",
@@ -47,6 +49,7 @@
     {
       "error": 0,
       "meta": {
+        "_dd.p.dm": "-0",
         "component": "nginx",
         "http.method": "GET",
         "http.status_code": "200",

@@ -24,9 +24,8 @@ struct SpanBufferOptions {
   std::string hostname;
   double analytics_rate = std::nan("");
   std::string service;
-  // The corresponding field in `TracerOptions` has been removed along with the
-  // corresponding feature.
-  uint64_t trace_tags_propagation_max_length;
+  // See the corresponding field in `TracerOptions`.
+  uint64_t tags_header_size;
 };
 
 // Keeps track of Spans until there is a complete trace, and sends completed
@@ -71,7 +70,6 @@ class SpanBuffer {
   // that an error occurred.  If an encoding error occurs, a corresponding
   // `_dd.propagation_error` tag value will be added to the relevant trace's
   // local root span.
-  // Note that this function is not currently used.
   std::string serializeTraceTags(uint64_t trace_id);
 
   // Change the name of the service associated with the trace having the

@@ -10,7 +10,6 @@
 
 #include "logger.h"
 #include "sampling_priority.h"
-#include "upstream_service.h"
 
 namespace ot = opentracing;
 
@@ -118,9 +117,11 @@ class SpanContext : public ot::SpanContext {
   OptionalSamplingPriority propagated_sampling_priority_ = nullptr;
   std::string origin_;
   std::unordered_map<std::string, std::string> baggage_;
-  // Trace tags are key/value pairs that are propagated along a trace.
-  // Currently trace tag propagation is disabled, but the plumbing for the
-  // feature, which includes this data member, remains for future use.
+  // Trace tags are key/value pairs that are propagated along a trace.  If this
+  // `SpanContext` was extracted, then `extracted_trace_tags_` contains any
+  // trace tags parsed from the "x-datadog-trace-tags" header.  If this
+  // `SpanContext` is later injected, these trace tags will be included as the
+  // "x-datadog-trace-tags" header, possibly modified.
   std::unordered_map<std::string, std::string> extracted_trace_tags_;
 
   mutable std::mutex mutex_;

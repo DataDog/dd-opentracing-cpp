@@ -6,10 +6,8 @@
 // before the trace is flushed.
 //
 // Among these root span tags, some are also propagated as trace context.
-// Propagated tags may someday be packaged into the "x-datadog-tags" header in
-// a particular format (see the cpp file for a description of the format).
-//
-// Currently the feature is not used.
+// Propagated tags are packaged into the "x-datadog-tags" header in a
+// particular format (see the cpp file for a description of the format).
 //
 // This component provides serialization and deserialization routines for the
 // "x-datadog-tags" header format.

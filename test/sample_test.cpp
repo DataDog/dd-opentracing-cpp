@@ -275,4 +275,38 @@ TEST_CASE("rules sampler") {
       }
     }
   }
+
+  SECTION("reports 'rule' sampling mechanism") {
+    TracerOptions tracer_options;
+    tracer_options.service = "zappasvc";
+    tracer_options.sampling_rules = R"([
+    {"sample_rate": 1.0}
+])";
+    const auto tracer =
+        std::make_shared<Tracer>(tracer_options, writer, sampler, std::make_shared<MockLogger>());
+
+    const auto span = tracer->StartSpanWithOptions("OperationMoonUnit", span_options);
+    span->FinishWithOptions(finish_options);
+
+    // The `SpanBuffer` will have made a sampling decision based on the
+    // matching rule, and the resulting `SamplingMechanism` will be visible in
+    // the "_dd.p.dm" tag.
+    //
+    // The expectation is that, since sampling was performed on account of a
+    // sampling rule, the sampling mechanism will be
+    // `SamplingMechanism::Rule` (which is 3).
+
+    REQUIRE(mwriter->traces.size() == 1);
+    REQUIRE(mwriter->traces[0].size() == 1);
+    const auto& maybe_span = mwriter->traces[0][0];
+    REQUIRE(maybe_span);
+    const auto& span_data = *maybe_span;
+
+    const auto tag_found = span_data.meta.find("_dd.p.dm");
+    REQUIRE(tag_found != span_data.meta.end());
+    const std::string& decision_maker = tag_found->second;
+
+    const std::string expected = "-" + std::to_string(int(SamplingMechanism::Rule));
+    REQUIRE(decision_maker == expected);
+  }
 }

@@ -27,11 +27,9 @@ struct PendingTrace {
 
   void finish();
   // If this tracer did not inherit a sampling decision from an upstream
-  // service, but instead made a sampling decision, then append an
-  // `UpstreamService` record to the "_dd.p.upstream_services" member of
-  // `trace_tags`.  Note that this function is idempotent.
-  // Note that this function is not currently used.
-  void applySamplingDecisionToUpstreamServices();
+  // service, but instead made a sampling decision, then record that decision
+  // in the "_dd.p.dm" member of `trace_tags`.
+  void applySamplingDecisionToTraceTags();
 
   std::shared_ptr<const Logger> logger;
   uint64_t trace_id;
@@ -49,9 +47,7 @@ struct PendingTrace {
   // `finish_root_span` in `span_buffer.cpp`).  In addition to those tags,
   // `trace_tags` are similarly added.
   // `trace_tags` originate from extracted trace context (`SpanContext`).  Some
-  // trace tags require special handling, e.g. "_dd.p.upstream_services".
-  // Note that trace tags are currently disabled.  These data structures remain
-  // for possible future use.
+  // trace tags require special handling, e.g. "_dd.p.dm".
   std::unordered_map<std::string, std::string> trace_tags;
   // `service` is the name of the service associated with this trace.  If the
   // service name changes (such as by calling `Span::setServiceName`), then
@@ -62,20 +58,12 @@ struct PendingTrace {
   // tag will be set on the local root span to the value of
   // `propagation_error`.  If no error occurs, then `propagation_error` will be
   // empty and the "_dd.propagation_error" tag will not be added.
-  // Note that since trace tag propagation is disabled, `propagation_error` is
-  // always empty; it remains here for possible future use.
   std::string propagation_error;
   // `sampling_decision_extracted` is whether `sampling_priority` was
   // determined by a decision within this tracer (`true`), or inherited from an
   // upstream service when span context was extracted (`false`), or has not yet
   // been decided (`false`).
   bool sampling_decision_extracted = false;
-  // `applied_sampling_decision_to_upstream_services` is whether the function
-  // `applySamplingDecisionToUpstreamServices` has done its work.  Note that
-  // since trace tag propagation is disabled,
-  // `applied_sampling_decision_to_upstream_services` is always `false`; it
-  // remains here for possible future use.
-  bool applied_sampling_decision_to_upstream_services = false;
 };
 
 }  // namespace opentracing

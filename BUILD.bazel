@@ -1,8 +1,6 @@
 cc_library(
     name = "dd_opentracing_cpp",
     srcs = [
-        "src/base64_rfc4648.cpp",
-        "src/base64_rfc4648.h",
         "src/bool.cpp",
         "src/bool.h",
         "src/clock.h",
@@ -38,8 +36,6 @@ cc_library(
         "src/tracer.h",
         "src/tracer_options.cpp",
         "src/tracer_options.h",
-        "src/upstream_service.cpp",
-        "src/upstream_service.h",
         "src/version.cpp",
         "src/writer.cpp",
         "src/writer.h",
