@@ -88,7 +88,7 @@ class RulesSampler {
 };
 
 class Logger;
-class SpanData;
+struct SpanData;
 
 // `SpanSampler` is consulted for each span, but only after another sampler has
 // decided that the _trace_ will be dropped (i.e. sampling priority <= 0).
