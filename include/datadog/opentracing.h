@@ -76,19 +76,19 @@ struct TracerOptions {
   double sample_rate = std::nan("");
   // This option is deprecated, and may be removed in future releases.
   bool priority_sampling = true;
-  // Rules sampling is applied when initiating traces to determine the sampling
-  // rate.  Configuration is specified as a JSON array of objects. Each object
-  // must have a "sample_rate", while the "name" and "service" fields are
-  // optional. The "sample_rate" value must be between 0.0 and 1.0 (inclusive).
-  // Rules are checked in order, so a more specific rule should be specified
-  // before a less specific rule.  Note that if the `sample_rate` field of this
-  // `TracerOptions` has a non-NaN value, then there is an implicit rule at the
-  // end of the list that matches any trace unmatched by other rules, and
-  // applies a sampling rate of `sample_rate`.  If no rule matches a trace,
-  // then "priority sampling" is applied instead, where the sample rate is
-  // determined by the Datadog trace agent.  If any rules are invalid, they are
-  // ignored. This option is also configurable as the environment variable
-  // DD_TRACE_SAMPLING_RULES.
+  // Rule-based trace sampling is applied when initiating traces to determine
+  // the sampling rate.  Configuration is specified as a JSON array of objects.
+  // Each object must have a "sample_rate", while the "name" and "service"
+  // fields are optional. The "sample_rate" value must be between 0.0 and 1.0
+  // (inclusive).  Rules are checked in order, so a more specific rule should
+  // be specified before a less specific rule.  Note that if the `sample_rate`
+  // field of this `TracerOptions` has a non-NaN value, then there is an
+  // implicit rule at the end of the list that matches any trace unmatched by
+  // other rules, and applies a sampling rate of `sample_rate`.  If no rule
+  // matches a trace, then "priority sampling" is applied instead, where the
+  // sample rate is determined by the Datadog trace agent.  If any rules are
+  // invalid, they are ignored. This option is also configurable as the
+  // environment variable DD_TRACE_SAMPLING_RULES.
   std::string sampling_rules = "[]";
   // Max amount of time to wait between sending traces to agent, in ms. Agent discards traces older
   // than 10s, so that is the upper bound.
@@ -156,6 +156,47 @@ struct TracerOptions {
   // serialized tags allowed.  Trace-wide tags whose serialized length exceeds
   // this limit are not propagated.
   uint64_t tags_header_size = 512;
+  // Rule-based span sampling, which is distinct from rule-based trace
+  // sampling, is used to determine which spans to keep, if any, when trace
+  // sampling decides to drop the trace.
+  // When the trace is to be dropped, each span is matched against the
+  // `span_sampling_rules`.  For each span, the first rule to match, if any,
+  // applies to the span and a span-specific sampling decision is made.  If the
+  // decision for the span is to keep, then the span is sent to Datadog even
+  // though the enclosing trace is not.
+  // `span_sampling_rules` is a JSON array of objects, where each object has
+  // the following shape:
+  //
+  //     {
+  //       "service": <pattern>,
+  //       "name": <pattern>,
+  //       "sample_rate": <number between 0.0 and 1.0>,
+  //       "max_per_second": <positive number>
+  //     }
+  //
+  // The properties mean the following:
+  //
+  // - "service" is a glob pattern that must match a span's service name in
+  //   order for the rule to match.  If "service" is not specified, then its
+  //   default value is "*".  Glob patterns are described below.
+  // - "name" is a glob pattern that must match a span's operation name in
+  //   order for the rule to match.  If "name" is not specified, then its default
+  //   value is "*".  Glob patterns are described below.
+  // - "sample_rate" is the probability that a span matching the rule will be
+  //   kept.  If "sample_rate" is not specified, then its default value is 1.0.
+  // - "max_per_second" is the maximum number of spans that will be kept on
+  //   account of this rule each second.  Spans that would cause the limit to
+  //   be exceeded are dropped.  If "max_per_second" is not specified, then
+  //   there is no limit.
+  //
+  // Glob patterns are strings that are evaluated character-by-character
+  // against a candidate string.  The characters in a glob pattern have the
+  // following interpetations:
+  //
+  // - "*" matches any contiguous substring, including the empty string.
+  // - "?" matches exactly one instance of any character.
+  // - Other characters match exactly one instance of themselves.
+  std::string span_sampling_rules = "[]";
 };
 
 // TraceEncoder exposes the data required to encode and submit traces to the

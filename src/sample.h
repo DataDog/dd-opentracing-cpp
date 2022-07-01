@@ -149,14 +149,14 @@ class SpanSampler {
   // `raw_json` configuration text.  Optionally specify a `clock` to use in
   // rate limiting.  If an error occurs, skip the offending rule and emit a
   // diagnostic using the specified `logger`.
-  void configure(ot::string_view raw_json, Logger& logger);
-  void configure(ot::string_view raw_json, Logger& logger, TimeProvider clock);
+  void configure(ot::string_view raw_json, const Logger& logger);
+  void configure(ot::string_view raw_json, const Logger& logger, TimeProvider clock);
 
   // Return a pointer to the first rule that the specified `span` matches, or
   // return `nullptr` if `span` does not match any configured rule.
   Rule* match(const SpanData& span);
 
-  // Return this sampler's rules.  This function is used in unit tests.
+  // Return this sampler's rules.
   const std::vector<Rule>& rules() const;
 };
 

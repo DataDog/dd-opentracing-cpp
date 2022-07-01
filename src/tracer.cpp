@@ -134,16 +134,51 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
 }
 
 std::string spanSamplingRules(const TracerOptions &options, const Logger &logger) {
+  // Prefer DD_SPAN_SAMPLING_RULES, if present.
+  // Next, prefer DD_SPAN_SAMPLING_RULES_FILE.
+  // If both are specified, log an error and use DD_SPAN_SAMPLING_RULES.
+  // If neither are specified, use `options.span_sampling_rules`.
+
   const char *const span_rules = std::getenv("DD_SPAN_SAMPLING_RULES");
   const char *const span_rules_file = std::getenv("DD_SPAN_SAMPLING_RULES_FILE");
   if (span_rules) {
     if (span_rules_file) {
-      logger.Log(LogLevel::error, "Both DD_SPAN_SAMPLING_RULES and DD_SPAN_SAMPLING_RULES_FILE have values in the environment.  DD_SPAN_SAMPLING_RULES will be used, and DD_SPAN_SAMPLING_RULES_FILE will be ignored.");
+      logger.Log(LogLevel::error,
+                 "Both DD_SPAN_SAMPLING_RULES and DD_SPAN_SAMPLING_RULES_FILE have values in the "
+                 "environment.  DD_SPAN_SAMPLING_RULES will be used, and "
+                 "DD_SPAN_SAMPLING_RULES_FILE will be ignored.");
     }
     return span_rules;
   }
 
-  // TODO
+  if (span_rules_file) {
+    const auto log_file_error = [&](const char *operation) {
+      std::string message;
+      message += "Unable to ";
+      message += operation;
+      message += " file \"";
+      message += span_rules_file;
+      message += "\" specified as value of environment variable DD_SPAN_SAMPLING_RULES_FILE.";
+      logger.Log(LogLevel::error, message);
+    };
+
+    std::ifstream file(span_rules_file);
+    if (!file) {
+      log_file_error("open");
+      return options.span_sampling_rules;
+    }
+
+    std::stringstream span_rules;
+    span_rules << file.rdbuf();
+    if (!file) {
+      log_file_error("read");
+      return options.span_sampling_rules;
+    }
+
+    return span_rules.str();
+  }
+
+  return options.span_sampling_rules;
 }
 
 }  // namespace
@@ -247,10 +282,10 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
   assert(logger_);
   configureRulesSampler(trace_sampler);
   auto span_sampler = std::make_shared<SpanSampler>();
-  span_sampler->configure(TODO, *logger_, get_time_);  // TODO
+  span_sampler->configure(spanSamplingRules(opts_, *logger_), *logger_, get_time_);
   startupLog(options);
   buffer_ = std::make_shared<SpanBuffer>(
-      logger_, writer, trace_sampler,
+      logger_, writer, trace_sampler,  // TODO: span_sampler
       SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
                         options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }

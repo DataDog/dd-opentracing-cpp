@@ -177,11 +177,11 @@ bool SpanSampler::Rule::allow() {
 
 const SpanSampler::Rule::Config& SpanSampler::Rule::config() const { return config_; }
 
-void SpanSampler::configure(ot::string_view json, Logger& logger) {
+void SpanSampler::configure(ot::string_view json, const Logger& logger) {
   configure(json, logger, getRealTime);
 }
 
-void SpanSampler::configure(ot::string_view raw_json, Logger& logger, TimeProvider clock) {
+void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, TimeProvider clock) {
   rules_.clear();
 
   // `raw_json` is expected to be a JSON array of objects, where each object
@@ -234,9 +234,9 @@ void SpanSampler::configure(ot::string_view raw_json, Logger& logger, TimeProvid
                            rule_json);
         }
         const double max_per_second = rule_json.at("max_per_second").get<json::number_float_t>();
-        if (!(max_per_second >= 0)) {
+        if (max_per_second <= 0) {
           log_invalid_json(
-              "span sampler: invalid value for 'max_per_second' (expected non-negative value)",
+              "span sampler: invalid value for 'max_per_second' (expected positive value)",
               rule_json);
           continue;
         }
