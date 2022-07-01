@@ -500,3 +500,243 @@ TEST_CASE("SpanSampler matching") {
     REQUIRE(sampler.match(span) == &sampler.rules()[3]);
   }
 }
+
+TEST_CASE("SpanSampler sampling") {
+  // Starting calendar time 2022-07-01 00:00:00 local time
+  std::tm start{};
+  start.tm_year = 122;
+  start.tm_mon = 7;
+  start.tm_mday = 1;
+  TimePoint now{std::chrono::system_clock::from_time_t(std::mktime(&start)),
+                std::chrono::steady_clock::time_point{}};
+  // Note: Use `advanceTime(now, ...)` to advance the clock.
+  const auto clock = [&now]() { return now; };
+  std::uint64_t next_id = 1;
+  const auto make_id = [&next_id]() { return next_id++; };
+  const auto trace_sampler = std::make_shared<MockRulesSampler>();
+  const auto writer = std::make_shared<MockWriter>(trace_sampler);
+  const auto span_sampler = std::make_shared<SpanSampler>();
+  const auto logger = std::make_shared<MockLogger>();
+  const auto span_buffer = std::make_shared<SpanBuffer>(logger, writer, trace_sampler,
+                                                        span_sampler, SpanBufferOptions{});
+  TracerOptions tracer_options;
+  tracer_options.service = "foosvc";
+  const auto tracer = std::make_shared<Tracer>(tracer_options, span_buffer, clock, make_id, logger);
+  const auto has_span_sampling_tag = [](const auto& span_ptr) {
+    const auto& numeric_tags = span_ptr->metrics;
+    return numeric_tags.count("_dd.span_sampling.mechanism") ||
+      numeric_tags.count("_dd.span_sampling.rule_rate") ||
+      numeric_tags.count("_dd.span_sampling.max_per_second");
+  };
+
+  SECTION("no span_sampling tags when there are no span sampling rules") {
+    // Make sure that the trace sampler is dropping the trace, otherwise we
+    // wouldn't expect the span sampling rules to matter.
+    trace_sampler->rule_rate = 0;
+    trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
+    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+
+    // We expect an empty array of rules to mean that span sampling won't
+    // happen.
+    span_sampler->configure("[]", *logger, clock);
+    {
+      const auto root = tracer->StartSpan("root");
+      REQUIRE(root);
+      advanceTime(now, std::chrono::milliseconds(8));
+      const auto child1 = tracer->StartSpan("child1", {ot::ChildOf(&root->context())});
+      REQUIRE(child1);
+      advanceTime(now, std::chrono::milliseconds(5));
+      const auto child2 = tracer->StartSpan("child2", {ot::ChildOf(&root->context())});
+      REQUIRE(child2);
+      advanceTime(now, std::chrono::milliseconds(31));
+      const auto grandchild = tracer->StartSpan("grandchild", {ot::ChildOf(&child1->context())});
+      REQUIRE(grandchild);
+      advanceTime(now, std::chrono::milliseconds(2));
+    }
+
+    REQUIRE(writer->traces.size() == 1);
+    const auto& trace = writer->traces.front();
+    REQUIRE(trace.size() == 4);
+
+    REQUIRE(std::none_of(trace.begin(), trace.end(), has_span_sampling_tag));
+  }
+
+  SECTION("no span_sampling tags when the trace is kept") {
+    // When the trace is kept, span sampling rules aren't consulted (even if
+    // they would match and keep spans).
+    trace_sampler->rule_rate = 1;
+    trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
+    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+
+    const auto rules_json = R"json([
+      {"service": "foosvc", "name": "grandchild"},
+      {"name": "child*"},
+      {"service": "foosvc", "max_per_second": 1000}
+    ])json";
+    span_sampler->configure(rules_json, *logger, clock);
+    {
+      const auto root = tracer->StartSpan("root");
+      REQUIRE(root);
+      advanceTime(now, std::chrono::milliseconds(8));
+      const auto child1 = tracer->StartSpan("child1", {ot::ChildOf(&root->context())});
+      REQUIRE(child1);
+      advanceTime(now, std::chrono::milliseconds(5));
+      const auto child2 = tracer->StartSpan("child2", {ot::ChildOf(&root->context())});
+      REQUIRE(child2);
+      advanceTime(now, std::chrono::milliseconds(31));
+      const auto grandchild = tracer->StartSpan("grandchild", {ot::ChildOf(&child1->context())});
+      REQUIRE(grandchild);
+      advanceTime(now, std::chrono::milliseconds(2));
+    }
+
+    REQUIRE(writer->traces.size() == 1);
+    const auto& trace = writer->traces.front();
+    REQUIRE(trace.size() == 4);
+
+    REQUIRE(std::none_of(trace.begin(), trace.end(), has_span_sampling_tag));
+  }
+
+  SECTION("expected span_sampling tags when the trace is dropped") {
+    // Make sure that the trace sampler is dropping the trace, otherwise we
+    // wouldn't expect the span sampling rules to matter.
+    trace_sampler->rule_rate = 0;
+    trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
+    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+
+    const auto rules_json = R"json([
+      {"service": "foosvc", "name": "grandchild", "max_per_second": 999},
+      {"name": "child*"},
+      {"service": "foosvc", "max_per_second": 1000}
+    ])json";
+    span_sampler->configure(rules_json, *logger, clock);
+    {
+      const auto root = tracer->StartSpan("root");
+      REQUIRE(root);
+      advanceTime(now, std::chrono::milliseconds(8));
+      const auto child1 = tracer->StartSpan("child1", {ot::ChildOf(&root->context())});
+      REQUIRE(child1);
+      advanceTime(now, std::chrono::milliseconds(5));
+      const auto child2 = tracer->StartSpan("child2", {ot::ChildOf(&root->context())});
+      REQUIRE(child2);
+      advanceTime(now, std::chrono::milliseconds(31));
+      const auto grandchild = tracer->StartSpan("grandchild", {ot::ChildOf(&child1->context())});
+      REQUIRE(grandchild);
+      advanceTime(now, std::chrono::milliseconds(2));
+    }
+
+    REQUIRE(writer->traces.size() == 1);
+    const auto& trace = writer->traces.front();
+    REQUIRE(trace.size() == 4);
+
+    for (const auto& span_ptr : trace) {
+      const auto& span = *span_ptr;
+      const auto& numeric_tags = span.metrics;
+      if (span.name == "root") {
+        // `root` matches the rule: {"service": "foosvc", "max_per_second": 1000}
+        REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
+        REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.max_per_second") == 1000);
+      } else if (span.name == "child1" || span.name == "child2") {
+        // `child1` and `child2` match the rule: {"name": "child*"}
+        REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
+        REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 0);
+      } else {
+        REQUIRE(span.name == "grandchild");
+        // `grandchild` matches the rule: {"service": "foosvc", "name": "grandchild"}
+        REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
+        REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 1);
+        REQUIRE(numeric_tags.at("_dd.span_sampling.max_per_second") == 999);
+      }
+    }
+  }
+
+  SECTION("probabilistic sampling for span rules") {
+    // Make sure that the trace sampler is dropping the trace, otherwise we
+    // wouldn't expect the span sampling rules to matter.
+    trace_sampler->rule_rate = 0;
+    trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
+    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+
+    const auto rules_json = R"json([
+      {"name": "mysql.*", "sample_rate": 0.5}
+    ])json";
+    span_sampler->configure(rules_json, *logger, clock);
+    const int child_count = 10000;
+    {
+      const auto root = tracer->StartSpan("root");
+      REQUIRE(root);
+      advanceTime(now, std::chrono::milliseconds(8));
+      // Generate a lot of spans that match the rule, so that our 50%
+      // probability can be measured.
+      for (int i = 0; i < child_count; ++i) {
+        const auto child = tracer->StartSpan("mysql.query", {ot::ChildOf(&root->context())});
+        REQUIRE(child);
+        advanceTime(now, std::chrono::milliseconds(100));
+      }
+    }
+
+    REQUIRE(writer->traces.size() == 1);
+    const auto& trace = writer->traces.front();
+    REQUIRE(trace.size() == child_count + 1);
+
+    // `root` did not match any rule.
+    const auto root_iter = std::find_if(trace.begin(), trace.end(), [](const auto& span_ptr) { return span_ptr->name == "root"; });
+    REQUIRE(root_iter != trace.end());
+    REQUIRE(!has_span_sampling_tag(*root_iter));
+
+    const int kept_children_count = std::count_if(trace.begin(), trace.end(), has_span_sampling_tag);
+    // 50% of `child_count` would be 5000.  Let's say within 5% of that -> 5000 +/- 10.
+    REQUIRE(kept_children_count >= 5000 - 10);
+    REQUIRE(kept_children_count <= 5000 + 10);
+  }
+
+  SECTION("rate limiting for span rules") {
+    // Make sure that the trace sampler is dropping the trace, otherwise we
+    // wouldn't expect the span sampling rules to matter.
+    trace_sampler->rule_rate = 0;
+    trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
+    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+
+    const auto rules_json = R"json([
+      {"name": "mysql.*", "max_per_second": 10}
+    ])json";
+    span_sampler->configure(rules_json, *logger, clock);
+
+    // Each trace's 20 children will hit the limiter after 10.
+    // Then a second goes by, so the limiter recharges.
+    // We'd expect 10 kept per trace, or 1000 total.
+    const int num_traces = 100;
+    const int children_per_trace = 20;
+    const int milliseconds_between_traces = 1000;
+    {
+      for (int i = 0; i < num_traces; ++i) {
+        advanceTime(now, std::chrono::milliseconds(milliseconds_between_traces));
+        const auto root = tracer->StartSpan("root");
+        REQUIRE(root);
+        for (int j = 0; j < children_per_trace; ++j) {
+          const auto child = tracer->StartSpan("mysql.query", {ot::ChildOf(&root->context())});
+          REQUIRE(child);
+        }
+      }
+    }
+
+    REQUIRE(writer->traces.size() == num_traces);
+
+    int kept_spans_count = 0;
+    for (const auto& trace : writer->traces) {
+      kept_spans_count += std::count_if(trace.begin(), trace.end(), has_span_sampling_tag);
+    }
+
+    // 10 is the configured `max_per_second`.
+    REQUIRE(kept_spans_count == num_traces * 10);
+  }
+}
