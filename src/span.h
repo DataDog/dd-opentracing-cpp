@@ -29,12 +29,12 @@ struct SpanData {
   std::string service;
   std::string resource;
   std::string name;
-  uint64_t trace_id;
-  uint64_t span_id;
-  uint64_t parent_id;
-  int64_t start;
-  int64_t duration;
-  int32_t error;
+  uint64_t trace_id = 0;
+  uint64_t span_id = 0;
+  uint64_t parent_id = 0;
+  int64_t start = 0;
+  int64_t duration = 0;
+  int32_t error = 0;
   std::unordered_map<std::string, std::string> meta;  // Aka, tags.
   std::unordered_map<std::string, double> metrics;
 
