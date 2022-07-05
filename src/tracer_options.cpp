@@ -4,6 +4,7 @@
 #include <datadog/version.h>
 #include <opentracing/ext/tags.h>
 
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <nlohmann/json.hpp>
@@ -11,6 +12,7 @@
 #include <sstream>
 
 #include "bool.h"
+#include "logger.h"
 
 namespace ot = opentracing;
 
@@ -112,6 +114,60 @@ ot::expected<double, std::string> parseDouble(const std::string &text, double mi
   return ot::make_unexpected("does not look like a double: " + text);
 } catch (const std::out_of_range &) {
   return ot::make_unexpected("not within the range of a double: " + text);
+}
+
+// Update `options.span_sampling_rules` if there are relevant environment
+// variables defined.  If an error occurs, log a diagnostic via
+// `options.log_func`.
+void applySpanSamplingRulesFromEnvironment(TracerOptions &options) {
+  // Prefer DD_SPAN_SAMPLING_RULES, if present.
+  // Next, prefer DD_SPAN_SAMPLING_RULES_FILE.
+  // If both are specified, log an error and use DD_SPAN_SAMPLING_RULES.
+  // If neither are specified, use `options.span_sampling_rules`.
+
+  const auto logger_ptr = makeLogger(options);
+  const auto &logger = *logger_ptr;
+
+  const char *const span_rules = std::getenv("DD_SPAN_SAMPLING_RULES");
+  const char *const span_rules_file = std::getenv("DD_SPAN_SAMPLING_RULES_FILE");
+  if (span_rules) {
+    if (span_rules_file) {
+      logger.Log(LogLevel::error,
+                 "Both DD_SPAN_SAMPLING_RULES and DD_SPAN_SAMPLING_RULES_FILE have values in the "
+                 "environment.  DD_SPAN_SAMPLING_RULES will be used, and "
+                 "DD_SPAN_SAMPLING_RULES_FILE will be ignored.");
+      return;
+    }
+    options.span_sampling_rules = span_rules;
+    return;
+  }
+
+  if (span_rules_file) {
+    const auto log_file_error = [&](const char *operation) {
+      std::string message;
+      message += "Unable to ";
+      message += operation;
+      message += " file \"";
+      message += span_rules_file;
+      message += "\" specified as value of environment variable DD_SPAN_SAMPLING_RULES_FILE.";
+      logger.Log(LogLevel::error, message);
+    };
+
+    std::ifstream file(span_rules_file);
+    if (!file) {
+      log_file_error("open");
+      return;
+    }
+
+    std::stringstream span_rules;
+    span_rules << file.rdbuf();
+    if (!file) {
+      log_file_error("read");
+      return;
+    }
+
+    options.span_sampling_rules = span_rules.str();
+  }
 }
 
 }  // namespace
@@ -272,6 +328,8 @@ ot::expected<TracerOptions, std::string> applyTracerOptionsFromEnvironment(
     }
     opts.sample_rate = maybe_value.value();
   }
+
+  applySpanSamplingRulesFromEnvironment(opts);
 
   return opts;
 }

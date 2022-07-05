@@ -3,11 +3,81 @@
 #include <datadog/tags.h>
 
 #include <catch2/catch.hpp>
+#include <cstdio>
+#include <stdexcept>
 
 #include "../src/tracer.h"
 #include "mocks.h"
 
 using namespace datadog::opentracing;
+
+namespace {
+
+// `EnvGuard` sets an environment variable to a specified value for the scope
+// of the `EnvGuard`, restoring the environment variables previous value
+// afterward.
+class EnvGuard {
+  std::string name_;
+  bool had_value_;
+  std::string old_value_;
+
+ public:
+  explicit EnvGuard(std::string name, const char *value) : name_(name) {
+    if (const char *const old_value = std::getenv(name.c_str())) {
+      had_value_ = true;
+      old_value_ = old_value;
+    } else {
+      had_value_ = false;
+    }
+
+    const bool overwrite = true;
+    ::setenv(name.c_str(), value, overwrite);
+  }
+
+  ~EnvGuard() {
+    if (had_value_) {
+      const bool overwrite = true;
+      ::setenv(name_.c_str(), old_value_.c_str(), overwrite);
+    } else {
+      ::unsetenv(name_.c_str());
+    }
+  }
+};
+
+// `TmpFile` creates a temporary file having the specified content, and deletes
+// the file at the end of the `TmpFile` scope.  A path to the temporary file is
+// accesible via the `name` member function.
+class TmpFile {
+  std::FILE *file_;
+  std::string name_;
+
+ public:
+  explicit TmpFile(ot::string_view content) {
+    char name_buffer[L_tmpnam];
+    if (std::tmpnam(name_buffer) == nullptr) {
+      throw std::runtime_error("Unable to create a temporary file name.");
+    }
+    name_ = name_buffer;
+
+    file_ = std::fopen(name_buffer, "w");
+    if (file_ == nullptr) {
+      throw std::runtime_error(std::strerror(errno));
+    }
+
+    const auto count = std::fwrite(content.data(), 1, content.size(), file_);
+    if (count != content.size()) {
+      throw std::runtime_error("unable to write to temporary file");
+    }
+
+    std::fflush(file_);
+  }
+
+  ~TmpFile() { std::fclose(file_); }
+
+  const std::string &name() const { return name_; }
+};
+
+}  // namespace
 
 TEST_CASE("tracer factory") {
   TracerFactory<MockTracer> factory;
@@ -528,6 +598,73 @@ TEST_CASE("tracer factory") {
       auto tracer = dynamic_cast<MockTracer *>(result->get());
       REQUIRE(!tracer->opts.analytics_enabled);
       REQUIRE(std::isnan(tracer->opts.analytics_rate));
+    }
+    SECTION("DD_SPAN_SAMPLING_RULES") {
+      const auto value = "[{}]";
+      EnvGuard guard("DD_SPAN_SAMPLING_RULES", value);
+
+      SECTION("overrides default") {
+        const auto input = R"json({
+          "service": "my-service"
+        })json";
+        std::string error;
+        const auto result = factory.MakeTracer(input, error);
+
+        REQUIRE(error == "");
+        REQUIRE(result);
+        REQUIRE(*result);
+        auto &tracer = static_cast<MockTracer &>(**result);
+        REQUIRE(tracer.opts.span_sampling_rules == value);
+      }
+
+      SECTION("overrides config") {
+        const auto input = R"json({
+          "service": "my-service",
+          "span_sampling_rules": [{}, {}]
+        })json";
+        std::string error;
+        const auto result = factory.MakeTracer(input, error);
+
+        REQUIRE(error == "");
+        REQUIRE(result);
+        REQUIRE(*result);
+        auto &tracer = static_cast<MockTracer &>(**result);
+        REQUIRE(tracer.opts.span_sampling_rules == value);
+      }
+    }
+    SECTION("DD_SPAN_SAMPLING_RULES_FILE") {
+      const std::string value = "[{}]";
+      TmpFile file(value);
+      EnvGuard guard("DD_SPAN_SAMPLING_RULES_FILE", file.name().c_str());
+
+      SECTION("overrides default") {
+        const auto input = R"json({
+          "service": "my-service"
+        })json";
+        std::string error;
+        const auto result = factory.MakeTracer(input, error);
+
+        REQUIRE(error == "");
+        REQUIRE(result);
+        REQUIRE(*result);
+        auto &tracer = static_cast<MockTracer &>(**result);
+        REQUIRE(tracer.opts.span_sampling_rules == value);
+      }
+
+      SECTION("overrides config") {
+        const auto input = R"json({
+          "service": "my-service",
+          "span_sampling_rules": [{}, {}]
+        })json";
+        std::string error;
+        const auto result = factory.MakeTracer(input, error);
+
+        REQUIRE(error == "");
+        REQUIRE(result);
+        REQUIRE(*result);
+        auto &tracer = static_cast<MockTracer &>(**result);
+        REQUIRE(tracer.opts.span_sampling_rules == value);
+      }
     }
   }
 }

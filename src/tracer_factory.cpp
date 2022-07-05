@@ -94,7 +94,7 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
       config.at("tags_header_size").get_to(options.tags_header_size);
     }
     if (config.find("span_sampling_rules") != config.end()) {
-      config.at("span_sampling_rules").get_to(options.span_sampling_rules);
+      options.span_sampling_rules = config.at("span_sampling_rules").dump();
     }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";
