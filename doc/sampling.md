@@ -120,9 +120,9 @@ This configuration option has the same meaning as the `DD_TRACE_RATE_LIMIT`
 environment variable.  Note that the environment variable overrides the
 `TracerOptions` field if both are specified.
 
-Span Sampling Rules
--------------------
-Span sampling rules are used to select spans to keep even when the enclosing
+Span Sampling
+-------------
+Span sampling is used to select spans to keep even when the enclosing
 trace is dropped.
 
 Similar to _trace_ sampling rules, _span_ sampling rules are configured as a
