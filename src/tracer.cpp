@@ -338,8 +338,9 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     span->SetTag(tag.first, tag.second);
   }
   return span;
-} catch (const std::exception& error) {
-  logger_->Log(LogLevel::error, std::string("Unexpected error in StartSpanWithOptions: ") + error.what());
+} catch (const std::exception &error) {
+  logger_->Log(LogLevel::error,
+               std::string("Unexpected error in StartSpanWithOptions: ") + error.what());
   return nullptr;
 }
 

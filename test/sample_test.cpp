@@ -521,12 +521,13 @@ TEST_CASE("SpanSampler sampling") {
                                                         span_sampler, SpanBufferOptions{});
   TracerOptions tracer_options;
   tracer_options.service = "foosvc";
-  const auto tracer = std::make_shared<Tracer>(tracer_options, span_buffer, clock, make_id, logger);
+  const auto tracer =
+      std::make_shared<Tracer>(tracer_options, span_buffer, clock, make_id, logger);
   const auto has_span_sampling_tag = [](const auto& span_ptr) {
     const auto& numeric_tags = span_ptr->metrics;
     return numeric_tags.count("_dd.span_sampling.mechanism") ||
-      numeric_tags.count("_dd.span_sampling.rule_rate") ||
-      numeric_tags.count("_dd.span_sampling.max_per_second");
+           numeric_tags.count("_dd.span_sampling.rule_rate") ||
+           numeric_tags.count("_dd.span_sampling.max_per_second");
   };
 
   SECTION("no span_sampling tags when there are no span sampling rules") {
@@ -534,7 +535,8 @@ TEST_CASE("SpanSampler sampling") {
     // wouldn't expect the span sampling rules to matter.
     trace_sampler->rule_rate = 0;
     trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
-    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+    trace_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
 
     // We expect an empty array of rules to mean that span sampling won't
     // happen.
@@ -566,7 +568,8 @@ TEST_CASE("SpanSampler sampling") {
     // they would match and keep spans).
     trace_sampler->rule_rate = 1;
     trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
-    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
+    trace_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::UserKeep);
 
     const auto rules_json = R"json([
       {"service": "foosvc", "name": "grandchild"},
@@ -601,7 +604,8 @@ TEST_CASE("SpanSampler sampling") {
     // wouldn't expect the span sampling rules to matter.
     trace_sampler->rule_rate = 0;
     trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
-    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+    trace_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
 
     const auto rules_json = R"json([
       {"service": "foosvc", "name": "grandchild", "max_per_second": 999},
@@ -634,7 +638,8 @@ TEST_CASE("SpanSampler sampling") {
       if (span.name == "root") {
         // `root` matches the rule: {"service": "foosvc", "max_per_second": 1000}
         REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
-        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") ==
+                int(SamplingMechanism::SpanRule));
         REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
         REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
         REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 1);
@@ -642,7 +647,8 @@ TEST_CASE("SpanSampler sampling") {
       } else if (span.name == "child1" || span.name == "child2") {
         // `child1` and `child2` match the rule: {"name": "child*"}
         REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
-        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") ==
+                int(SamplingMechanism::SpanRule));
         REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
         REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
         REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 0);
@@ -650,7 +656,8 @@ TEST_CASE("SpanSampler sampling") {
         REQUIRE(span.name == "grandchild");
         // `grandchild` matches the rule: {"service": "foosvc", "name": "grandchild"}
         REQUIRE(numeric_tags.count("_dd.span_sampling.mechanism") == 1);
-        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") == int(SamplingMechanism::SpanRule));
+        REQUIRE(numeric_tags.at("_dd.span_sampling.mechanism") ==
+                int(SamplingMechanism::SpanRule));
         REQUIRE(numeric_tags.count("_dd.span_sampling.rule_rate") == 1);
         REQUIRE(numeric_tags.at("_dd.span_sampling.rule_rate") == 1.0);
         REQUIRE(numeric_tags.count("_dd.span_sampling.max_per_second") == 1);
@@ -664,7 +671,8 @@ TEST_CASE("SpanSampler sampling") {
     // wouldn't expect the span sampling rules to matter.
     trace_sampler->rule_rate = 0;
     trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
-    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+    trace_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
 
     const auto rules_json = R"json([
       {"name": "mysql.*", "sample_rate": 0.5}
@@ -689,11 +697,13 @@ TEST_CASE("SpanSampler sampling") {
     REQUIRE(trace.size() == child_count + 1);
 
     // `root` did not match any rule.
-    const auto root_iter = std::find_if(trace.begin(), trace.end(), [](const auto& span_ptr) { return span_ptr->name == "root"; });
+    const auto root_iter = std::find_if(
+        trace.begin(), trace.end(), [](const auto& span_ptr) { return span_ptr->name == "root"; });
     REQUIRE(root_iter != trace.end());
     REQUIRE(!has_span_sampling_tag(*root_iter));
 
-    const int kept_children_count = std::count_if(trace.begin(), trace.end(), has_span_sampling_tag);
+    const int kept_children_count =
+        std::count_if(trace.begin(), trace.end(), has_span_sampling_tag);
     // 50% of `child_count` would be 5000.  Let's say within 5% of that -> 5000 +/- 10.
     REQUIRE(kept_children_count >= 5000 - 10);
     REQUIRE(kept_children_count <= 5000 + 10);
@@ -704,7 +714,8 @@ TEST_CASE("SpanSampler sampling") {
     // wouldn't expect the span sampling rules to matter.
     trace_sampler->rule_rate = 0;
     trace_sampler->sampling_mechanism = SamplingMechanism::Manual;
-    trace_sampler->sampling_priority = std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
+    trace_sampler->sampling_priority =
+        std::make_unique<SamplingPriority>(SamplingPriority::UserDrop);
 
     const auto rules_json = R"json([
       {"name": "mysql.*", "max_per_second": 10}
