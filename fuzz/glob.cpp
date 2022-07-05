@@ -1,5 +1,7 @@
 #include "../src/glob.h"
 
+// Fuzz the `glob_match` function.  See "../src/glob.h".
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   const auto begin_pattern = reinterpret_cast<const char *>(data);
   const auto end = begin_pattern + size;
