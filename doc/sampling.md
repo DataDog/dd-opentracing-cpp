@@ -129,12 +129,17 @@ Similar to _trace_ sampling rules, _span_ sampling rules are configured as a
 JSON array of object, where each object may contain the following properties:
 ```
 [{
-    "service": <the span's service name, or any if absent>,
-    "name": <the span's operation name, or any if absent>,
+    "service": <matches the span's service name, or any if absent>,
+    "name": <matches the span's operation name, or any if absent>,
     "sample_rate": <the probability of sampling matching spans, or 1.0 if absent>,
     "max_per_second": <limit in spans sampled by this rule each second, or unlimited if absent>
 }, ...]
 ```
+
+The `service` and `name` are glob patterns, where "glob" here means:
+- `*` matches any substring, including the empty string,
+- `?` matches exactly one of any character, and
+- any other character matches exactly one of itself.
 
 Span sampling rules are examined only when the enclosing trace is to be
 dropped.
