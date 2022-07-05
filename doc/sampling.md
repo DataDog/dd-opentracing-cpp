@@ -120,5 +120,32 @@ This configuration option has the same meaning as the `DD_TRACE_RATE_LIMIT`
 environment variable.  Note that the environment variable overrides the
 `TracerOptions` field if both are specified.
 
+Span Sampling Rules
+-------------------
+Span sampling rules are used to select spans to keep even when the enclosing
+trace is dropped.
+
+Similar to _trace_ sampling rules, _span_ sampling rules are configured as a
+JSON array of object, where each object may contain the following properties:
+```
+[{
+    "service": <the span's service name, or any if absent>,
+    "name": <the span's operation name, or any if absent>,
+    "sample_rate": <the probability of sampling matching spans, or 1.0 if absent>,
+    "max_per_second": <limit in spans sampled by this rule each second, or unlimited if absent>
+}, ...]
+```
+
+Span sampling rules are examined only when the enclosing trace is to be
+dropped.
+
+The first span sampling rule that matches a span is used to make a span
+sampling decision for that span.  If the decision is "keep," then the span is
+sent to Datadog despite the enclosing trace having been dropped.
+
+Span sampling rules can be configured [directly][3] or [in a file][4].
+
 [1]: https://docs.datadoghq.com/tracing/trace_ingestion/mechanisms/?tab=environmentvariables#in-the-agent
 [2]: https://docs.datadoghq.com/tracing/setup_overview/proxy_setup/?tab=nginx
+[3]: configuration.md#span-sampling-rules
+[4]: configuration.md#span-sampling-rules-file
