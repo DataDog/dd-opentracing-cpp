@@ -665,6 +665,22 @@ TEST_CASE("tracer factory") {
         auto &tracer = static_cast<MockTracer &>(**result);
         REQUIRE(tracer.opts.span_sampling_rules == value);
       }
+
+      SECTION("does not override DD_SPAN_SAMPLING_RULES") {
+        const auto override_value = "[{}, {}, {}]";
+        EnvGuard guard("DD_SPAN_SAMPLING_RULES", override_value);
+        const auto input = R"json({
+          "service": "my-service"
+        })json";
+        std::string error;
+        const auto result = factory.MakeTracer(input, error);
+
+        REQUIRE(error == "");
+        REQUIRE(result);
+        REQUIRE(*result);
+        auto &tracer = static_cast<MockTracer &>(**result);
+        REQUIRE(tracer.opts.span_sampling_rules == override_value);
+      }
     }
   }
 }

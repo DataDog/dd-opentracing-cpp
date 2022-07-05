@@ -131,14 +131,13 @@ void applySpanSamplingRulesFromEnvironment(TracerOptions &options) {
   const char *const span_rules = std::getenv("DD_SPAN_SAMPLING_RULES");
   const char *const span_rules_file = std::getenv("DD_SPAN_SAMPLING_RULES_FILE");
   if (span_rules) {
+    options.span_sampling_rules = span_rules;
     if (span_rules_file) {
       logger.Log(LogLevel::error,
                  "Both DD_SPAN_SAMPLING_RULES and DD_SPAN_SAMPLING_RULES_FILE have values in the "
                  "environment.  DD_SPAN_SAMPLING_RULES will be used, and "
                  "DD_SPAN_SAMPLING_RULES_FILE will be ignored.");
-      return;
     }
-    options.span_sampling_rules = span_rules;
     return;
   }
 
