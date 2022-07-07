@@ -193,14 +193,14 @@ void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, Time
   // `raw_json` is expected to be a JSON array of objects, where each object
   // configures a `SpanSampler::Rule`.
   try {
-    const auto log_invalid_json = [&](const std::string& description, json& object) {
+    const auto log_invalid_json = [&](const std::string& description, const json& object) {
       logger.Log(LogLevel::error, description + ": " + object.dump());
     };
 
     const json config_json = json::parse(raw_json);
 
-    for (auto& item : config_json.items()) {
-      auto rule_json = item.value();
+    for (const auto& item : config_json.items()) {
+      const auto rule_json = item.value();
 
       if (!rule_json.is_object()) {
         log_invalid_json("span sampler: unexpected element type in rules array", rule_json);
