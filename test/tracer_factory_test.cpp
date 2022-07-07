@@ -14,7 +14,7 @@ using namespace datadog::opentracing;
 namespace {
 
 // `EnvGuard` sets an environment variable to a specified value for the scope
-// of the `EnvGuard`, restoring the environment variables previous value
+// of the `EnvGuard`, restoring the environment variable's previous value
 // afterward.
 class EnvGuard {
   std::string name_;
