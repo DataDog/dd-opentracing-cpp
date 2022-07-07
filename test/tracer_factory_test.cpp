@@ -4,6 +4,7 @@
 
 #include <catch2/catch.hpp>
 #include <cstdio>
+#include <fstream>
 #include <stdexcept>
 
 #include "../src/tracer.h"
@@ -48,7 +49,6 @@ class EnvGuard {
 // the file at the end of the `TmpFile` scope.  A path to the temporary file is
 // accesible via the `name` member function.
 class TmpFile {
-  std::FILE *file_;
   std::string name_;
 
  public:
@@ -59,20 +59,18 @@ class TmpFile {
     }
     name_ = name_buffer;
 
-    file_ = std::fopen(name_buffer, "w");
-    if (file_ == nullptr) {
-      throw std::runtime_error(std::strerror(errno));
+    std::ofstream file(name_buffer);
+    if (!file) {
+      throw std::runtime_error("unable to open temporary file for writing: " + name_);
     }
 
-    const auto count = std::fwrite(content.data(), 1, content.size(), file_);
-    if (count != content.size()) {
-      throw std::runtime_error("unable to write to temporary file");
+    file.write(content.data(), content.size());
+    if (!file) {
+      throw std::runtime_error("unable to write to temporary file named: " + name_);
     }
-
-    std::fflush(file_);
   }
 
-  ~TmpFile() { std::fclose(file_); }
+  ~TmpFile() { std::remove(name_.c_str()); }
 
   const std::string &name() const { return name_; }
 };
