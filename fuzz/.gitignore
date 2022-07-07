@@ -1,2 +1,7 @@
-*.log
+# Build artifacts
 glob
+glob-manual
+
+# Output artifacts
+*.log
+slow-unit-*
