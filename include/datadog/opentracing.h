@@ -189,13 +189,20 @@ struct TracerOptions {
   //   be exceeded are dropped.  If "max_per_second" is not specified, then
   //   there is no limit.
   //
-  // Glob patterns are strings that are evaluated character-by-character
-  // against a candidate string.  The characters in a glob pattern have the
-  // following interpetations:
+  // Glob patterns are a simplified form of regular expressions.  Certain
+  // characters in a glob pattern have special meaning:
   //
-  // - "*" matches any contiguous substring, including the empty string.
+  // - "*" matches any substring, including the empty string.
   // - "?" matches exactly one instance of any character.
   // - Other characters match exactly one instance of themselves.
+  //
+  // For example:
+  //
+  // - The glob pattern "foobar" is matched by "foobar" only.
+  // - The glob pattern "foo*" is matched by "foobar", "foo", and "fooop", but
+  //   not by "fond".
+  // - The glob pattern "a?b*e*" is matched by "amble" and "albedo", but not by
+  //   "albino".
   std::string span_sampling_rules = "[]";
 };
 
