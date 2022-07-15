@@ -64,7 +64,7 @@ enum class SamplingMechanism {
   RemoteRateEmergency = 7,
   // Individual span kept by a matching span sampling rule when the enclosing
   // trace was dropped.
-  SpanRule = 8
+  SpanRule = 8,
 };
 
 // `OptionalSamplingMechanism` is either a `SamplingMechanism` or "empty,"
