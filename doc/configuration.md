@@ -112,7 +112,7 @@ specified as a JSON array of objects.
 For more information about the configuration of trace sampling, see
 [sampling.md][6].
 
-- **TracerOptions member**: `std::string sampling_rules`
+- **TracerOptions member**: `std::string sampling_rules` _(JSON)_
 - **JSON property**: `"sampling_rules"` _(array of objects)_
 - **Environment variable**: `DD_TRACE_SAMPLING_RULES` _(JSON)_
 - **Default value**: `[]`
@@ -253,6 +253,28 @@ made, is propagated between services along the trace in the form of the
 order to prevent rejection by peers or other HTTP header policies.  This
 configuration option is that limit, in bytes.
 
+### Span Sampling Rules
+Span sampling rules allow spans to be sent to Datadog that otherwise would be
+dropped due to trace sampling.
+
+For more information about the configuration of span sampling, see the [Span
+Sampling][11] section of [sampling.md][6].
+
+- **TracerOptions member**: `std::string span_sampling_rules` _(JSON)_
+- **JSON property**: `"span_sampling_rules"` _(array of objects)_
+- **Environment variable**: `DD_SPAN_SAMPLING_RULES` _(JSON)_
+- **Default value**: `[]`
+
+### Span Sampling Rules File
+Span sampling rules (see above) can be specified in their own file.  The value
+of the `DD_SPAN_SAMPLING_RULES_FILE` environment variable is the path to a file
+whose contents are the span sampling rules JSON array.
+
+- **Environment variable**: `DD_SPAN_SAMPLING_RULES_FILE`
+
+Note that `DD_SPAN_SAMPLING_RULES_FILE` is ignored when
+`DD_SPAN_SAMPLING_RULES` is also in the environment.
+
 - **TracerOptions member**: `uint64_t tags_header_size`
 - **JSON property**: `tags_header_size` _(number)_
 - **Environment variable**: `DD_TRACE_TAGS_PROPAGATION_MAX_LENGTH`
@@ -267,3 +289,4 @@ configuration option is that limit, in bytes.
 [7]: https://github.com/openzipkin/b3-propagation
 [8]: https://pubs.opengroup.org/onlinepubs/9699919799/
 [9]: https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging
+[11]: sampling.md#span-sampling

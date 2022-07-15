@@ -419,7 +419,8 @@ TEST_CASE("sampling behaviour") {
   auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
+  auto buffer =
+      std::make_shared<SpanBuffer>(logger, writer, sampler, nullptr, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -633,7 +634,8 @@ TEST_CASE("force tracing behaviour") {
   auto logger = std::make_shared<MockLogger>();
   auto sampler = std::make_shared<MockRulesSampler>();
   auto writer = std::make_shared<MockWriter>(sampler);
-  auto buffer = std::make_shared<SpanBuffer>(logger, writer, sampler, SpanBufferOptions{});
+  auto buffer =
+      std::make_shared<SpanBuffer>(logger, writer, sampler, nullptr, SpanBufferOptions{});
   TracerOptions tracer_options{"", 0, "service_name", "web"};
   std::shared_ptr<Tracer> tracer{new Tracer{tracer_options, buffer, getRealTime, getId}};
   ot::Tracer::InitGlobal(tracer);
@@ -788,7 +790,6 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
         std::cerr << "Exception thrown in test: " << error.what() << '\n';
       }
     }
-
     SECTION("including a 'decision maker' for us, if we make the sampling decision") {
       const std::string serialized_tags = "_dd.p.hello=world";
       // Our sampler will make a decision.

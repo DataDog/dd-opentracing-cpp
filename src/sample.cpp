@@ -1,6 +1,14 @@
 #include "sample.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <sstream>
+
+#include "clock.h"
+#include "glob.h"
+#include "logger.h"
+#include "span.h"
 
 namespace datadog {
 namespace opentracing {
@@ -134,6 +142,144 @@ RuleResult RulesSampler::match(const std::string& service, const std::string& na
 }
 
 void RulesSampler::updatePrioritySampler(json config) { priority_sampler_.configure(config); }
+
+SpanSampler::Rule::Config::Config()
+    : service_pattern("*"),
+      operation_name_pattern("*"),
+      sample_rate(1.0),
+      max_per_second(std::nan("")),
+      text() {}
+
+SpanSampler::Rule::Rule(const SpanSampler::Rule::Config& config, TimeProvider clock)
+    : config_(config) {
+  if (!std::isnan(config.max_per_second)) {
+    limiter_ = std::make_unique<Limiter>(clock, config.max_per_second);
+  }
+}
+
+bool SpanSampler::Rule::match(const SpanData& span) const {
+  const auto is_match = [](const std::string& pattern, const std::string& subject) {
+    // Since "*" is the default pattern, optimize for that case.
+    return pattern == "*" || glob_match(pattern, subject);
+  };
+
+  return is_match(config_.service_pattern, span.service) &&
+         is_match(config_.operation_name_pattern, span.name);
+}
+
+bool SpanSampler::Rule::sample(const SpanData& span) { return roll(span) && allow(); }
+
+bool SpanSampler::Rule::roll(const SpanData& span) const {
+  const uint64_t max_hash = maxIdFromSampleRate(config_.sample_rate);
+  // Use the span ID (not the trace ID), so that rolls can differ among spans
+  // within the same trace (given the same sample rate).
+  const uint64_t hashed_id = span.span_id * constant_rate_hash_factor;
+  return hashed_id < max_hash;
+}
+
+bool SpanSampler::Rule::allow() {
+  if (!limiter_) {
+    return true;
+  }
+
+  return limiter_->allow().allowed;
+}
+
+const SpanSampler::Rule::Config& SpanSampler::Rule::config() const { return config_; }
+
+void SpanSampler::configure(ot::string_view raw_json, const Logger& logger, TimeProvider clock) {
+  rules_.clear();
+
+  // `raw_json` is expected to be a JSON array of objects, where each object
+  // configures a `SpanSampler::Rule`.
+  try {
+    const auto log_invalid_json = [&](const std::string& description, const json& object) {
+      logger.Log(LogLevel::error, description + ": " + object.dump());
+    };
+
+    const json config_json = json::parse(raw_json);
+
+    for (const auto& item : config_json.items()) {
+      const auto rule_json = item.value();
+
+      if (!rule_json.is_object()) {
+        log_invalid_json("span sampler: unexpected element type in rules array", rule_json);
+        continue;
+      }
+
+      // Default values are enforced by the `Rule::Config` constructor.
+      Rule::Config config;
+
+      if (rule_json.contains("service")) {
+        if (!rule_json.at("service").is_string()) {
+          log_invalid_json("span sampler: invalid type for 'service' (expected string)",
+                           rule_json);
+          continue;
+        }
+        config.service_pattern = rule_json.at("service").get<std::string>();
+      }
+
+      if (rule_json.contains("name")) {
+        if (!rule_json.at("name").is_string()) {
+          log_invalid_json("span sampler: invalid type for 'name' (expected string)", rule_json);
+          continue;
+        }
+        config.operation_name_pattern = rule_json.at("name").get<std::string>();
+      }
+
+      if (rule_json.contains("sample_rate")) {
+        if (!rule_json.at("sample_rate").is_number()) {
+          log_invalid_json("span sampler: invalid type for 'sample_rate' (expected number)",
+                           rule_json);
+          continue;
+        }
+        const double sample_rate = rule_json.at("sample_rate").get<json::number_float_t>();
+        if (!(sample_rate >= 0.0 && sample_rate <= 1.0)) {
+          log_invalid_json(
+              "span sampler: invalid value for 'sample_rate' (expected value between 0.0 and 1.0)",
+              rule_json);
+          continue;
+        }
+        config.sample_rate = sample_rate;
+      }
+
+      if (rule_json.contains("max_per_second")) {
+        if (!rule_json.at("max_per_second").is_number()) {
+          log_invalid_json("span sampler: invalid type for 'max_per_second' (expected number)",
+                           rule_json);
+          continue;
+        }
+        const double max_per_second = rule_json.at("max_per_second").get<json::number_float_t>();
+        if (max_per_second <= 0) {
+          log_invalid_json(
+              "span sampler: invalid value for 'max_per_second' (expected positive value)",
+              rule_json);
+          continue;
+        }
+        config.max_per_second = max_per_second;
+      }
+
+      config.text = rule_json.dump();
+      rules_.emplace_back(config, clock);
+    }
+  } catch (const json::parse_error& error) {
+    std::string message;
+    message += "span sampler: unable to parse JSON config: ";
+    message += error.what();
+    logger.Log(LogLevel::error, message);
+  }
+}
+
+SpanSampler::Rule* SpanSampler::match(const SpanData& span) {
+  const auto found = std::find_if(rules_.begin(), rules_.end(),
+                                  [&](const Rule& rule) { return rule.match(span); });
+  if (found == rules_.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+const std::vector<SpanSampler::Rule>& SpanSampler::rules() const { return rules_; }
 
 }  // namespace opentracing
 }  // namespace datadog

@@ -9,8 +9,13 @@ namespace datadog {
 namespace opentracing {
 
 SpanBuffer::SpanBuffer(std::shared_ptr<const Logger> logger, std::shared_ptr<Writer> writer,
-                       std::shared_ptr<RulesSampler> sampler, SpanBufferOptions options)
-    : logger_(logger), writer_(writer), sampler_(sampler), options_(options) {}
+                       std::shared_ptr<RulesSampler> trace_sampler,
+                       std::shared_ptr<SpanSampler> span_sampler, SpanBufferOptions options)
+    : logger_(logger),
+      writer_(writer),
+      trace_sampler_(trace_sampler),
+      span_sampler_(span_sampler),
+      options_(options) {}
 
 void SpanBuffer::registerSpan(const SpanContext& context) {
   std::lock_guard<std::mutex> lock_guard{mutex_};
@@ -52,7 +57,7 @@ void SpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
     generateSamplingPriorityImpl(trace.finished_spans->back().get());
-    trace.finish();
+    trace.finish(span_sampler_.get());
     unbufferAndWriteTrace(trace_id);
   }
 }
@@ -171,7 +176,8 @@ OptionalSamplingPriority SpanBuffer::generateSamplingPriorityImpl(const SpanData
 
   // Consult the sampler for a decision, save the decision, and then return the
   // saved decision.
-  auto sampler_result = sampler_->sample(span->env(), span->service, span->name, span->trace_id);
+  auto sampler_result =
+      trace_sampler_->sample(span->env(), span->service, span->name, span->trace_id);
   setSamplerResult(span->trace_id, sampler_result);
   setSamplingPriorityFromSampler(span->trace_id, sampler_result);
   return getSamplingPriorityImpl(span->trace_id);

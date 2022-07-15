@@ -11,8 +11,8 @@
 #include <unistd.h>
 #endif
 
+#include <cassert>
 #include <cmath>
-#include <fstream>
 #include <random>
 #include <sstream>
 
@@ -137,7 +137,7 @@ uint64_t traceTagsPropagationMaxLength(const TracerOptions &options, const Logge
 void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexcept {
   try {
     auto log_invalid_json = [&](const std::string &description, json &object) {
-      logger_->Log(LogLevel::info, description + ": " + object.get<std::string>());
+      logger_->Log(LogLevel::error, description + ": " + object.dump());
     };
     json config = json::parse(opts_.sampling_rules);
     for (auto &item : config.items()) {
@@ -160,6 +160,7 @@ void Tracer::configureRulesSampler(std::shared_ptr<RulesSampler> sampler) noexce
         log_invalid_json(
             "rules sampler: invalid value for sample rate (expected value between 0.0 and 1.0)",
             rule);
+        continue;
       }
       // "service" and "name" are optional
       bool has_service = rule.contains("service") && rule.at("service").is_string();
@@ -223,16 +224,19 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<SpanBuffer> buffer, TimePr
       legacy_obfuscation_(legacyObfuscationEnabled()) {}
 
 Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
-               std::shared_ptr<RulesSampler> sampler, std::shared_ptr<const Logger> logger)
+               std::shared_ptr<RulesSampler> trace_sampler, std::shared_ptr<const Logger> logger)
     : logger_(logger),
       opts_(options),
       get_time_(getRealTime),
       get_id_(getId),
       legacy_obfuscation_(legacyObfuscationEnabled()) {
-  configureRulesSampler(sampler);
+  assert(logger_);
+  configureRulesSampler(trace_sampler);
+  auto span_sampler = std::make_shared<SpanSampler>();
+  span_sampler->configure(opts_.span_sampling_rules, *logger_, get_time_);
   startupLog(options);
   buffer_ = std::make_shared<SpanBuffer>(
-      logger_, writer, sampler,
+      logger_, writer, trace_sampler, span_sampler,
       SpanBufferOptions{isEnabled(), reportingHostname(options), analyticsRate(options),
                         options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
@@ -285,8 +289,9 @@ std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation
     span->SetTag(tag.first, tag.second);
   }
   return span;
-} catch (const std::bad_alloc &) {
-  // At least don't crash.
+} catch (const std::exception &error) {
+  logger_->Log(LogLevel::error,
+               std::string("Unexpected error in StartSpanWithOptions: ") + error.what());
   return nullptr;
 }
 

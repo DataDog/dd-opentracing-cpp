@@ -120,5 +120,55 @@ This configuration option has the same meaning as the `DD_TRACE_RATE_LIMIT`
 environment variable.  Note that the environment variable overrides the
 `TracerOptions` field if both are specified.
 
+Span Sampling
+-------------
+Span sampling is used to select spans to keep even when the enclosing
+trace is dropped.
+
+Similar to _trace_ sampling rules, _span_ sampling rules are configured as a
+JSON array of object, where each object may contain the following properties:
+```
+[{
+    "service": <matches the span's service name, or any if absent>,
+    "name": <matches the span's operation name, or any if absent>,
+    "sample_rate": <the probability of sampling matching spans, or 1.0 if absent>,
+    "max_per_second": <limit in spans sampled by this rule each second, or unlimited if absent>
+}, ...]
+```
+
+The `service` and `name` are glob patterns, where "glob" here means:
+- `*` matches any substring, including the empty string,
+- `?` matches exactly one of any character, and
+- any other character matches exactly one of itself.
+
+Span sampling rules are examined only when the enclosing trace is to be
+dropped.
+
+The first span sampling rule that matches a span is used to make a span
+sampling decision for that span.  If the decision is "keep," then the span is
+sent to Datadog despite the enclosing trace having been dropped.
+
+Span sampling rules can be configured [directly][3] or [in a file][4].
+
+For example, consider the following span sampling rules:
+```shell
+export DD_SPAN_SAMPLING_RULES='[
+  {"service": "router", "name": "rack.request", "max_per_second": 2000},
+  {"service": "classic-mysql", "name": "mysql2.*"},
+  {"service": "authn?", "sample_rate": 0.5}
+]'
+```
+These rules state:
+
+- When a trace is dropped, keep spans whose service name is `router` and whose
+  operation name is `rack.request`, but keep at most 2000 such spans per
+  second.
+- When a trace is dropped, keep spans whose service name is `classic-mysql` and
+  whose operation name begins with `mysql2.`.
+- When a trace is dropped, keep 50% of spans whose service name is `authn`
+  followed by another character, e.g. `authny`, `authnj`. 
+
 [1]: https://docs.datadoghq.com/tracing/trace_ingestion/mechanisms/?tab=environmentvariables#in-the-agent
 [2]: https://docs.datadoghq.com/tracing/setup_overview/proxy_setup/?tab=nginx
+[3]: configuration.md#span-sampling-rules
+[4]: configuration.md#span-sampling-rules-file

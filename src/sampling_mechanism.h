@@ -59,7 +59,12 @@ enum class SamplingMechanism {
   // Reserved for future use.
   AppSec = 5,
   // Reserved for future use.
-  RemoteRateUserDefined = 6
+  RemoteRateUserDefined = 6,
+  // Reserved for future use.
+  RemoteRateEmergency = 7,
+  // Individual span kept by a matching span sampling rule when the enclosing
+  // trace was dropped.
+  SpanRule = 8,
 };
 
 // `OptionalSamplingMechanism` is either a `SamplingMechanism` or "empty,"

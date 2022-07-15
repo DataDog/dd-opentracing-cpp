@@ -93,6 +93,9 @@ ot::expected<TracerOptions> optionsFromConfig(const char *configuration,
     if (config.find("tags_header_size") != config.end()) {
       config.at("tags_header_size").get_to(options.tags_header_size);
     }
+    if (config.find("span_sampling_rules") != config.end()) {
+      options.span_sampling_rules = config.at("span_sampling_rules").dump();
+    }
   } catch (const nlohmann::detail::type_error &) {
     error_message = "configuration has an argument with an incorrect type";
     return ot::make_unexpected(std::make_error_code(std::errc::invalid_argument));

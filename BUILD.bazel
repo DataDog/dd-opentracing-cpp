@@ -6,6 +6,8 @@ cc_library(
         "src/clock.h",
         "src/encoder.cpp",
         "src/encoder.h",
+        "src/glob.cpp",
+        "src/glob.h",
         "src/limiter.cpp",
         "src/limiter.h",
         "src/logger.cpp",
