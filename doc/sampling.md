@@ -150,6 +150,24 @@ sent to Datadog despite the enclosing trace having been dropped.
 
 Span sampling rules can be configured [directly][3] or [in a file][4].
 
+For example, consider the following span sampling rules:
+```shell
+export DD_SPAN_SAMPLING_RULES='[
+  {"service": "router", "name": "rack.request", "max_per_second": 2000},
+  {"service": "classic-mysql", "name": "mysql2.*"},
+  {"service": "authn?", "sample_rate": 0.5}
+]'
+```
+These rules state:
+
+- When a trace is dropped, keep spans whose service name is `router` and whose
+  operation name is `rack.request`, but keep at most 2000 such spans per
+  second.
+- When a trace is dropped, keep spans whose service name is `classic-mysql` and
+  whose operation name begins with `mysql2.`.
+- When a trace is dropped, keep 50% of spans whose service name is `authn`
+  followed by another character, e.g. `authny`, `authnj`. 
+
 [1]: https://docs.datadoghq.com/tracing/trace_ingestion/mechanisms/?tab=environmentvariables#in-the-agent
 [2]: https://docs.datadoghq.com/tracing/setup_overview/proxy_setup/?tab=nginx
 [3]: configuration.md#span-sampling-rules

@@ -254,12 +254,8 @@ order to prevent rejection by peers or other HTTP header policies.  This
 configuration option is that limit, in bytes.
 
 ### Span Sampling Rules
-When a trace is dropped, it may still be advantageous to send some of its spans
-to Datadog.  For example, if there are [user-defined metrics derived from
-spans][10], those metrics account only for spans sent to Datadog.  Also, trace
-search queries exclude spans not sent to Datadog.  In these cases, a subset of
-the spans in the dropped trace can be nonetheless kept by defining span
-sampling rules.
+Span sampling rules allow spans to be sent to Datadog that otherwise would be
+dropped due to trace sampling.
 
 For more information about the configuration of span sampling, see the [Span
 Sampling][11] section of [sampling.md][6].
@@ -270,7 +266,9 @@ Sampling][11] section of [sampling.md][6].
 - **Default value**: `[]`
 
 ### Span Sampling Rules File
-Span sampling rules (see above) can be specified in their own file.
+Span sampling rules (see above) can be specified in their own file.  The value
+of the `DD_SPAN_SAMPLING_RULES_FILE` environment variable is the path to a file
+whose contents are the span sampling rules JSON array.
 
 - **Environment variable**: `DD_SPAN_SAMPLING_RULES_FILE`
 
@@ -291,5 +289,4 @@ Note that `DD_SPAN_SAMPLING_RULES_FILE` is ignored when
 [7]: https://github.com/openzipkin/b3-propagation
 [8]: https://pubs.opengroup.org/onlinepubs/9699919799/
 [9]: https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging
-[10]: https://docs.datadoghq.com/tracing/generate_metrics/
 [11]: sampling.md#span-sampling
