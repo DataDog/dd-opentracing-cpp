@@ -254,6 +254,9 @@ order to prevent rejection by peers or other HTTP header policies.  This
 configuration option is that limit, in bytes.
 
 ### Span Sampling Rules
+_Note: Span sampling does not work yet, because the necessary Datadog Agent
+changes are not yet released._
+
 Span sampling rules allow spans to be sent to Datadog that otherwise would be
 dropped due to trace sampling.
 
@@ -266,6 +269,9 @@ Sampling][11] section of [sampling.md][6].
 - **Default value**: `[]`
 
 ### Span Sampling Rules File
+_Note: Span sampling does not work yet, because the necessary Datadog Agent
+changes are not yet released._
+
 Span sampling rules (see above) can be specified in their own file.  The value
 of the `DD_SPAN_SAMPLING_RULES_FILE` environment variable is the path to a file
 whose contents are the span sampling rules JSON array.
