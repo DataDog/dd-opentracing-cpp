@@ -68,12 +68,12 @@ function wait_for_port() {
 }
 
 function run_nginx() {
-  eval "nginx -g \"daemon off;\" 1>/tmp/nginx_log.txt &"
+  nginx -g "daemon off;" 1>/tmp/nginx_log.txt &
   NGINX_PID=$!
   wait_for_port 80
 }
 
-echo "Test 1: Ensure the right traces sent to the agent."
+echo "======== Test 1: Ensure the right traces sent to the agent. ========"
 # Start wiremock in background
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
@@ -105,7 +105,7 @@ then
 fi
 
 reset_test
-echo "Test 2: Check that libcurl isn't writing to stdout"
+echo "======== Test 2: Check that libcurl isn't writing to stdout ========"
 run_nginx
 curl -s localhost?[1-10000] 1> /tmp/curl_log.txt
 
@@ -118,7 +118,7 @@ then
 fi
 
 reset_test
-echo "Test 3: Check that creating a root span doesn't produce an error"
+echo "======== Test 3: Check that creating a root span doesn't produce an error ========"
 run_nginx
 curl -s localhost?[1-5] 1> /tmp/curl_log.txt
 
@@ -137,7 +137,7 @@ then
 fi
 
 reset_test
-echo "Test 4: Check that priority sampling works."
+echo "======== Test 4: Check that priority sampling works. ========"
 # Start the mock agent
 wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "{\"rate_by_service\":{\"service:nginx,env:prod\":0.5, \"service:nginx,env:\":0.2, \"service:wrong,env:\":0.1, \"service:nginx,env:wrong\":0.9}}" }}' http://localhost:8126/__admin/mappings/new
@@ -189,7 +189,7 @@ then
 fi
 
 reset_test
-echo "Test 5: Ensure that NGINX errors are reported to Datadog"
+echo "======== Test 5: Ensure that NGINX errors are reported to Datadog ========"
 wiremock --port 8126 >/dev/null 2>&1 &
 # Wait for wiremock to start
 wait_for_port 8126
@@ -213,7 +213,7 @@ fi
 
 reset_test
 
-echo "Test 6: Origin header is propagated and adds a tag"
+echo "======== Test 6: Origin header is propagated and adds a tag ========"
 wiremock --port 8126 >/dev/null 2>&1 & wait_for_port 8126
 curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "OK" }}' http://localhost:8126/__admin/mappings/new
 wiremock --port 8080 >/dev/null 2>&1 & wait_for_port 8080
@@ -246,5 +246,39 @@ then
   echo -e "Expected:\n${EXPECTED}\n"
   echo "Diff:"
   echo "${DIFF}"
+  exit 1
+fi
+
+reset_test
+echo "======== Test 7: Check that extracting a child span without X-Datadog-Tags doesn't produce an error ========"
+# See <https://github.com/DataDog/dd-opentracing-cpp/issues/241>.
+
+wiremock --port 8080 >/dev/null 2>&1 & wait_for_port 8080
+curl -s -X POST --data '{ "priority":10, "request": { "method": "ANY", "urlPattern": ".*" }, "response": { "status": 200, "body": "Hello World" }}' http://localhost:8080/__admin/mappings/new
+
+echo '{
+  "service": "nginx",
+  "operation_name_override": "nginx.handle"
+}' > ${TRACER_CONF_PATH}
+
+run_nginx
+
+curl -s \
+  -H 'X-Datadog-Trace-Id: 1234' \
+  -H 'X-Datadog-Parent-Id: 1234' \
+  -H 'X-Datadog-Sampling-Priority: 0' \
+  http://localhost/proxy/ >/tmp/curl_log.txt
+
+if [ "$(cat ${NGINX_ERROR_LOG} | grep 'no opentracing context value found for span context key ' | wc -l)" != "0" ]
+then
+  echo "Extraction errors in nginx log file:"
+  cat ${NGINX_ERROR_LOG}
+  echo ""
+  exit 1
+elif [ "$(cat ${NGINX_ERROR_LOG})" != "" ]
+then
+  echo "Other errors in nginx log file:"
+  cat ${NGINX_ERROR_LOG}
+  echo ""
   exit 1
 fi

@@ -325,9 +325,11 @@ ot::expected<void> SpanContext::serialize(std::ostream &writer,
       j[json_origin_key] = origin_;
     }
   }
-  std::string tags = pending_traces->serializeTraceTags(trace_id_);
-  if (!tags.empty()) {
-    j[json_tags_key] = std::move(tags);
+  auto tags = pending_traces->serializeTraceTags(trace_id_);
+  if (tags) {
+    j[json_tags_key] = *tags;
+  } else {
+    j[json_tags_key] = "";
   }
   j[json_baggage_key] = baggage_;
 
@@ -397,9 +399,14 @@ ot::expected<void> SpanContext::serialize(const ot::TextMapWriter &writer,
     }
   }
 
-  const std::string tags = pending_traces->serializeTraceTags(trace_id_);
-  if (!tags.empty()) {
-    result = writer.Set(headers_impl.tags_header, tags);
+  const auto tags = pending_traces->serializeTraceTags(trace_id_);
+  // Inject the trace tags, even if they're empty of if an error occurred.
+  // This is to work around a quirk of nginx-opentracing.
+  // See <https://github.com/DataDog/dd-opentracing-cpp/issues/241>.
+  if (tags) {
+    result = writer.Set(headers_impl.tags_header, *tags);
+  } else {
+    result = writer.Set(headers_impl.tags_header, "");
   }
   if (!result) {
     return result;

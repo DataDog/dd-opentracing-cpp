@@ -183,20 +183,20 @@ OptionalSamplingPriority SpanBuffer::generateSamplingPriorityImpl(const SpanData
   return getSamplingPriorityImpl(span->trace_id);
 }
 
-std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
-  std::string result;
+std::unique_ptr<std::string> SpanBuffer::serializeTraceTags(uint64_t trace_id) {
   std::lock_guard<std::mutex> lock{mutex_};
 
   const auto trace_found = traces_.find(trace_id);
   if (trace_found == traces_.end()) {
     logger_->Log(LogLevel::error, trace_id,
                  "Requested trace_id not found in SpanBuffer::serializeTraceTags");
-    return result;
+    return nullptr;
   }
 
   auto& trace = trace_found->second;
 
   trace.applySamplingDecisionToTraceTags();
+  std::string result;
   for (const auto& entry : trace.trace_tags) {
     appendTag(result, entry.first, entry.second);
   }
@@ -209,11 +209,10 @@ std::string SpanBuffer::serializeTraceTags(uint64_t trace_id) {
         << "Serialized trace tags are too large for propagation.  Configured maximum length is "
         << configured_max << ", but the following has length " << result.size() << ": " << result;
     logger_->Log(LogLevel::error, trace_id, message.str());
-    // Return an empty string, which will not be propagated.
-    result.clear();
+    return nullptr;
   }
 
-  return result;
+  return std::unique_ptr<std::string>(new std::string(std::move(result)));
 }
 
 void SpanBuffer::setServiceName(uint64_t trace_id, ot::string_view service_name) {
