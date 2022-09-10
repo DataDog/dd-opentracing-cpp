@@ -900,7 +900,11 @@ TEST_CASE("propagated Datadog tags (x-datadog-tags)") {
       REQUIRE(result);
 
       const auto injected_json = nlohmann::json::parse(injected.str());
-      REQUIRE(injected_json.find("tags") == injected_json.end());
+      const auto tags = injected_json.find("tags");
+      // See <https://github.com/DataDog/dd-opentracing-cpp/issues/241>.
+      // Also, the redundant parentheses are required here because of the way
+      // Catch2 parses predicates (it's the "||").
+      REQUIRE((tags == injected_json.end() || *tags == ""));
 
       // Because the tags were omitted due to being oversized, there will be a
       // specific error tag on the local root span.

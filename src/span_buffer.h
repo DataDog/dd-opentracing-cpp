@@ -78,12 +78,10 @@ class SpanBuffer {
   OptionalSamplingPriority generateSamplingPriority(const SpanData* span);
 
   // Return the serialization of the trace tags associated with the trace
-  // having the specified `trace_id`, or return an empty string if an error
-  // occurs.  Note that an empty string could mean either that there no tags or
-  // that an error occurred.  If an encoding error occurs, a corresponding
-  // `_dd.propagation_error` tag value will be added to the relevant trace's
-  // local root span.
-  std::string serializeTraceTags(uint64_t trace_id);
+  // having the specified `trace_id`, or return `nullptr` if an error occurs.
+  // If an encoding error occurs, a corresponding `_dd.propagation_error` tag
+  // value will be added to the relevant trace's local root span.
+  std::unique_ptr<std::string> serializeTraceTags(uint64_t trace_id);
 
   // Change the name of the service associated with the trace having the
   // specified `trace_id` to the specified `service_name`.
