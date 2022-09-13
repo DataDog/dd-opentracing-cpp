@@ -5,7 +5,7 @@
 namespace datadog {
 namespace version {
 
-const std::string tracer_version = "v1.3.5";
+const std::string tracer_version = "v1.3.6";
 const std::string cpp_version = std::to_string(__cplusplus);
 
 }  // namespace version
