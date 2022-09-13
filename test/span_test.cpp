@@ -329,6 +329,109 @@ TEST_CASE("span") {
     REQUIRE(result->meta["error"] == error_tag_test_case.span_tag);
   }
 
+  SECTION("error.* tags override error tag") {
+    // The tag name `opentracing::ext::error` is "error", which is also the
+    // first part of the nested tags "error.msg", "error.stack", and
+    // "error.type".  The latter tags are significant to Error Tracking
+    // <https://docs.datadoghq.com/tracing/error_tracking/>.
+    //
+    // It was found that setting the "error" tag makes some parts of Datadog
+    // behave as if all "error.*" tags had been removed.  A user who set both
+    // the "error" tag and the "error.msg" tag, for example, might find that
+    // only the "error" tag appeared in the Datadog UI.
+    //
+    // This test section verifies that the above does not happen.
+
+    auto span_id = get_id();
+    Span span{logger,     nullptr, buffer, get_time,
+              span_id,    span_id, 0,      SpanContext{logger, span_id, span_id, "", {}},
+              get_time(), "",      "",     "",
+              "",         ""};
+
+    using OptionalString = ot::util::variant<std::nullptr_t, std::string>;
+
+    // For each member of `ErrorTags`, `nullptr` denotes the absence of the tag.
+    struct ErrorTags {
+      OptionalString error;  // "error" tag
+      OptionalString msg;    // "error.msg" tag
+      OptionalString stack;  // "error.stack" tag
+      OptionalString type;   // "error.type" tag
+    };
+
+    struct Case {
+      int index;        // for debugging
+      ErrorTags before; // before span finishes
+      ErrorTags after;  // after span finishes
+      bool error_property_after;
+    };
+
+    // clang-format off
+    auto test_case = GENERATE(values<Case>({
+          //   Before span finishes                After span finishes                   error?
+          //   ----------------------------------  ------------------------------------
+          //   error    .msg    .stack   .type      error    .msg     .stack   .type
+          //   ----------------------------------  --------------------------------------------
+          // No error tags means no error.
+          {0, {nullptr, nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, false},
+          // Setting any of the "error.*" tags sets the error property.
+          {1, {nullptr, "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
+          {2, {nullptr, nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
+          {3, {nullptr, nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
+          // "error" without "error.*" leaves just "error".
+          {4, {"true",  nullptr, nullptr, nullptr}, {"true",  nullptr, nullptr, nullptr}, true},
+          // Setting "error.*" unsets "error", but keeps the error property.
+          {5, {"true",  "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
+          {6, {"true",  nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
+          {7, {"true",  nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
+    }));
+    // clang-format on
+
+    CAPTURE(test_case.index);
+
+    if (test_case.before.error != nullptr) {
+      span.SetTag("error", test_case.before.error.get<std::string>());
+    }
+    if (test_case.before.msg!= nullptr) {
+      span.SetTag("error.msg", test_case.before.msg.get<std::string>());
+    }
+    if (test_case.before.stack != nullptr) {
+      span.SetTag("error.stack", test_case.before.stack.get<std::string>());
+    }
+    if (test_case.before.type != nullptr) {
+      span.SetTag("error.type", test_case.before.type.get<std::string>());
+    }
+
+    span.FinishWithOptions(finish_options);
+    const auto& after = *buffer->traces().at(100).finished_spans->at(0);
+
+    REQUIRE(after.error == int(test_case.error_property_after));
+
+    if (test_case.after.error == nullptr) {
+      REQUIRE(after.meta.count("error") == 0);
+    } else {
+      REQUIRE(after.meta.count("error") == 1);
+      REQUIRE(after.meta.at("error") == test_case.after.error.get<std::string>());
+    }
+    if (test_case.after.msg == nullptr) {
+      REQUIRE(after.meta.count("error.msg") == 0);
+    } else {
+      REQUIRE(after.meta.count("error.msg") == 1);
+      REQUIRE(after.meta.at("error.msg") == test_case.after.msg.get<std::string>());
+    }
+    if (test_case.after.stack == nullptr) {
+      REQUIRE(after.meta.count("error.stack") == 0);
+    } else {
+      REQUIRE(after.meta.count("error.stack") == 1);
+      REQUIRE(after.meta.at("error.stack") == test_case.after.stack.get<std::string>());
+    }
+    if (test_case.after.type == nullptr) {
+      REQUIRE(after.meta.count("error.type") == 0);
+    } else {
+      REQUIRE(after.meta.count("error.type") == 1);
+      REQUIRE(after.meta.at("error.type") == test_case.after.type.get<std::string>());
+    }
+  }
+
   SECTION("operation name can be overridden") {
     auto span_id = get_id();
     Span span{logger,
