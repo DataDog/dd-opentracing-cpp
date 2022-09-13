@@ -103,6 +103,33 @@ std::regex &PATH_MIXED_ALPHANUMERICS() {
       "\\d\\?]*[\\d-]+[^\\/]*))"};
   return r;
 }
+
+// Deduce `span.error` and "error.*" tag values from the set values of "error*"
+// tags.
+// See the error-related test SECTIONs in `span_test.cpp` for more information.
+void finish_error_tags(SpanData& span) {
+  const std::string error_details[] = {"error.msg", "error.stack", "error.type"};
+
+  const auto error_tag = span.meta.find(::ot::ext::error);
+  if (error_tag != span.meta.end()) {
+    if (error_tag->second == "" || !stob(error_tag->second, true)) {
+      span.error = 0;
+      span.meta.erase(error_tag);
+      for (const auto& tag_name : error_details) {
+        span.meta.erase(tag_name);
+      }
+      return;
+    }
+    span.error = 1;
+  }
+
+  for (const auto& tag_name : error_details) {
+    if (span.meta.count(tag_name)) {
+      span.error = 1;
+      span.meta.erase(::ot::ext::error);
+    }
+  }
+}
 }  // namespace
 
 // Imperfectly audits the data in a Span, removing some things that could cause information leaks
@@ -134,7 +161,6 @@ void Span::FinishWithOptions(
   span_->duration =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time_).count();
   // Apply special tags.
-  // If we add any more cases; then abstract this. For now, KISS.
   auto tag = span_->meta.find(tags::span_type);
   if (tag != span_->meta.end()) {
     span_->type = tag->second;
@@ -150,19 +176,7 @@ void Span::FinishWithOptions(
     span_->service = tag->second;
     span_->meta.erase(tag);
   }
-  tag = span_->meta.find(::ot::ext::error);
-  if (tag != span_->meta.end()) {
-    // tag->second is the JSON-serialized value of the variadic type given to SetTag.
-    // Errors can be a flag or a detailed message.
-    // Empty or false-y values indicate no error.
-    // Any other value will mark the span to indicate an error occured.
-    if (tag->second == "" || !stob(tag->second, true)) {
-      span_->error = 0;
-    } else {
-      span_->error = 1;
-    }
-    // Don't erase the tag, in case it is populated with interesting information.
-  }
+  finish_error_tags(*span_);
   tag = span_->meta.find(tags::analytics_event);
   if (tag != span_->meta.end()) {
     // tag->second is the JSON-serialized value of the variadic type given to SetTag.
