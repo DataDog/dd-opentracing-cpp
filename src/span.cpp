@@ -107,7 +107,7 @@ std::regex &PATH_MIXED_ALPHANUMERICS() {
 // Deduce `span.error` and "error.*" tag values from the set values of "error*"
 // tags.
 // See the error-related test SECTIONs in `span_test.cpp` for more information.
-void finish_error_tags(SpanData& span) {
+void finish_error_tags(SpanData &span) {
   const std::string error_details[] = {"error.msg", "error.stack", "error.type"};
 
   const auto error_tag = span.meta.find(::ot::ext::error);
@@ -115,7 +115,7 @@ void finish_error_tags(SpanData& span) {
     if (error_tag->second == "" || !stob(error_tag->second, true)) {
       span.error = 0;
       span.meta.erase(error_tag);
-      for (const auto& tag_name : error_details) {
+      for (const auto &tag_name : error_details) {
         span.meta.erase(tag_name);
       }
       return;
@@ -123,7 +123,7 @@ void finish_error_tags(SpanData& span) {
     span.error = 1;
   }
 
-  for (const auto& tag_name : error_details) {
+  for (const auto &tag_name : error_details) {
     if (span.meta.count(tag_name)) {
       span.error = 1;
       span.meta.erase(::ot::ext::error);

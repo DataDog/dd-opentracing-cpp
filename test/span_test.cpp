@@ -359,9 +359,9 @@ TEST_CASE("span") {
     };
 
     struct Case {
-      int index;        // for debugging
-      ErrorTags before; // before span finishes
-      ErrorTags after;  // after span finishes
+      int index;         // for debugging
+      ErrorTags before;  // before span finishes
+      ErrorTags after;   // after span finishes
       bool error_property_after;
     };
 
@@ -395,7 +395,7 @@ TEST_CASE("span") {
     if (test_case.before.error != nullptr) {
       span.SetTag("error", test_case.before.error.get<std::string>());
     }
-    if (test_case.before.msg!= nullptr) {
+    if (test_case.before.msg != nullptr) {
       span.SetTag("error.msg", test_case.before.msg.get<std::string>());
     }
     if (test_case.before.stack != nullptr) {
