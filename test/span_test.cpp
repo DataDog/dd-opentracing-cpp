@@ -306,19 +306,20 @@ TEST_CASE("span") {
       std::string span_tag;
     };
 
+    // The resulting "error" tag is always unset.
+    // See the next section for more information.
     auto error_tag_test_case = GENERATE(values<ErrorTagTestCase>({
         {"0", 0, ""},
         {0, 0, ""},
         {"", 0, ""},
         {"false", 0, ""},
         {false, 0, ""},
-        {"1", 1, "1"},
-        {1, 1, "1"},
-        {"any random truth-ish string or value lol", 1,
-         "any random truth-ish string or value lol"},
-        {std::vector<ot::Value>{"hi", 420, true}, 1, "[\"hi\",420,true]"},
-        {"true", 1, "true"},
-        {true, 1, "true"},
+        {"1", 1, ""},
+        {1, 1, ""},
+        {"any random truth-ish string or value lol", 1, ""},
+        {std::vector<ot::Value>{"hi", 420, true}, 1, ""},
+        {"true", 1, ""},
+        {true, 1, ""},
     }));
 
     span.SetTag("error", error_tag_test_case.value);
@@ -367,26 +368,40 @@ TEST_CASE("span") {
 
     // clang-format off
     auto test_case = GENERATE(values<Case>({
-          //   Before span finishes                After span finishes                   error?
-          //   ----------------------------------  ------------------------------------
-          //   error    .msg    .stack   .type      error    .msg     .stack   .type
-          //   ----------------------------------  --------------------------------------------
+          //    Before span finishes                  After span finishes
+          //    ----------------------------------    ------------------------------------
+          //    error    .msg    .stack   .type       error    .msg     .stack   .type      error?
+          //    ----------------------------------    --------------------------------------------
           // No error tags means no error.
-          {0,  {nullptr, nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {0,   {nullptr, nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, false},
           // Setting any of the "error.*" tags sets the error property.
-          {1,  {nullptr, "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
-          {2,  {nullptr, nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
-          {3,  {nullptr, nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
-          // "error" without "error.*" leaves just "error".
-          {4,  {"true",  nullptr, nullptr, nullptr}, {"true",  nullptr, nullptr, nullptr}, true},
+          {1,   {nullptr, "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
+          {2,   {nullptr, nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
+          {3,   {nullptr, nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
+          // Truthy "error" without "error.*" marks as error but sets no tags.
+          {4,   {"true",  nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {5,   {"TRUE",  nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {6,   {"1",     nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {7,   {"true",  nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {8,   {"True",  nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {9,   {"T",     nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          {10,  {"t",     nullptr, nullptr, nullptr}, {nullptr, nullptr, nullptr, nullptr}, true},
+          // If "error" is nonempty, not truthy, and not falsy, then set "error.msg" instead.
+          {11,  {"EBADF", nullptr, nullptr, nullptr}, {nullptr, "EBADF", nullptr, nullptr}, true},
+          {12,  {"9",     nullptr, nullptr, nullptr}, {nullptr, "9",     nullptr, nullptr}, true},
+          {13,  {"oops!", nullptr, nullptr, nullptr}, {nullptr, "oops!", nullptr, nullptr}, true},
+          {14,  {"-0",    nullptr, nullptr, nullptr}, {nullptr, "-0",    nullptr, nullptr}, true},
           // Setting "error.*" unsets "error", but keeps the error property.
-          {5,  {"true",  "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
-          {6,  {"true",  nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
-          {7,  {"true",  nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
-          // If "error" is falsy, then "error" and "error.*" tags are removed, and no error.
-          {8,  {"false", "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
-          {9,  {"0",     "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
-          {10, {"",      "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {15,  {"true",  "dummy", nullptr, nullptr}, {nullptr, "dummy", nullptr, nullptr}, true},
+          {16,  {"true",  nullptr, "dummy", nullptr}, {nullptr, nullptr, "dummy", nullptr}, true},
+          {17,  {"true",  nullptr, nullptr, "dummy"}, {nullptr, nullptr, nullptr, "dummy"}, true},
+          // If "error" is falsy or empty, then "error" and "error.*" tags are removed, and no error.
+          {18,  {"false", "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {19,  {"FALSE", "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {20,  {"F",     "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {21,  {"f",     "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {22,  {"0",     "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
+          {23,  {"",      "dummy", "dummy", "dummy"}, {nullptr, nullptr, nullptr, nullptr}, false},
     }));
     // clang-format on
 
