@@ -1,4 +1,5 @@
-#include <string>
+#include "bool.h"
+
 #include <unordered_map>
 
 namespace datadog {
@@ -12,17 +13,27 @@ std::unordered_map<std::string, bool> conversions{
 }  // namespace
 
 bool stob(const std::string& str, bool fallback) {
-  if (str.empty()) {
-    return fallback;
+  switch (tribool(str)) {
+    case Tribool::True:
+      return true;
+    case Tribool::False:
+      return false;
+    default:
+      return fallback;
   }
-  auto result = conversions.find(str);
-  if (result == conversions.end()) {
-    return fallback;
-  }
-  return result->second;
 }
 
-bool isbool(const std::string& str) { return conversions.find(str) != conversions.end(); }
+bool isbool(const std::string& str) { return tribool(str) != Tribool::Neither; }
+
+Tribool tribool(bool value) { return value ? Tribool::True : Tribool::False; }
+
+Tribool tribool(const std::string& str) {
+  auto entry = conversions.find(str);
+  if (entry == conversions.end()) {
+    return Tribool::Neither;
+  }
+  return tribool(entry->second);
+}
 
 }  // namespace opentracing
 }  // namespace datadog
