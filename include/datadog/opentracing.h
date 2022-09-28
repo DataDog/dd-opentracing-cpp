@@ -156,8 +156,8 @@ struct TracerOptions {
   // serialized tags allowed.  Trace-wide tags whose serialized length exceeds
   // this limit are not propagated.
   uint64_t tags_header_size = 512;
-  // Note about `span_sampling_rules`: Span sampling does not work yet, because
-  // the necessary Datadog Agent changes are not yet released.
+  // Note about `span_sampling_rules`: Span sampling requires version 7.40 of
+  // the Datadog Agent or a more recent version.
   //
   // Rule-based span sampling, which is distinct from rule-based trace
   // sampling, is used to determine which spans to keep, if any, when trace
