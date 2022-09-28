@@ -122,8 +122,7 @@ environment variable.  Note that the environment variable overrides the
 
 Span Sampling
 -------------
-_Note: Span sampling does not work yet, because the necessary Datadog Agent
-changes are not yet released._
+_Note: Span sampling requires version 7.40 of the Datadog Agent or a more recent version._
 
 Span sampling is used to select spans to keep even when the enclosing
 trace is dropped.
