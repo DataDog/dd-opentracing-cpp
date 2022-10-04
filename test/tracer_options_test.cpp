@@ -78,7 +78,7 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_REPORT_HOSTNAME", "true"},
         {"DD_TRACE_ANALYTICS_ENABLED", "true"},
         {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"},
-        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"},
+        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,a.b_c:a:b,partition:5"},
         {"DD_TRACE_RATE_LIMIT", "200"},
         {"DD_TRACE_SAMPLE_RATE", "0.7"}},
        TracerOptions{
@@ -101,6 +101,7 @@ TEST_CASE("tracer options from environment variables") {
                {"host", "my-host-name"},
                {"region", "us-east-1"},
                {"datacenter", "us"},
+               {"a.b_c", "a:b"},
                {"partition", "5"},
            },                                 // tags
            "test-version v0.0.1",             // version
