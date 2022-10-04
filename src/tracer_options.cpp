@@ -68,7 +68,7 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
       keyfound = false;
       continue;
     }
-    if (ch == itemsep) {
+    if (ch == itemsep && !keyfound) {
       keyfound = true;
       continue;
     }

@@ -21,6 +21,15 @@ std::ostream &operator<<(std::ostream &stream,
 }  // namespace opentracing
 }  // namespace datadog
 
+namespace std {
+
+std::ostream &operator<<(std::ostream &stream,
+                         const std::pair<const std::string, std::string> &key_value) {
+  return stream << key_value.first << " → " << key_value.second;
+}
+
+}  // namespace std
+
 void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, std::string> &lhs,
                                       const ot::expected<TracerOptions, std::string> &rhs) {
   // One is an error, the other not.
@@ -78,7 +87,7 @@ TEST_CASE("tracer options from environment variables") {
         {"DD_TRACE_REPORT_HOSTNAME", "true"},
         {"DD_TRACE_ANALYTICS_ENABLED", "true"},
         {"DD_TRACE_ANALYTICS_SAMPLE_RATE", "0.5"},
-        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,partition:5"},
+        {"DD_TAGS", "host:my-host-name,region:us-east-1,datacenter:us,a.b_c:a:b,partition:5"},
         {"DD_TRACE_RATE_LIMIT", "200"},
         {"DD_TRACE_SAMPLE_RATE", "0.7"}},
        TracerOptions{
@@ -101,6 +110,7 @@ TEST_CASE("tracer options from environment variables") {
                {"host", "my-host-name"},
                {"region", "us-east-1"},
                {"datacenter", "us"},
+               {"a.b_c", "a:b"},
                {"partition", "5"},
            },                                 // tags
            "test-version v0.0.1",             // version
