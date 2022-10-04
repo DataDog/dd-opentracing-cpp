@@ -69,8 +69,10 @@ std::map<std::string, std::string> keyvalues(std::string text, char itemsep, cha
       continue;
     }
     if (ch == itemsep) {
-      keyfound = true;
-      continue;
+      if (!keyfound) {
+        keyfound = true;
+        continue;
+      }
     }
     assignchar(ch);
   }
