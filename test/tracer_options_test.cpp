@@ -21,6 +21,15 @@ std::ostream &operator<<(std::ostream &stream,
 }  // namespace opentracing
 }  // namespace datadog
 
+namespace std {
+
+std::ostream &operator<<(std::ostream &stream,
+                         const std::pair<const std::string, std::string> &key_value) {
+  return stream << key_value.first << " → " << key_value.second;
+}
+
+}  // namespace std
+
 void requireTracerOptionsResultsMatch(const ot::expected<TracerOptions, std::string> &lhs,
                                       const ot::expected<TracerOptions, std::string> &rhs) {
   // One is an error, the other not.
