@@ -302,7 +302,7 @@ TEST_CASE("span") {
 
     struct ErrorTagTestCase {
       ot::Value value;
-      uint32_t span_error;
+      int32_t span_error;
       std::string span_tag;
     };
 
