@@ -61,7 +61,8 @@ void SpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
   }
 }
 
-void SpanBuffer::unbufferAndWriteTrace(std::unordered_map<uint64_t, PendingTrace>::iterator trace_iter) {
+void SpanBuffer::unbufferAndWriteTrace(
+    std::unordered_map<uint64_t, PendingTrace>::iterator trace_iter) {
   // `mutex_` must already be locked, and `trace_iter` must not be
   // `traces_.end()`.
   auto& trace = trace_iter->second;

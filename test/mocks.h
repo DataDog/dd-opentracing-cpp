@@ -231,7 +231,7 @@ struct MockBuffer : public SpanBuffer {
                    SpanBufferOptions{true, "localhost", std::nan(""), service, tags_header_size}) {
   }
 
-  void unbufferAndWriteTrace(std::unordered_map<uint64_t, PendingTrace>::iterator) override {
+  void unbufferAndWriteTrace(std::unordered_map<uint64_t, PendingTrace>::iterator) override{
       // Haha NOPE.
       // Leave the trace inside the traces map instead of deleting it.
   };
