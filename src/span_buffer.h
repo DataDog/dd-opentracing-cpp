@@ -126,7 +126,7 @@ class SpanBuffer {
  protected:
   // Exists to make it easy for a subclass (ie, our testing mock) to override on-trace-finish
   // behaviour.
-  virtual void unbufferAndWriteTrace(uint64_t trace_id);
+  virtual void unbufferAndWriteTrace(std::unordered_map<uint64_t, PendingTrace>::iterator trace_iter);
 
   std::unordered_map<uint64_t, PendingTrace> traces_;
   SpanBufferOptions options_;
