@@ -14,5 +14,6 @@ services:
       - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
     environment:
       - 'DD_APM_ENABLED=true'
+      - 'DD_LOG_LEVEL=error'
       - DD_API_KEY
     image: 'datadog/agent'

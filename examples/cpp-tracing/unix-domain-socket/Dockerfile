@@ -1,6 +1,6 @@
 from ubuntu:20.04
 
-run apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install build-essential cmake wget
+run apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install build-essential cmake wget coreutils
 
 # Download and install the latest release of the Datadog C++ tracer library.
 copy bin/install-latest-dd-opentracing-cpp .

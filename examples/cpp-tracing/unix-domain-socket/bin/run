@@ -1,5 +1,14 @@
 #!/bin/sh
 
+if [ -z "$DD_API_KEY" ]; then
+  >&2 echo "Please set environment variable DD_API_KEY"
+  exit 1
+fi
+
 testdir=$(dirname "$(dirname "$(realpath "$0")")")
 
-docker-compose --file "$testdir/docker-compose.yaml" up --build --remove-orphans
+docker-compose --file "$testdir/docker-compose.yaml" up \
+  --build \
+  --remove-orphans \
+  --abort-on-container-exit \
+  --exit-code-from dd-opentracing-cpp-example-unix-domain-socket

@@ -1,7 +1,7 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 RUN apt-get update && \
-  apt-get -y install build-essential cmake wget
+  DEBIAN_FRONTEND=noninteractive apt-get -y install build-essential cmake wget coreutils
 
 # Download and install OpenTracing-cpp
 RUN get_latest_release() { \
@@ -14,7 +14,7 @@ RUN get_latest_release() { \
   tar zxvf opentracing-cpp.tar.gz -C ./opentracing-cpp/ --strip-components=1 && \
   cd opentracing-cpp/.build && \
   cmake .. && \
-  make && \
+  make -j "$(nproc)" && \
   make install && \
   # Install dd-opentracing-cpp shared plugin.
   wget https://github.com/DataDog/dd-opentracing-cpp/releases/download/${DD_OPENTRACING_CPP_VERSION}/linux-amd64-libdd_opentracing_plugin.so.gz && \
@@ -23,7 +23,7 @@ RUN get_latest_release() { \
 
 COPY tracer_example.cpp .
 
-RUN g++ -std=c++11 -o tracer_example tracer_example.cpp -lopentracing
+RUN g++ -std=c++14 -o tracer_example tracer_example.cpp -lopentracing
 # Add /usr/local/lib to LD_LIBRARY_PATH
 RUN ldconfig
 

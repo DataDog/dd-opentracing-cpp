@@ -1,7 +1,7 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 RUN apt-get update && \
-  apt-get -y install build-essential cmake wget
+  DEBIAN_FRONTEND=noninteractive apt-get -y install build-essential cmake wget coreutils
 
 # Download and install dd-opentracing-cpp library.
 RUN get_latest_release() { \
@@ -15,7 +15,7 @@ RUN get_latest_release() { \
   # Download and install the correct version of opentracing-cpp, & other deps.
   ../scripts/install_dependencies.sh && \
   cmake .. && \
-  make && \
+  make -j "$(nproc)" && \
   make install
 
 COPY tracer_example.cpp .
