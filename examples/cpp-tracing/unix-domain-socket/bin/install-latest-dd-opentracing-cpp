@@ -17,5 +17,5 @@ cd dd-opentracing-cpp/.build
 # Download and install the correct version of opentracing-cpp, & other deps.
 ../scripts/install_dependencies.sh
 cmake ..
-make
+make -j "$(nproc)"
 make install

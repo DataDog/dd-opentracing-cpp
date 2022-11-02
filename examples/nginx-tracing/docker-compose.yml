@@ -24,6 +24,7 @@ services:
     environment:
       - DD_API_KEY
       - DD_APM_ENABLED=true
+      - DD_LOG_LEVEL=error
       - DD_LOGS_ENABLED=true
       - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
       - DD_AC_EXCLUDE=name:datadog-agent
