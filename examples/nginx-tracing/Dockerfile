@@ -6,7 +6,7 @@ RUN apt-get update && \
 
 # Install nginx-opentracing
 RUN get_latest_release() { \
-  wget -qO- "https://api.github.com/repos/$1/releases/latest" | jq .'tag_name' | sed -E 's/.*"([^"]+)".*/\1/'; \
+  wget -qO- "https://api.github.com/repos/$1/releases/latest" | jq -r .'tag_name'; \
   } && \
   NGINX_VERSION=`nginx -v 2>&1 > /dev/null | sed -E "s/^.*nginx\/(.*)/\\1/"`&& \
   OPENTRACING_NGINX_VERSION="$(get_latest_release opentracing-contrib/nginx-opentracing)" && \
