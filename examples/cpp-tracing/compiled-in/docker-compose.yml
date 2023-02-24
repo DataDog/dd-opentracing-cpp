@@ -5,13 +5,9 @@ services:
       context: ./
     depends_on:
       - dd-agent
+    stdin_open: true
+    tty: true
   dd-agent:
-    container_name: dd-agent
-    volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
-      - '/proc/:/host/proc/:ro'
-      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
-    environment:
-      - 'DD_APM_ENABLED=true'
-      - DD_API_KEY
-    image: 'datadog/agent'
+    build:
+      context: ./
+      dockerfile: agent.dockerfile
