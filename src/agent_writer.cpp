@@ -156,11 +156,29 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
             payload = trace_encoder_->payload();
             trace_encoder_->clearTraces();
           }  // lock on mutex_ ends.
-          // Send spans, not in critical period.
+          // Send the spans. Note that this is not in the critical section above.
           bool success = retryFiniteOnFail(
               [&]() { return AgentWriter::postTraces(handle, headers, payload, logger_); });
+          // Sending could fail. If it succeeds, then the HTTP response status
+          // could indicate an error or a successful response.
           if (success) {
-            trace_encoder_->handleResponse(handle->getResponse());
+            int response_status;
+            const CURLcode rc = handle->getResponseStatus(response_status);
+            if (rc == CURLE_OK) {
+              if (response_status < 200 || response_status >= 300) {
+                const std::string body = handle->getResponse();
+                std::ostringstream diagnostic;
+                diagnostic << "Datadog Agent returned response with non-success HTTP status "
+                           << response_status << " and the following body of length "
+                           << body.size() << ": " << body;
+                logger_->Log(LogLevel::error, diagnostic.str());
+              } else {
+                // success
+                trace_encoder_->handleResponse(handle->getResponse());
+              }
+            }
+            // if `success == false`, then `postTraces` will have already logged
+            // an error.
           }
           // Let thread calling 'flush' know that we're done flushing.
           {

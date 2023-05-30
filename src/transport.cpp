@@ -97,6 +97,14 @@ CURLcode CurlHandle::perform() {
 
 std::string CurlHandle::getError() { return std::string(curl_error_buffer_); }
 std::string CurlHandle::getResponse() { return response_buffer_.str(); }
+CURLcode CurlHandle::getResponseStatus(int& status) {
+  long raw;
+  CURLcode result = curl_easy_getinfo(handle_, CURLINFO_RESPONSE_CODE, &raw);
+  if (result == CURLE_OK) {
+    status = static_cast<int>(raw);
+  }
+  return result;
+}
 
 }  // namespace opentracing
 }  // namespace datadog

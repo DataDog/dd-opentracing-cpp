@@ -24,6 +24,7 @@ class Handle {
   virtual CURLcode perform() = 0;
   virtual std::string getError() = 0;
   virtual std::string getResponse() = 0;
+  virtual CURLcode getResponseStatus(int& status) = 0;
 };
 
 // A Handle that uses real curl to really send things. Not thread-safe.
@@ -39,6 +40,7 @@ class CurlHandle : public Handle {
   CURLcode perform() override;
   std::string getError() override;
   std::string getResponse() override;
+  CURLcode getResponseStatus(int& status) override;
 
  private:
   // For things that need cleaning up if the constructor fails as well as on destruction.
