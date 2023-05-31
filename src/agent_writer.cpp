@@ -162,20 +162,24 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
           // Sending could fail. If it succeeds, then the HTTP response status
           // could indicate an error or success.
           if (success) {
-            int response_status;
-            const CURLcode rc = handle->getResponseStatus(response_status);
-            if (rc == CURLE_OK) {
-              if (response_status < 200 || response_status >= 300) {
-                const std::string body = handle->getResponse();
-                std::ostringstream diagnostic;
-                diagnostic << "Datadog Agent returned response with non-success HTTP status "
-                           << response_status << " and the following body of length "
-                           << body.size() << ": " << body;
-                logger_->Log(LogLevel::error, diagnostic.str());
-              } else {
-                // success
-                trace_encoder_->handleResponse(handle->getResponse());
-              }
+            const int response_status = handle->getResponseStatus();
+            if (response_status == 0) {
+              const std::string body = handle->getResponse();
+              std::ostringstream diagnostic;
+              diagnostic << "Datadog Agent returned response without an HTTP status and with the "
+                            "following body of length "
+                         << body.size() << ": " << body;
+              logger_->Log(LogLevel::error, diagnostic.str());
+            } else if (response_status < 200 || response_status >= 300) {
+              const std::string body = handle->getResponse();
+              std::ostringstream diagnostic;
+              diagnostic << "Datadog Agent returned response with non-success HTTP status "
+                         << response_status << " and the following body of length " << body.size()
+                         << ": " << body;
+              logger_->Log(LogLevel::error, diagnostic.str());
+            } else {
+              // success
+              trace_encoder_->handleResponse(handle->getResponse());
             }
           }
           // If `success == false`, then `postTraces` will have already logged

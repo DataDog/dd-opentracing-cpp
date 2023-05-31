@@ -196,14 +196,14 @@ TEST_CASE("writer") {
 
   SECTION("bad handle causes constructor to fail") {
     std::unique_ptr<MockHandle> handle_ptr{new MockHandle{}};
-    handle_ptr->setopt_rcode = CURLE_OPERATION_TIMEDOUT;
+    handle_ptr->rcode = CURLE_OPERATION_TIMEDOUT;
     REQUIRE_THROWS(AgentWriter{std::move(handle_ptr), only_send_traces_when_we_flush,
                                max_queued_traces, disable_retry, "hostname", 6319, "",
                                std::make_shared<RulesSampler>(), std::make_shared<MockLogger>()});
   }
 
   SECTION("handle failure during post") {
-    handle->setopt_rcode = CURLE_OPERATION_TIMEDOUT;
+    handle->rcode = CURLE_OPERATION_TIMEDOUT;
     writer.write(make_trace(
         {TestSpanData{"web", "service", "service.name", "resource", 1, 1, 0, 69, 420, 0}}));
     // Redirect stderr so the test logs don't look like a failure.
@@ -211,7 +211,7 @@ TEST_CASE("writer") {
     REQUIRE(logger->records.back().message ==
             "Error setting agent request size: Timeout was reached");
     // Dropped all spans.
-    handle->setopt_rcode = CURLE_OK;
+    handle->rcode = CURLE_OK;
     REQUIRE(handle->getTraces()->size() == 0);
   }
 

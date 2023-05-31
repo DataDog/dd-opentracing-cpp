@@ -275,7 +275,7 @@ struct MockHandle : public Handle {
 
   CURLcode setopt(CURLoption key, const char* value) override {
     std::unique_lock<std::mutex> lock(mutex);
-    if (setopt_rcode == CURLE_OK) {
+    if (rcode == CURLE_OK) {
       // We might have null characters if it's the POST data, thanks msgpack!
       if (key == CURLOPT_POSTFIELDS && options.find(CURLOPT_POSTFIELDSIZE) != options.end()) {
         long len = std::stol(options.find(CURLOPT_POSTFIELDSIZE)->second);
@@ -284,23 +284,23 @@ struct MockHandle : public Handle {
         options[key] = std::string(value);
       }
     }
-    return setopt_rcode;
+    return rcode;
   }
 
   CURLcode setopt(CURLoption key, long value) override {
     std::unique_lock<std::mutex> lock(mutex);
-    if (setopt_rcode == CURLE_OK) {
+    if (rcode == CURLE_OK) {
       options[key] = std::to_string(value);
     }
-    return setopt_rcode;
+    return rcode;
   }
 
   CURLcode setopt(CURLoption key, size_t value) override {
     std::unique_lock<std::mutex> lock(mutex);
-    if (setopt_rcode == CURLE_OK) {
+    if (rcode == CURLE_OK) {
       options[key] = std::to_string(value);
     }
-    return setopt_rcode;
+    return rcode;
   }
 
   void setHeaders(std::map<std::string, std::string> headers_) override {
@@ -331,12 +331,9 @@ struct MockHandle : public Handle {
     return response;
   }
 
-  CURLcode getResponseStatus(int& status) override {
+  int getResponseStatus() override {
     std::unique_lock<std::mutex> lock(mutex);
-    if (get_response_status_rcode == CURLE_OK) {
-      status = response_status;
-    }
-    return get_response_status_rcode;
+    return response_status;
   }
 
   // Note, this returns any traces that have been added to the request - NOT traces that have been
@@ -360,8 +357,7 @@ struct MockHandle : public Handle {
   std::string error = "";
   std::string response = "";
   int response_status = 200;
-  CURLcode setopt_rcode = CURLE_OK;
-  CURLcode get_response_status_rcode = CURLE_OK;
+  CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
   // Each time an perform is called, the next perform_result is used to determine if it
   // succeeds or fails. Loops. Default is for all operations to succeed.
