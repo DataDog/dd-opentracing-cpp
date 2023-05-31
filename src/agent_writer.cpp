@@ -160,7 +160,7 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
           bool success = retryFiniteOnFail(
               [&]() { return AgentWriter::postTraces(handle, headers, payload, logger_); });
           // Sending could fail. If it succeeds, then the HTTP response status
-          // could indicate an error or a successful response.
+          // could indicate an error or success.
           if (success) {
             int response_status;
             const CURLcode rc = handle->getResponseStatus(response_status);
