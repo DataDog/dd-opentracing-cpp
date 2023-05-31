@@ -184,6 +184,38 @@ TEST_CASE("writer") {
     REQUIRE(sampler->config == "");
   }
 
+  SECTION("handle error responses") {
+    using Catch::Matchers::Contains;
+
+    // HTTP status zero indicates "no status."
+    handle->response_status = 0;
+    writer.write(make_trace(
+        {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
+
+    writer.flush(std::chrono::seconds(10));
+    REQUIRE(logger->records.size() != 0);
+    // The logged error diagnostic will say that there was not response status.
+    REQUIRE_THAT(logger->records.back().message, Contains("response without an HTTP status"));
+
+    // HTTP statuses outside of [200, 300) indicate an error.
+    std::vector<int> statuses;
+    for (int i = 100; i < 200; ++i) {
+      statuses.push_back(i);
+    }
+    for (int i = 300; i < 600; ++i) {
+      statuses.push_back(i);
+    }
+    auto status = GENERATE_COPY(from_range(statuses));
+    handle->response_status = status;
+    writer.write(make_trace(
+        {TestSpanData{"web", "service", "resource", "service.name", 1, 1, 0, 69, 420, 0}}));
+
+    writer.flush(std::chrono::seconds(10));
+    REQUIRE(logger->records.size() != 0);
+    // The logged error diagnostic will contain the response status.
+    REQUIRE_THAT(logger->records.back().message, Contains(" " + std::to_string(status) + " "));
+  }
+
   SECTION("queue does not grow indefinitely") {
     for (uint64_t i = 0; i < 30; i++) {  // Only 25 actually get written.
       writer.write(make_trace(
