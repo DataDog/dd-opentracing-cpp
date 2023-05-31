@@ -177,9 +177,10 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
                 trace_encoder_->handleResponse(handle->getResponse());
               }
             }
-            // if `success == false`, then `postTraces` will have already logged
-            // an error.
           }
+          // If `success == false`, then `postTraces` will have already logged
+          // an error.
+
           // Let thread calling 'flush' know that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);
