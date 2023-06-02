@@ -97,6 +97,14 @@ CURLcode CurlHandle::perform() {
 
 std::string CurlHandle::getError() { return std::string(curl_error_buffer_); }
 std::string CurlHandle::getResponse() { return response_buffer_.str(); }
+int CurlHandle::getResponseStatus() {
+  long raw = 0;
+  // As of November 2003 (libcurl version 7.10.8), fetching the response code
+  // will not return an error.
+  // If there is no response code to return, then zero will be set.
+  (void)curl_easy_getinfo(handle_, CURLINFO_RESPONSE_CODE, &raw);
+  return static_cast<int>(raw);
+}
 
 }  // namespace opentracing
 }  // namespace datadog

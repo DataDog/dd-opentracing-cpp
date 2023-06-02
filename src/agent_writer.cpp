@@ -156,12 +156,39 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
             payload = trace_encoder_->payload();
             trace_encoder_->clearTraces();
           }  // lock on mutex_ ends.
-          // Send spans, not in critical period.
+          // Send the spans. Note that this is not in the critical section above.
           bool success = retryFiniteOnFail(
               [&]() { return AgentWriter::postTraces(handle, headers, payload, logger_); });
+          // Sending could fail. If it succeeds, then the HTTP response status
+          // could indicate an error or success. Also, an empty response body
+          // indicates an error even when the status is 200.
           if (success) {
-            trace_encoder_->handleResponse(handle->getResponse());
+            const int response_status = handle->getResponseStatus();
+            const std::string body = handle->getResponse();
+            if (response_status == 0) {
+              std::ostringstream diagnostic;
+              diagnostic << "Datadog Agent returned response without an HTTP status and with the "
+                            "following body of length "
+                         << body.size() << ": " << body;
+              logger_->Log(LogLevel::error, diagnostic.str());
+            } else if (response_status != 200) {
+              std::ostringstream diagnostic;
+              diagnostic << "Datadog Agent returned response with unexpected HTTP status "
+                         << response_status << " and the following body of length " << body.size()
+                         << ": " << body;
+              logger_->Log(LogLevel::error, diagnostic.str());
+            } else if (body.empty()) {
+              logger_->Log(LogLevel::error,
+                           "Datadog Agent returned response without a body. This tracer might be "
+                           "sending batches of traces too frequently.");
+            } else {
+              // success
+              trace_encoder_->handleResponse(handle->getResponse());
+            }
           }
+          // If `success == false`, then `postTraces` will have already logged
+          // an error.
+
           // Let thread calling 'flush' know that we're done flushing.
           {
             std::unique_lock<std::mutex> lock(mutex_);

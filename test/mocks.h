@@ -331,6 +331,11 @@ struct MockHandle : public Handle {
     return response;
   }
 
+  int getResponseStatus() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    return response_status;
+  }
+
   // Note, this returns any traces that have been added to the request - NOT traces that have been
   // successfully posted.
   std::unique_ptr<std::vector<std::vector<TestSpanData>>> getTraces() {
@@ -351,6 +356,7 @@ struct MockHandle : public Handle {
   std::map<std::string, std::string> headers;
   std::string error = "";
   std::string response = "";
+  int response_status = 200;
   CURLcode rcode = CURLE_OK;
   std::atomic<bool>* is_destructed = nullptr;
   // Each time an perform is called, the next perform_result is used to determine if it

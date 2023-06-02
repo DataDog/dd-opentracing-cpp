@@ -5,7 +5,7 @@ set -e
 
 usage() {
     argv0="$0"
-    
+
     cat <<END_USAGE
 format.sh - format Datadog C++ source code
 
