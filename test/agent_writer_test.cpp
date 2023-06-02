@@ -194,15 +194,15 @@ TEST_CASE("writer") {
 
     writer.flush(std::chrono::seconds(10));
     REQUIRE(logger->records.size() != 0);
-    // The logged error diagnostic will say that there was not response status.
+    // The logged error diagnostic will say that there was no response status.
     REQUIRE_THAT(logger->records.back().message, Contains("response without an HTTP status"));
 
-    // HTTP statuses outside of [200, 300) indicate an error.
+    // HTTP statuses other than 200 are unexpected.
     std::vector<int> statuses;
     for (int i = 100; i < 200; ++i) {
       statuses.push_back(i);
     }
-    for (int i = 300; i < 600; ++i) {
+    for (int i = 201; i < 600; ++i) {
       statuses.push_back(i);
     }
     auto status = GENERATE_COPY(from_range(statuses));

@@ -170,10 +170,10 @@ void AgentWriter::startWriting(std::unique_ptr<Handle> handle) {
                             "following body of length "
                          << body.size() << ": " << body;
               logger_->Log(LogLevel::error, diagnostic.str());
-            } else if (response_status < 200 || response_status >= 300) {
+            } else if (response_status != 200) {
               const std::string body = handle->getResponse();
               std::ostringstream diagnostic;
-              diagnostic << "Datadog Agent returned response with non-success HTTP status "
+              diagnostic << "Datadog Agent returned response with unexpected HTTP status "
                          << response_status << " and the following body of length " << body.size()
                          << ": " << body;
               logger_->Log(LogLevel::error, diagnostic.str());
