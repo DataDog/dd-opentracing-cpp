@@ -33,6 +33,6 @@ for i in "${versions[@]}"; do
 	curl -w "\n" "http://$IP/" "http://$IP/healthcheck"
 done
 sleep 1
-echo "check for traces at https://app.datadoghq.com/apm/livetail or https://app.datadoghq.com/apm/traces"
+echo "check for traces at https://app.datadoghq.com/apm/traces"
 sleep 5
 docker-compose kill
