@@ -17,5 +17,3 @@ services:
       - 'DD_LOG_LEVEL=error'
       - DD_API_KEY
     image: 'datadog/agent'
-    ports:
-        - "127.0.0.1:8126:8126"

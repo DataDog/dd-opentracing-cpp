@@ -24,4 +24,5 @@ RUN g++ -std=c++14 -o tracer_example tracer_example.cpp -I/dd-opentracing-cpp/de
 # Add /usr/local/lib to LD_LIBRARY_PATH
 RUN ldconfig
 
+USER nobody
 CMD sleep 5 && ./tracer_example && sleep 25
