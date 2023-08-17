@@ -8,7 +8,7 @@ fi
 
 OPENTRACING_VERSION=${OPENTRACING_VERSION:-1.6.0}
 CURL_VERSION=${CURL_VERSION:-7.70.0}
-MSGPACK_VERSION=${MSGPACK_VERSION:-3.2.1}
+MSGPACK_VERSION=${MSGPACK_VERSION:-6.1.0}
 
 MAKE_JOB_COUNT=${MAKE_JOB_COUNT:-$(nproc)}
 
@@ -68,7 +68,7 @@ if [ "$BUILD_MSGPACK" -eq "1" ]; then
   tar zxf msgpack.tar.gz
   mkdir -p "msgpack-${MSGPACK_VERSION}/.build"
   cd "msgpack-${MSGPACK_VERSION}/.build"
-  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF -DMSGPACK_CXX11=ON ..
+  cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF -DMSGPACK_CXX14=ON ..
   make --jobs="$MAKE_JOB_COUNT"
   make install
   cd ../..
