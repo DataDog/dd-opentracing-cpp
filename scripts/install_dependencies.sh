@@ -64,15 +64,15 @@ fi
 
 # Msgpack
 if [ "$BUILD_MSGPACK" -eq "1" ]; then
-  wget "https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-${MSGPACK_VERSION}.tar.gz" -O msgpack.tar.gz
+  wget "https://github.com/msgpack/msgpack-c/releases/download/cpp-${MSGPACK_VERSION}/msgpack-cxx-${MSGPACK_VERSION}.tar.gz" -O msgpack.tar.gz
   tar zxf msgpack.tar.gz
-  mkdir -p "msgpack-${MSGPACK_VERSION}/.build"
-  cd "msgpack-${MSGPACK_VERSION}/.build"
+  mkdir -p "msgpack-cxx-${MSGPACK_VERSION}/.build"
+  cd "msgpack-cxx-${MSGPACK_VERSION}/.build"
   cmake -DCMAKE_INSTALL_PREFIX="$install_dir" -DBUILD_SHARED_LIBS=OFF -DMSGPACK_CXX14=ON ..
   make --jobs="$MAKE_JOB_COUNT"
   make install
   cd ../..
-  rm -r "msgpack-${MSGPACK_VERSION}/"
+  rm -r "msgpack-cxx-${MSGPACK_VERSION}/"
   rm msgpack.tar.gz
 fi
 
