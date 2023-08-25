@@ -3,6 +3,7 @@
 
 # Build folder
 .build/
+build/
 
 # Locally installed dependencies
 deps/
