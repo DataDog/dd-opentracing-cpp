@@ -64,7 +64,7 @@ CPMAddPackage(
 find_package(Threads REQUIRED)
 
 # Code Sanitizers
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/3rd_party/sanitizers-cmake" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/sanitizers-cmake" ${CMAKE_MODULE_PATH})
 find_package(Sanitizers)
 
 # Code
