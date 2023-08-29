@@ -16,7 +16,7 @@
 #define DD_OPENTRACING_API
 #endif  // _MSC_VER
 
-#include <opentelemetry/opentracingshim/tracer_shim.h>
+#include <opentracing/tracer.h>
 
 #include <cmath>
 #include <iostream>
