@@ -10,9 +10,16 @@ CPMAddPackage(
   GITHUB_REPOSITORY maztheman/opentelemetry-cpp
   GIT_TAG main
   OPTIONS
-  "WITH_STL ON" "WITH_OPENTRACING ON" "BUILD_TESTING OFF" "BUILD_STATIC_LIBS ON"
+  "WITH_STL OFF" "WITH_OPENTRACING ON" "BUILD_TESTING OFF" "BUILD_STATIC_LIBS ON"
 )
-CPMAddPackage("gh:curl/curl#curl-8_2_1")
+CPMAddPackage(
+  NAME curl
+  GITHUB_REPOSITORY curl/curl
+  GIT_TAG curl-8_2_1
+  OPTIONS 
+  "HTTP_ONLY ON" "CURL_ENABLE_SSL OFF"
+
+)
 CPMAddPackage(
   NAME msgpack-c 
   GITHUB_REPOSITORY msgpack/msgpack-c
