@@ -62,7 +62,7 @@ if(BUILD_COVERAGE)
 endif()
 set(DATADOG_LINK_LIBRARIES  
     msgpack-cxx
-    libcurl Threads::Threads nlohmann_json::nlohmann_json Catch2::Catch2WithMain CLI11::CLI11 ${COVERAGE_LIBRARIES} datadog_project_options opentelemetry_api)
+    libcurl Threads::Threads nlohmann_json::nlohmann_json CLI11::CLI11 ${COVERAGE_LIBRARIES} datadog_project_options opentelemetry_api)
 
 ## Shared lib
 if(BUILD_SHARED)

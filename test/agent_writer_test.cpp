@@ -1,8 +1,10 @@
 #include "../src/agent_writer.h"
 
+#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <datadog/version.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <ctime>
 
 #include "mocks.h"
@@ -185,7 +187,7 @@ TEST_CASE("writer") {
   }
 
   SECTION("handle error responses") {
-    using Catch::Matchers::Contains;
+    using Catch::Matchers::ContainsSubstring;
 
     // HTTP status zero indicates "no status."
     handle->response_status = 0;
@@ -195,7 +197,8 @@ TEST_CASE("writer") {
     writer.flush(std::chrono::seconds(10));
     REQUIRE(logger->records.size() != 0);
     // The logged error diagnostic will say that there was no response status.
-    REQUIRE_THAT(logger->records.back().message, Contains("response without an HTTP status"));
+    REQUIRE_THAT(logger->records.back().message,
+                 ContainsSubstring("response without an HTTP status"));
 
     // HTTP status 200 with an empty body means that the response really should
     // be 429 "too many requests," but the Agent is not configured to return
@@ -207,7 +210,7 @@ TEST_CASE("writer") {
     writer.flush(std::chrono::seconds(10));
     REQUIRE(logger->records.size() != 0);
     // The logged error diagnostic will mention the lack of response.
-    REQUIRE_THAT(logger->records.back().message, Contains("response without a body"));
+    REQUIRE_THAT(logger->records.back().message, ContainsSubstring("response without a body"));
 
     // HTTP statuses other than 200 are unexpected.
     std::vector<int> statuses;
@@ -225,7 +228,8 @@ TEST_CASE("writer") {
     writer.flush(std::chrono::seconds(10));
     REQUIRE(logger->records.size() != 0);
     // The logged error diagnostic will contain the response status.
-    REQUIRE_THAT(logger->records.back().message, Contains(" " + std::to_string(status) + " "));
+    REQUIRE_THAT(logger->records.back().message,
+                 ContainsSubstring(" " + std::to_string(status) + " "));
   }
 
   SECTION("queue does not grow indefinitely") {

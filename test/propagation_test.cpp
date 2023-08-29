@@ -1,9 +1,11 @@
+#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 #include <opentracing/tracer.h>
 
 #include <cassert>
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
 
