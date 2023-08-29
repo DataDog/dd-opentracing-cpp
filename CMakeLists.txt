@@ -97,7 +97,8 @@ endif()
 if(BUILD_OBJECT)
   add_library(dd_opentracing-object OBJECT ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-object)
-  target_link_libraries(dd_opentracing-object ${CURL_LIBRARIES} Threads::Threads)
+  target_link_libraries(dd_opentracing-object opentelemetry_opentracing_shim ${DATADOG_LINK_LIBRARIES} ${CURL_LIBRARIES} Threads::Threads)
+  target_include_directories(dd_opentracing-object PUBLIC include)
   set_property(TARGET dd_opentracing-object PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_compile_definitions(dd_opentracing-object PUBLIC DD_OPENTRACING_OBJECT)
 endif()
@@ -114,10 +115,11 @@ if(BUILD_PLUGIN)
   if(BUILD_COVERAGE)
     target_link_options(dd_opentracing_plugin PRIVATE -fprofile-arcs -ftest-coverage)
   endif()
-  target_link_libraries(dd_opentracing_plugin PUBLIC ${DATADOG_LINK_LIBRARIES}
+  target_link_libraries(dd_opentracing_plugin PUBLIC opentelemetry_opentracing_shim ${DATADOG_LINK_LIBRARIES}
                         -static-libstdc++
                         -static-libgcc
                         -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/export.map)
+  target_include_directories(dd_opentracing_plugin PUBLIC include)
   install(TARGETS dd_opentracing_plugin
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
