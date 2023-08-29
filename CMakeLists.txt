@@ -11,7 +11,7 @@ set(SOVERSION 0)
 include(GNUInstallDirs)
 
 option(BUILD_SHARED "Builds shared library" ON)
-option(BUILD_STATIC "Builds static library" ON)
+option(BUILD_STATIC "Builds static library" OFF)
 option(BUILD_OBJECT "Builds objects for use in another project" OFF)
 option(BUILD_PLUGIN "Builds plugin (requires gcc and not macos)" OFF)
 option(BUILD_TESTING "Builds tests, also enables BUILD_SHARED" OFF)
@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 14)
 
 include(Dependencies.cmake)
 add_external_dependencies()
