@@ -17,7 +17,7 @@ CPMAddPackage(
   NAME msgpack-c 
   GITHUB_REPOSITORY msgpack/msgpack-c
   GIT_TAG cpp-6.1.0
-  OPTIONS "MSGPACK_CXX20 ON" "MSGPACK_USE_BOOST OFF"
+  OPTIONS "MSGPACK_CXX14 ON" "MSGPACK_USE_BOOST OFF"
 )
 CPMAddPackage(
   NAME nlohmann_json
