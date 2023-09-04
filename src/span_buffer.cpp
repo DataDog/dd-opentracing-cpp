@@ -53,20 +53,18 @@ void SpanBuffer::finishSpan(std::unique_ptr<SpanData> span) {
     logger_->Log(LogLevel::error, "A Span that was not registered was submitted to SpanBuffer");
     return;
   }
-  uint64_t trace_id = span->traceId();
   trace.finished_spans->push_back(std::move(span));
   if (trace.finished_spans->size() == trace.all_spans.size()) {
     generateSamplingPriorityImpl(trace.finished_spans->back().get());
     trace.finish(span_sampler_.get());
-    unbufferAndWriteTrace(trace_id);
+    unbufferAndWriteTrace(trace_iter);
   }
 }
 
-void SpanBuffer::unbufferAndWriteTrace(uint64_t trace_id) {
-  auto trace_iter = traces_.find(trace_id);
-  if (trace_iter == traces_.end()) {
-    return;
-  }
+void SpanBuffer::unbufferAndWriteTrace(
+    std::unordered_map<uint64_t, PendingTrace>::iterator trace_iter) {
+  // `mutex_` must already be locked, and `trace_iter` must not be
+  // `traces_.end()`.
   auto& trace = trace_iter->second;
   if (options_.enabled) {
     writer_->write(std::move(trace.finished_spans));
