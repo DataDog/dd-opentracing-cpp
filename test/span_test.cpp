@@ -1,9 +1,11 @@
 #include "../src/span.h"
 
+#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <datadog/tags.h>
 #include <opentracing/ext/tags.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <ostream>

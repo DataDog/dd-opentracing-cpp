@@ -1,8 +1,10 @@
 #include "../src/tracer_options.h"
 
+#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <opentracing/ext/tags.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <ostream>
 using namespace datadog::opentracing;
 using namespace std::string_literals;

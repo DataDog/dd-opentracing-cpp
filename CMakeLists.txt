@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-project(dd-opentracing-cpp)
+project(dd-opentracing-cpp CXX C)
 
 set(SOVERSION 0)
 
@@ -25,37 +25,33 @@ endif()
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
+
 set(CMAKE_CXX_STANDARD 14)
 
-# Includes
-include_directories(SYSTEM 3rd_party/include deps/include)
-include_directories(include)
-
-# Libraries
-set(CMAKE_LIBRARY_PATH deps/lib)
+include(Dependencies.cmake)
+add_external_dependencies()
 
 # Dependencies
-find_path(OPENTRACING_INCLUDE_DIR NAMES opentracing/tracer.h)
-find_library(OPENTRACING_LIB opentracing)
-find_library(MSGPACK_LIB msgpack)
-find_package(CURL)
 find_package(Threads REQUIRED)
 
 # Code Sanitizers
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/3rd_party/sanitizers-cmake" ${CMAKE_MODULE_PATH})
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/sanitizers-cmake")
 find_package(Sanitizers)
 
 # Code
 install(DIRECTORY include/datadog DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 file(GLOB DD_OPENTRACING_SOURCES "src/*.cpp")
 message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+
+add_library(datadog_project_options INTERFACE)
+
 if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-  add_compile_options(-Wall -Wextra -Werror -pedantic -Wnon-virtual-dtor -Woverloaded-virtual -Wold-style-cast -std=c++14)
+  target_compile_options(datadog_project_options INTERFACE -Wall -Wextra -pedantic)
   if(BUILD_COVERAGE)
-      add_compile_options(-g -O0 -fprofile-arcs -ftest-coverage)
+      target_compile_options(datadog_project_options INTERFACE -g -O0 -fprofile-arcs -ftest-coverage)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-  add_compile_options(/W3)
+  target_compile_options(datadog_project_options INTERFACE /W3)
 else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
@@ -64,7 +60,9 @@ endif()
 if(BUILD_COVERAGE)
   set(COVERAGE_LIBRARIES gcov)
 endif()
-set(DATADOG_LINK_LIBRARIES ${OPENTRACING_LIB} ${CURL_LIBRARIES} Threads::Threads ${COVERAGE_LIBRARIES})
+set(DATADOG_LINK_LIBRARIES  
+    msgpack-cxx
+    libcurl Threads::Threads nlohmann_json::nlohmann_json CLI11::CLI11 ${COVERAGE_LIBRARIES} datadog_project_options opentelemetry_api)
 
 ## Shared lib
 if(BUILD_SHARED)
@@ -73,8 +71,9 @@ if(BUILD_SHARED)
   if(BUILD_COVERAGE)
     target_link_options(dd_opentracing PRIVATE -fprofile-arcs -ftest-coverage)
   endif()
-  target_link_libraries(dd_opentracing ${DATADOG_LINK_LIBRARIES})
+  target_link_libraries(dd_opentracing opentelemetry_opentracing_shim ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing PROPERTIES SOVERSION ${SOVERSION})
+  target_include_directories(dd_opentracing PUBLIC include)
   target_compile_definitions(dd_opentracing PUBLIC DD_OPENTRACING_SHARED)
   install(TARGETS dd_opentracing
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -85,8 +84,9 @@ endif()
 if(BUILD_STATIC)
   add_library(dd_opentracing-static STATIC ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-static)
-  target_link_libraries(dd_opentracing-static ${DATADOG_LINK_LIBRARIES})
+  target_link_libraries(dd_opentracing-static opentelemetry_opentracing_shim_static ${DATADOG_LINK_LIBRARIES})
   set_target_properties(dd_opentracing-static PROPERTIES OUTPUT_NAME dd_opentracing POSITION_INDEPENDENT_CODE ON)
+  target_include_directories(dd_opentracing-static PUBLIC include)
   target_compile_definitions(dd_opentracing-static PUBLIC DD_OPENTRACING_STATIC)
   install(TARGETS dd_opentracing-static
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -97,7 +97,8 @@ endif()
 if(BUILD_OBJECT)
   add_library(dd_opentracing-object OBJECT ${DD_OPENTRACING_SOURCES})
   add_sanitizers(dd_opentracing-object)
-  target_link_libraries(dd_opentracing-object ${CURL_LIBRARIES} Threads::Threads)
+  target_link_libraries(dd_opentracing-object opentelemetry_opentracing_shim ${DATADOG_LINK_LIBRARIES} ${CURL_LIBRARIES} Threads::Threads)
+  target_include_directories(dd_opentracing-object PUBLIC include)
   set_property(TARGET dd_opentracing-object PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_compile_definitions(dd_opentracing-object PUBLIC DD_OPENTRACING_OBJECT)
 endif()
@@ -114,10 +115,11 @@ if(BUILD_PLUGIN)
   if(BUILD_COVERAGE)
     target_link_options(dd_opentracing_plugin PRIVATE -fprofile-arcs -ftest-coverage)
   endif()
-  target_link_libraries(dd_opentracing_plugin PUBLIC ${DATADOG_LINK_LIBRARIES}
+  target_link_libraries(dd_opentracing_plugin PUBLIC opentelemetry_opentracing_shim ${DATADOG_LINK_LIBRARIES}
                         -static-libstdc++
                         -static-libgcc
                         -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/export.map)
+  target_include_directories(dd_opentracing_plugin PUBLIC include)
   install(TARGETS dd_opentracing_plugin
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
