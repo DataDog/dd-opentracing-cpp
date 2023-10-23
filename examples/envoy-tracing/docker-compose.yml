@@ -4,9 +4,11 @@ services:
     environment:
       - DD_API_KEY
       - DD_APM_ENABLED=true
+      - DOCKER_HOST
     image: 'datadog/agent'
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - /run/user:/run/user:ro'
       - '/proc/:/host/proc/:ro'
       - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
 
@@ -27,6 +29,21 @@ services:
       - /etc/envoy/envoy.yaml
     volumes:
       - './envoy-19511b1.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.21:
+    image: envoyproxy/envoy:v1.21.1
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      # - -l
+      # - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.21.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.19:
     image: envoyproxy/envoy:v1.19.1
