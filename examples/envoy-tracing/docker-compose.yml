@@ -15,17 +15,35 @@ services:
       context: ./services/service1
       dockerfile: ./Dockerfile
 
+  envoy-local:
+    image: ubuntu:22.04
+    depends_on:
+      - dd-agent
+      - service1
+      - client
+    entrypoint: []
+    command:
+      - envoy
+      # - -l
+      # - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-local.yaml:/etc/envoy/envoy.yaml:ro'
+      - '../../../envoy/bazel-bin/source/exe/envoy-static:/usr/local/bin/envoy:ro'
+
   envoy-19511b1:
     image: envoyproxy/envoy-dev:19511b1428cf0f601e3e9d8d237c1df2de74f6eb
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
     command:
       - envoy
-      - -l
+      # - -l
       # - debug
-      # - -c
+      - -c
       - /etc/envoy/envoy.yaml
     volumes:
       - './envoy-19511b1.yaml:/etc/envoy/envoy.yaml:ro'
@@ -33,6 +51,7 @@ services:
   envoy-v1.27:
     image: envoyproxy/envoy:v1.27.2
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -48,6 +67,7 @@ services:
   envoy-v1.26:
     image: envoyproxy/envoy:v1.26.6
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -63,6 +83,7 @@ services:
   envoy-v1.21:
     image: envoyproxy/envoy:v1.21.1
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -78,6 +99,7 @@ services:
   envoy-v1.19:
     image: envoyproxy/envoy:v1.19.1
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -93,6 +115,7 @@ services:
   envoy-v1.18:
     image: envoyproxy/envoy:v1.18.4
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -108,6 +131,7 @@ services:
   envoy-v1.17:
     image: envoyproxy/envoy:v1.17.4
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -123,6 +147,7 @@ services:
   envoy-v1.16:
     image: envoyproxy/envoy:v1.16.5
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -138,6 +163,7 @@ services:
   envoy-v1.15:
     image: envoyproxy/envoy:v1.15.3
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -153,6 +179,7 @@ services:
   envoy-v1.14:
     image: envoyproxy/envoy:v1.14.1
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -168,6 +195,7 @@ services:
   envoy-v1.13:
     image: envoyproxy/envoy:v1.13.1
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -183,6 +211,7 @@ services:
   envoy-v1.12:
     image: envoyproxy/envoy:v1.12.3
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
@@ -198,6 +227,7 @@ services:
   envoy-v1.11:
     image: envoyproxy/envoy:v1.11.2
     depends_on:
+      - client
       - dd-agent
       - service1
     entrypoint: []
