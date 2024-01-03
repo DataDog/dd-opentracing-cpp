@@ -1,19 +1,19 @@
 version: "3.2"
 services:
+  client:
+    build:
+      context: ./services/client
+      dockerfile: ./Dockerfile
+
   dd-agent:
-    environment:
-      - DD_API_KEY
-      - DD_APM_ENABLED=true
-      - DOCKER_HOST
-    image: 'datadog/agent'
-    volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
-      - /run/user:/run/user:ro'
-      - '/proc/:/host/proc/:ro'
-      - '/sys/fs/cgroup/:/host/sys/fs/cgroup:ro'
+    build:
+      context: ./services/agent
+      dockerfile: ./Dockerfile
 
   service1:
-    image: 'nginx'
+    build:
+      context: ./services/service1
+      dockerfile: ./Dockerfile
 
   envoy-19511b1:
     image: envoyproxy/envoy-dev:19511b1428cf0f601e3e9d8d237c1df2de74f6eb
@@ -24,11 +24,41 @@ services:
     command:
       - envoy
       - -l
-      - debug
-      - -c
+      # - debug
+      # - -c
       - /etc/envoy/envoy.yaml
     volumes:
       - './envoy-19511b1.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.27:
+    image: envoyproxy/envoy:v1.27.2
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      # - -l
+      # - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.27.yaml:/etc/envoy/envoy.yaml:ro'
+
+  envoy-v1.26:
+    image: envoyproxy/envoy:v1.26.6
+    depends_on:
+      - dd-agent
+      - service1
+    entrypoint: []
+    command:
+      - envoy
+      # - -l
+      # - debug
+      - -c
+      - /etc/envoy/envoy.yaml
+    volumes:
+      - './envoy-v1.26.yaml:/etc/envoy/envoy.yaml:ro'
 
   envoy-v1.21:
     image: envoyproxy/envoy:v1.21.1
@@ -53,8 +83,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -68,8 +98,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -83,8 +113,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -98,8 +128,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -113,8 +143,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -128,8 +158,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -143,8 +173,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -158,8 +188,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
@@ -173,8 +203,8 @@ services:
     entrypoint: []
     command:
       - envoy
-      - -l
-      - debug
+      # - -l
+      # - debug
       - -c
       - /etc/envoy/envoy.yaml
     volumes:
