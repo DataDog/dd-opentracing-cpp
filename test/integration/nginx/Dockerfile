@@ -1,7 +1,7 @@
 # Creates an image with nginx and the Datadog OpenTracing nginx module installed.
 # Runs a simple integration test.
 ARG NGINX_VERSION=1.18.0
-ARG OPENTRACING_NGINX_VERSION=0.16.0
+ARG OPENTRACING_NGINX_VERSION=0.34.0
 
 # The nginx testbed. Build this image first since we don't want it rebuilt if just the code changes.
 FROM ubuntu:20.04 as nginx-testbed
@@ -17,7 +17,7 @@ RUN wget https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalo
 RUN printf '#!/bin/bash\nset -x\njava -jar '"$(pwd)/wiremock-standalone-2.18.0.jar \"\$@\"\n" > /usr/local/bin/wiremock && \
   chmod a+x /usr/local/bin/wiremock
 
-ARG NGINX_VERSION=0.34.0
+ARG NGINX_VERSION
 
 # Install nginx
 RUN CODENAME=$(lsb_release -s -c) && \
@@ -30,7 +30,7 @@ RUN CODENAME=$(lsb_release -s -c) && \
 
 # Install nginx-opentracing
 ARG OPENTRACING_NGINX_VERSION
-RUN wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${NGINX_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz && \
+RUN wget https://github.com/opentracing-contrib/nginx-opentracing/releases/download/v${OPENTRACING_NGINX_VERSION}/linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz && \
   NGINX_MODULES=$(nginx -V 2>&1 | grep "configure arguments" | sed -n 's/.*--modules-path=\([^ ]*\).*/\1/p') && \
   tar zxvf linux-amd64-nginx-${NGINX_VERSION}-ngx_http_module.so.tgz -C "${NGINX_MODULES}"
 
