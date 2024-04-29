@@ -2,6 +2,9 @@
 
 [![CircleCI](https://circleci.com/gh/DataDog/dd-opentracing-cpp/tree/master.svg?style=svg)](https://app.circleci.com/pipelines/github/DataDog/dd-opentracing-cpp?branch=master)
 
+> [!WARNING]
+> Datadog OpenTracing for C++ is deprecated. Please use [dd-trace-cpp](https://github.com/DataDog/dd-trace-cpp/tree/main).
+
 ## Usage
 
 Usage docs are on the main Datadog website:
