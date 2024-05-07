@@ -203,7 +203,7 @@ run_nginx
 curl -s localhost/get_error/ 1> /tmp/curl_log.txt
 
 GOT=$(get_n_traces 1)
-ERROR=$(echo "$GOT" | jq '.[] | .[] | .error')
+ERROR=$(echo "$GOT" | jq '.[] | map(select(.resource != "dummySpan")) | .[] | .error')
 
 if ! [ "$ERROR" = "1" ]
 then

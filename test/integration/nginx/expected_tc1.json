@@ -67,5 +67,22 @@
       "service": "nginx",
       "type": "web"
     }
+  ],
+  [
+    {
+      "error": 0,
+      "meta": {
+        "_dd.p.dm": "-4",
+        "operation": "dummySpan",
+        "sampling.priority": "0"
+      },
+      "metrics": {
+        "_sampling_priority_v1": -1
+      },
+      "name": "nginx.handle",
+      "resource": "dummySpan",
+      "service": "nginx",
+      "type": "web"
+    }
   ]
 ]
