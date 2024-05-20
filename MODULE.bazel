@@ -1,0 +1,15 @@
+module(
+    name = "dd-dd-opentracing-cpp",
+    repo_name = "com_github_datadog_dd_opentracing_cpp",
+)
+
+bazel_dep(
+    name = "msgpack-c",
+    version = "6.1.0",
+    repo_name = "com_github_msgpack_msgpack_c",
+)
+bazel_dep(
+    name = "opentracing-cpp",
+    version = "1.6.0",
+    repo_name = "io_opentracing_cpp",
+)
