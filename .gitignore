@@ -39,6 +39,7 @@ deps/
 
 # Bazel
 bazel-*
+MODULE.bazel.lock
 
 # IDE settings
 .vscode/
