@@ -1,6 +1,8 @@
 #include "../src/span_buffer.h"
 
-#include <catch2/catch.hpp>
+#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
+#include <catch2/catch_all.hpp>
 
 #include "../src/sample.h"
 #include "mocks.h"
