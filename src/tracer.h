@@ -45,6 +45,9 @@ class Tracer : public ot::Tracer, public std::enable_shared_from_this<Tracer> {
 
   Tracer() = delete;
 
+  // Destructs tracer and flushes internal buffers
+  virtual ~Tracer();
+
   // Starts a new span.
   std::unique_ptr<ot::Span> StartSpanWithOptions(ot::string_view operation_name,
                                                  const ot::StartSpanOptions &options) const

@@ -241,6 +241,13 @@ Tracer::Tracer(TracerOptions options, std::shared_ptr<Writer> writer,
                         options.service, traceTagsPropagationMaxLength(options, *logger_)});
 }
 
+Tracer::~Tracer() {
+  try {
+    Close();
+  } catch (...) {
+  }
+}
+
 std::unique_ptr<ot::Span> Tracer::StartSpanWithOptions(ot::string_view operation_name,
                                                        const ot::StartSpanOptions &options) const
     noexcept try {
